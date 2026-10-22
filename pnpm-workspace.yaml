@@ -1,0 +1,4 @@
+# Dependency install scripts are blocked (docs/adr/0002). strictDepBuilds makes an
+# unreviewed one fail the install; acknowledge a harmless one with `<pkg>: false` under allowBuilds.
+strictDepBuilds: true
+allowBuilds: {}
