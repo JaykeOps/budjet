@@ -1,0 +1,3 @@
+# No git hooks or package install scripts
+
+The repo installs no git hooks (no Husky, no git-hooks.nix, no `prepare`/`postinstall` scripts) and dependency lifecycle scripts are blocked at install. Every script that runs automatically on clone or install is code execution from a dependency or the repo before anyone has looked at it, and we don't need the convenience: all checks (commit messages, lint, typecheck, tests) are Dagger functions that run identically on a laptop, in an agent sandbox, and in CI. The trade-off is that nothing stops a bad commit locally; contributors and agents run the Dagger checks before pushing, and CI rejects what slips through.
