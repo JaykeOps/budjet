@@ -20,6 +20,8 @@ nix develop -c dagger call end-to-end
 
 `dagger functions` lists the rest. New CI logic goes in the Dagger module so it runs locally first; the workflow YAML stays a thin `dagger call`. The one exception is the GitHub Pages deploy in `release.yml`, which uses GitHub's own actions for short-lived credentials.
 
+A Dagger run failing with `no space left on device` means the engine's cache filled the Docker disk, not that the code is broken: run `nix develop -c dagger core engine local-cache prune`, then rerun the call. One cold run of every function takes about 7 GB.
+
 Hooks and install scripts stay off (ADR 0002): commit with plain `git commit`, and when a dependency fails `pnpm install` because it wants a build script, stop and ask the human whether to acknowledge it as `<pkg>: false` under `allowBuilds` in `pnpm-workspace.yaml`.
 
 ## Commits, branches and PRs
