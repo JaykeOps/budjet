@@ -28,6 +28,7 @@ const NIX_CONFIG = [
 // cz exit codes: https://commitizen-tools.github.io/commitizen/exit_codes/
 const CZ_NO_COMMITS_FOUND = 3;
 const CZ_NO_COMMITS_TO_BUMP = 21;
+const GIT_NO_TAG_FOUND = 128;
 
 @object()
 export class Budjet {
@@ -43,6 +44,7 @@ export class Budjet {
         "playwright-report",
         ".direnv",
         ".dagger/sdk",
+        "result",
       ],
     })
     source: Directory,
@@ -76,59 +78,51 @@ export class Budjet {
     base = "origin/master",
   ): Promise<string> {
     if (prTitle !== undefined) {
-      return this.nix(this.toolchain(), [
+      return this.inDevShell(this.toolchain(), [
         "cz",
         "check",
         "--message",
         prTitle,
       ]).stdout();
     }
-
-    const checked = this.nix(
-      this.withGit(),
-      ["cz", "check", "--rev-range", `${base}..HEAD`],
-      {
-        expect: ReturnType.Any,
-      },
+    return stdoutOr(
+      this.inDevShell(
+        this.withHistory(),
+        ["cz", "check", "--rev-range", `${base}..HEAD`],
+        ReturnType.Any,
+      ),
+      { [CZ_NO_COMMITS_FOUND]: `No commits since ${base}.` },
     );
-    const exitCode = await checked.exitCode();
-    if (exitCode === CZ_NO_COMMITS_FOUND) return `No commits since ${base}.`;
-    if (exitCode !== 0) throw new Error(await output(checked));
-    return checked.stdout();
   }
 
   /** Lint and format-check with Biome. */
   @func()
   async lint(): Promise<string> {
-    return this.nix(this.workspace(), ["biome", "check", "."]).stdout();
+    return this.inDevShell(this.workspace(), ["pnpm", "lint"]).stdout();
   }
 
   /** Typecheck with tsc. */
   @func()
   async typecheck(): Promise<string> {
-    return this.nix(this.workspace(), ["pnpm", "typecheck"]).stdout();
+    return this.inDevShell(this.workspace(), ["pnpm", "typecheck"]).stdout();
   }
 
   /** Run the Vitest unit tests. */
   @func()
   async test(): Promise<string> {
-    return this.nix(this.workspace(), ["pnpm", "test"]).stdout();
+    return this.inDevShell(this.workspace(), ["pnpm", "test"]).stdout();
   }
 
-  /** Build the app; the version is stamped into it. */
+  /** Build the app, stamping `tag` into it when given. */
   @func()
-  build(version = "0.0.0-dev"): Directory {
-    return this.nix(
-      this.workspace().withEnvVariable("BUDJET_VERSION", version),
-      ["pnpm", "build"],
-    ).directory("/src/dist");
+  build(tag?: string): Directory {
+    return this.built(tag).directory("/src/dist");
   }
 
   /** Run the Playwright end-to-end tests against a production build. */
   @func()
   async endToEnd(): Promise<string> {
-    const built = this.nix(this.workspace(), ["pnpm", "build"]);
-    return this.nix(built.withEnvVariable("CI", "true"), [
+    return this.inDevShell(this.built().withEnvVariable("CI", "true"), [
       "pnpm",
       "e2e",
     ]).stdout();
@@ -140,41 +134,42 @@ export class Budjet {
    */
   @func()
   async nextVersion(): Promise<string> {
-    const next = this.nix(
-      this.withGit(),
-      ["cz", "bump", "--get-next", "--yes"],
-      {
-        expect: ReturnType.Any,
-      },
+    const next = await stdoutOr(
+      this.inDevShell(
+        this.withHistory(),
+        ["cz", "bump", "--get-next", "--yes"],
+        ReturnType.Any,
+      ),
+      { [CZ_NO_COMMITS_FOUND]: "", [CZ_NO_COMMITS_TO_BUMP]: "" },
     );
-    const exitCode = await next.exitCode();
-    if (exitCode === CZ_NO_COMMITS_TO_BUMP) return "";
-    if (exitCode !== 0) throw new Error(await output(next));
-    return (await next.stdout()).trim();
+    return next.trim();
   }
 
   /**
    * Cut a Release if the commits call for one: create the GitHub Release (and
    * with it the tag) at `sha`, with release notes and the built app attached.
-   * Returns the released version, or "" when there was nothing to release.
+   * Returns that same build to deploy, or an empty directory when there was
+   * nothing to release.
    */
   @func()
-  async release(token: Secret, repo: string, sha: string): Promise<string> {
+  async release(token: Secret, repo: string, sha: string): Promise<Directory> {
     const version = await this.nextVersion();
-    if (version === "") return "";
+    if (version === "") return dag.directory();
     const tag = `v${version}`;
+    const dist = this.build(tag);
 
     // With no CHANGELOG.md in the repo (docs/adr/0003), bound the notes by the
     // previous tag or cz repeats the whole history in every release.
-    const previousTag = this.withGit().withExec(
-      ["git", "describe", "--tags", "--abbrev=0", "--match", "v*"],
-      { expect: ReturnType.Any },
+    const previousTag = await stdoutOr(
+      this.inDevShell(
+        this.withHistory(),
+        ["git", "describe", "--tags", "--abbrev=0", "--match", "v*"],
+        ReturnType.Any,
+      ),
+      { [GIT_NO_TAG_FOUND]: "" },
     );
-    const since =
-      (await previousTag.exitCode()) === 0
-        ? ["--start-rev", (await previousTag.stdout()).trim()]
-        : [];
-    const notes = this.nix(this.withGit(), [
+    const since = previousTag ? ["--start-rev", previousTag.trim()] : [];
+    const notes = this.inDevShell(this.withHistory(), [
       "cz",
       "changelog",
       "--dry-run",
@@ -183,9 +178,9 @@ export class Budjet {
       ...since,
     ]);
 
-    await this.nix(
+    await this.inDevShell(
       this.toolchain()
-        .withDirectory("/release/dist", this.build(version))
+        .withDirectory("/release/dist", dist)
         .withNewFile("/release/notes.md", await notes.stdout())
         .withWorkdir("/release")
         .withSecretVariable("GH_TOKEN", token),
@@ -201,7 +196,7 @@ export class Budjet {
       ],
     ).sync();
 
-    return version;
+    return dist;
   }
 
   /** A Nix container with the flake's dev shell realised, keyed only on the flake files. */
@@ -218,7 +213,7 @@ export class Budjet {
   }
 
   /** The toolchain plus the source with its git history, for cz. */
-  private withGit(): Container {
+  private withHistory(): Container {
     return this.toolchain()
       .withEnvVariable("GIT_CONFIG_COUNT", "1")
       .withEnvVariable("GIT_CONFIG_KEY_0", "safe.directory")
@@ -228,7 +223,7 @@ export class Budjet {
 
   /** The toolchain plus installed dependencies and the source, without git history. */
   private workspace(): Container {
-    const installed = this.nix(
+    const installed = this.inDevShell(
       this.toolchain()
         .withMountedCache("/pnpm-store", dag.cacheVolume("budjet-pnpm-store"))
         .withDirectory("/src", this.source, {
@@ -239,18 +234,33 @@ export class Budjet {
     return installed.withDirectory("/src", this.source, { exclude: [".git"] });
   }
 
-  private nix(
+  /** The workspace after a production build; the app's default version applies without `tag`. */
+  private built(tag?: string): Container {
+    const workspace = tag
+      ? this.workspace().withEnvVariable("BUDJET_VERSION", tag)
+      : this.workspace();
+    return this.inDevShell(workspace, ["pnpm", "build"]);
+  }
+
+  private inDevShell(
     container: Container,
     cmd: string[],
-    opts?: { expect?: ReturnType },
+    expect = ReturnType.Success,
   ): Container {
     return container.withExec(
       ["nix", "develop", "path:/toolchain", "-c", ...cmd],
-      opts,
+      { expect },
     );
   }
 }
 
-async function output(container: Container): Promise<string> {
-  return `${await container.stdout()}${await container.stderr()}`;
+/** Stdout of an exec run with `ReturnType.Any`, or the fallback for an expected exit code. */
+async function stdoutOr(
+  container: Container,
+  fallbacks: Record<number, string>,
+): Promise<string> {
+  const exitCode = await container.exitCode();
+  if (exitCode === 0) return container.stdout();
+  if (exitCode in fallbacks) return fallbacks[exitCode];
+  throw new Error(`${await container.stdout()}${await container.stderr()}`);
 }

@@ -28,8 +28,12 @@
             dagger.packages.${system}.dagger
           ];
 
-          # @playwright/test in package.json must stay pinned to this version.
-          PLAYWRIGHT_BROWSERS_PATH = pkgs.playwright-driver.browsers;
+          # @playwright/test must match; playwright.config.ts fails fast when it doesn't.
+          # Chromium only: the e2e suite runs nothing else, and all three browsers are ~2 GiB.
+          PLAYWRIGHT_BROWSERS_PATH = pkgs.playwright-driver.browsers.override {
+            withFirefox = false;
+            withWebkit = false;
+          };
           PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
           PLAYWRIGHT_NIX_VERSION = pkgs.playwright-driver.version;
           # Without fonts, headless Chromium lays text out at zero size and nothing is "visible".

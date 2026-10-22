@@ -18,24 +18,20 @@ jobs:
     permissions:
       contents: write
     outputs:
-      version: ${{ steps.release.outputs.version }}
+      released: ${{ steps.release.outputs.released }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
-      # Prints the released version, or nothing when no commit warrants a bump.
+      # Exports the released build, or an empty directory when no commit warrants a release.
       - id: release
         run: |
-          version=$(nix develop -c dagger call release --token env:GITHUB_TOKEN --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          nix develop -c dagger call release --token env:GITHUB_TOKEN --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA" export --path dist
+          if [ -f dist/index.html ]; then echo "released=true" >> "$GITHUB_OUTPUT"; fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: steps.release.outputs.version != ''
-        run: nix develop -c dagger call build --version "$VERSION" export --path dist
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-      - if: steps.release.outputs.version != ''
+      - if: steps.release.outputs.released == 'true'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist
@@ -44,7 +40,7 @@ jobs:
   # short-lived OIDC credentials, so no long-lived token is stored anywhere.
   deploy-pages:
     needs: release
-    if: needs.release.outputs.version != ''
+    if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
     permissions:
       pages: write

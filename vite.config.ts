@@ -5,7 +5,7 @@ import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   define: {
-    __APP_VERSION__: JSON.stringify(process.env.BUDJET_VERSION ?? "0.0.0-dev"),
+    __APP_VERSION__: JSON.stringify(process.env.BUDJET_VERSION ?? "v0.0.0-dev"),
   },
   plugins: [
     react(),
@@ -33,7 +33,6 @@ export default defineConfig({
     }),
   ],
   test: {
-    environment: "jsdom",
     passWithNoTests: true,
     include: ["src/**/*.test.{ts,tsx}"],
   },

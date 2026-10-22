@@ -26,8 +26,6 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
 
   e2e:
-    # A title edit can't change the build; a skipped required check counts as passing.
-    if: github.event.action != 'edited'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
