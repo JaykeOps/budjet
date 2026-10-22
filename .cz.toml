@@ -1,0 +1,6 @@
+# The git tag is the version (docs/adr/0003): nothing is written back to the repo.
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "scm"
+tag_format = "v$version"
+major_version_zero = true
