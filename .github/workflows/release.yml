@@ -1,0 +1,57 @@
+# Thin wrapper: the release logic lives in the Dagger module (.dagger/), see docs/adr/0003.
+name: release
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      # Prints the released version, or nothing when no commit warrants a bump.
+      - id: release
+        run: |
+          version=$(nix develop -c dagger call release --token env:GITHUB_TOKEN --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: steps.release.outputs.version != ''
+        run: nix develop -c dagger call build --version "$VERSION" export --path dist
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+      - if: steps.release.outputs.version != ''
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist
+
+  # The one piece of CI logic outside Dagger: GitHub's Pages actions deploy with
+  # short-lived OIDC credentials, so no long-lived token is stored anywhere.
+  deploy-pages:
+    needs: release
+    if: needs.release.outputs.version != ''
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
