@@ -4,8 +4,8 @@ import { App } from "./App";
 import {
   createChangeLogWriter,
   createInMemoryChangeLog,
+  thisDeviceId,
 } from "./kernel/change-log";
-import { thisDeviceId } from "./slices/budget-setup";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing from index.html");

@@ -8,11 +8,3 @@ export { type Budget, budget };
 export function useBudget(): Budget | undefined {
   return useChangeLogQuery(budget);
 }
-
-let deviceId: string | undefined;
-
-/** This device's id, stamped on every record it writes. Lives only as long as the page for now. */
-export function thisDeviceId(): string {
-  deviceId ??= crypto.randomUUID();
-  return deviceId;
-}
