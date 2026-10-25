@@ -1,6 +1,7 @@
 import type { ChangeRecord } from "../../kernel/change-log";
 import { addMoney, type Money, money } from "../../kernel/money";
 import { isBudgetCreated } from "../budget-setup/records";
+import { isTransactionRecorded } from "../transactions/records";
 import { type AccountKind, isAccountOpened } from "./records";
 
 export type Account = {
@@ -11,21 +12,34 @@ export type Account = {
   balance: Money;
 };
 
-/** Every Account, in the order they were opened, with its balance. */
+/**
+ * Every Account, in the order they were opened, with its balance: its Opening
+ * Balance plus money coming in less money going out. Transfers and
+ * Adjustments join it as those slices arrive.
+ */
 export function accounts(records: readonly ChangeRecord[]): Account[] {
-  return records.filter(isAccountOpened).map((opened) => ({
-    id: opened.subjectId,
-    name: opened.payload.name,
-    kind: opened.payload.kind,
-    closed: false,
-    balance: opened.payload.openingBalance,
-  }));
+  const byId = new Map<string, Account>();
+  for (const record of records) {
+    if (isAccountOpened(record)) {
+      byId.set(record.subjectId, {
+        id: record.subjectId,
+        name: record.payload.name,
+        kind: record.payload.kind,
+        closed: false,
+        balance: record.payload.openingBalance,
+      });
+    }
+  }
+  for (const record of records) {
+    if (!isTransactionRecorded(record)) continue;
+    const account = byId.get(record.payload.accountId);
+    if (account)
+      account.balance = addMoney(account.balance, record.payload.amount);
+  }
+  return [...byId.values()];
 }
 
-/**
- * An Account's balance. For now that is its Opening Balance; Transactions,
- * Transfers and Adjustments join it as those slices arrive.
- */
+/** An Account's balance. */
 export function accountBalance(
   records: readonly ChangeRecord[],
   accountId: string,
