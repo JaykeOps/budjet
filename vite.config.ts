@@ -2,6 +2,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { configDefaults } from "vitest/config";
 
 export default defineConfig({
   define: {
@@ -34,6 +35,24 @@ export default defineConfig({
   ],
   test: {
     passWithNoTests: true,
-    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
+    // Performance tests time wall-clock runs, so they run alone, never beside
+    // the other checks that would compete for the same CPU.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
+          exclude: [...configDefaults.exclude, "**/*.performance.test.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "performance",
+          include: ["src/**/*.performance.test.ts"],
+        },
+      },
+    ],
   },
 });
