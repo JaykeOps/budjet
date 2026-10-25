@@ -17,7 +17,10 @@ export function budget(records: readonly ChangeRecord[]): Budget | undefined {
     created && {
       id: created.subjectId,
       currency: created.payload.currency,
-      firstMonth: currentMonth(new Date(created.timestamp.wallTime)),
+      firstMonth:
+        created.payload.version === 2
+          ? created.payload.firstMonth
+          : currentMonth(new Date(created.timestamp.wallTime)),
     }
   );
 }

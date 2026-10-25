@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createChangeLogWriter,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { createBudget } from "./commands";
 import { budget } from "./index";
+import type { BudgetCreated } from "./records";
 
 function setUp(now?: () => number) {
   const changeLog = createInMemoryChangeLog();
@@ -43,11 +44,31 @@ describe("Budget Setup", () => {
     expect(budget(changeLog.readAll())).toMatchObject({ currency: "EUR" });
   });
 
-  it("starts at the Month it was created in", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("starts at the Month it was created in, on the creating device's calendar", () => {
+    vi.useFakeTimers({ now: new Date(2026, 9, 31, 23, 59) });
+    const { changeLog, writer } = setUp(() =>
+      new Date(2026, 10, 1, 0, 30).getTime(),
+    );
+    createBudget(writer, { currency: "USD" });
+
+    expect(budget(changeLog.readAll())).toMatchObject({
+      firstMonth: "2026-10",
+    });
+  });
+
+  it("starts a Budget recorded without its first Month at the Month of the record's time", () => {
     const { changeLog, writer } = setUp(() =>
       new Date(2026, 9, 31, 23, 59).getTime(),
     );
-    createBudget(writer, { currency: "USD" });
+    writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+      "budget",
+      "BudgetCreated",
+      { version: 1, currency: "USD" },
+    );
 
     expect(budget(changeLog.readAll())).toMatchObject({
       firstMonth: "2026-10",
