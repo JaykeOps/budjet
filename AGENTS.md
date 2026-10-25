@@ -45,3 +45,17 @@ Hooks and install scripts stay off (ADR 0002): commit with plain `git commit`, a
 ## Releases
 
 Merging to `master` releases automatically: `cz` derives the next version from the commits since the last tag (ADR 0003). The git tag is the version; leave `version` in `package.json` at `0.0.0`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues (JaykeOps/budjet) via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical labels: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
