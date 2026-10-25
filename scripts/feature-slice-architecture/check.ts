@@ -15,16 +15,16 @@ const IMPORT_SPECIFIER = /(?:\bfrom|\bimport\s*\(?)\s*["']([^"']+)["']/g;
 type Import = { file: string; specifier: string; target: string };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const violations = checkSliceBoundaries(process.argv[2] ?? "src");
+  const violations = findFeatureSliceViolations(process.argv[2] ?? "src");
   if (violations.length > 0) {
     console.error(violations.join("\n"));
     process.exitCode = 1;
   } else {
-    console.log("Slice boundaries hold.");
+    console.log("Feature slices hold to ADR 0005.");
   }
 }
 
-export function checkSliceBoundaries(srcDir: string): string[] {
+export function findFeatureSliceViolations(srcDir: string): string[] {
   const violations: string[] = [];
   const queryDependencies = new Map<string, Set<string>>();
   for (const { file, specifier, target } of relativeImports(srcDir)) {
