@@ -38,6 +38,7 @@ import {
   editTransfer,
   makeTransfer,
 } from "./slices/transfers/commands";
+import { useUrlParameter } from "./url-parameter";
 
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
@@ -106,7 +107,7 @@ function Shell() {
         }
         onClose={(accountId) => closeAccount(writer, accountId)}
       />
-      <TransactionsScreen
+      <AccountTransactions
         currency={budget.currency}
         onRecord={(input) => recordTransaction(writer, input)}
         onEdit={(id, input) => editTransaction(writer, id, input)}
@@ -119,6 +120,23 @@ function Shell() {
         onDelete={(id) => deleteTransfer(writer, id)}
       />
     </>
+  );
+}
+
+/** The Transactions screen for the Account in the address bar (`?account=<id>`). */
+function AccountTransactions(
+  props: Omit<
+    ComponentProps<typeof TransactionsScreen>,
+    "selectedAccountId" | "onSelectAccount"
+  >,
+) {
+  const [accountId, setAccountId] = useUrlParameter("account");
+  return (
+    <TransactionsScreen
+      selectedAccountId={accountId ?? undefined}
+      onSelectAccount={(id) => setAccountId(id, "push")}
+      {...props}
+    />
   );
 }
 

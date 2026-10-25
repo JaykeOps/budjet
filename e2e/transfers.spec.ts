@@ -42,6 +42,10 @@ test("a user moves money between Accounts and sees both balances change", async 
     await expect(balanceOf(page, "Checking")).toContainText("$800.00");
     await expect(balanceOf(page, "Savings")).toContainText("$700.00");
     await expect(readyToAssign).toHaveText(/\$1,500\.00/);
+    await page
+      .getByRole("region", { name: "Transactions", exact: true })
+      .getByRole("combobox", { name: /^Account/ })
+      .selectOption({ label: "Checking" });
     const checking = page.getByRole("table", {
       name: "Transactions in Checking",
     });
