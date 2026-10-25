@@ -153,6 +153,11 @@ test("Payees used before are suggested", async ({ page }) => {
   await record.getByLabel("Amount").fill("2000");
   await record.getByLabel("Payee").fill("Employer");
   await record.getByRole("button", { name: "Record Transaction" }).click();
+  await expect(
+    page
+      .getByRole("table", { name: "Transactions in Checking" })
+      .getByRole("row", { name: /Employer/ }),
+  ).toBeVisible();
 
   await reloadWhenSaved(page);
 
