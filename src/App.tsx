@@ -11,6 +11,8 @@ import {
 import { openAccount } from "./slices/accounts/commands";
 import { BudgetSetupForm, useBudget } from "./slices/budget-setup";
 import { createBudget } from "./slices/budget-setup/commands";
+import { CategoryList } from "./slices/categories";
+import { addStarterSet } from "./slices/categories/commands";
 
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
@@ -36,7 +38,10 @@ function Shell() {
   if (!budget) {
     return (
       <BudgetSetupForm
-        onCreate={({ currency }) => createBudget(writer, { currency })}
+        onCreate={({ currency }) => {
+          createBudget(writer, { currency });
+          addStarterSet(writer);
+        }}
       />
     );
   }
@@ -54,6 +59,7 @@ function Shell() {
       <section aria-labelledby="budget-heading">
         <h2 id="budget-heading">Budget</h2>
         <p>Kept in {budget.currency}.</p>
+        <CategoryList />
       </section>
       <AccountsScreen
         currency={budget.currency}
