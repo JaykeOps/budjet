@@ -4,9 +4,21 @@ import type { ChangeRecord } from "../../kernel/change-log";
 import type { Money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
-import { available, readyToAssign, spending } from "./queries";
+import {
+  available,
+  type OverspentCategory,
+  overspent,
+  readyToAssign,
+  spending,
+} from "./queries";
 
-export { available, readyToAssign, spending };
+export {
+  available,
+  type OverspentCategory,
+  overspent,
+  readyToAssign,
+  spending,
+};
 
 export function useReadyToAssign(): Money | undefined {
   return useChangeLogQuery(readyToAssign);
@@ -26,6 +38,15 @@ export function useAvailable(categoryId: string, of: Month): Money | undefined {
     useCallback(
       (records: readonly ChangeRecord[]) => available(records, categoryId, of),
       [categoryId, of],
+    ),
+  );
+}
+
+export function useOverspent(of: Month): OverspentCategory[] | undefined {
+  return useChangeLogQuery(
+    useCallback(
+      (records: readonly ChangeRecord[]) => overspent(records, of),
+      [of],
     ),
   );
 }
