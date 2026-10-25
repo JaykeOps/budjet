@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { reloadWhenSaved } from "./reload";
 
 /** A Budget in USD with Checking holding $1,000 and Savings holding $500. */
 async function createBudget(page: Page) {
@@ -60,7 +61,7 @@ test("a user moves money between Accounts and sees both balances change", async 
   };
   await expectMoved();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectMoved();
 });
@@ -81,14 +82,14 @@ test("a user edits and deletes a Transfer", async ({ page }) => {
   await expect(edit).toHaveCount(0);
   await expect(balanceOf(page, "Checking")).toContainText("$950.00");
   await expect(balanceOf(page, "Savings")).toContainText("$550.00");
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(balanceOf(page, "Checking")).toContainText("$950.00");
 
   await transfers.getByRole("button", { name: "Delete" }).click();
 
   await expect(transfers.getByRole("row")).toHaveCount(1);
   await expect(balanceOf(page, "Checking")).toContainText("$1,000.00");
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(balanceOf(page, "Savings")).toContainText("$500.00");
 });
 

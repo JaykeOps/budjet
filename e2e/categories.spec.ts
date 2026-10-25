@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { reloadWhenSaved } from "./reload";
 
 /** Each Category Group's name followed by its Categories' names, in order. */
 async function outline(page: Page) {
@@ -60,7 +61,7 @@ test("a user organises Categories into Category Groups and the order is kept", a
   ];
   await expect.poll(() => outline(page)).toEqual(organised);
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expect.poll(() => outline(page)).toEqual(organised);
 });
@@ -131,7 +132,7 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
   };
   await expectRentHidden();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectRentHidden();
 
@@ -152,7 +153,7 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
   };
   await expectRentBack();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectRentBack();
 });

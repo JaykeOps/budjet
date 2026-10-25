@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { reloadWhenSaved } from "./reload";
 
 async function addFirstAccount(page: Page, openingBalance: string) {
   const setup = page.getByRole("form", { name: "Add your first Account" });
@@ -39,7 +40,7 @@ test("a first-time user creates a Budget in their currency and adds their first 
   };
   await expectBudget();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectBudget();
 });
@@ -52,7 +53,7 @@ test("setup resumes at the first Account after a reload", async ({ page }) => {
     page.getByRole("heading", { name: "Add your first Account" }),
   ).toBeVisible();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expect(
     page.getByRole("heading", { name: "Add your first Account" }),
@@ -74,7 +75,7 @@ test("a returning user's Budget opens with the network offline", async ({
   await expect(page.getByText("Kept in EUR")).toBeVisible();
 
   await context.setOffline(true);
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expect(page.getByText("Kept in EUR")).toBeVisible();
   await expect(

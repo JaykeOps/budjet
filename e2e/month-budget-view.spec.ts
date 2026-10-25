@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { reloadWhenSaved } from "./reload";
 
 async function createBudget(page: Page, openingBalance: string) {
   await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
@@ -34,7 +35,7 @@ test("the Month Budget view opens on the current Month with every Category in it
     ]);
   await expectOutline();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectOutline();
 });
@@ -60,7 +61,7 @@ test("Ready to Assign turns into a red warning once more is assigned than there 
   };
   await expectWarning();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectWarning();
 });
@@ -88,7 +89,7 @@ test("a user steps between Months, assigns money in a future Month and stays on 
   await rent.press("Enter");
   await expect(readyToAssign).toHaveText(/\$850\.00/);
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expect(december).toBeVisible();
   await expect(rent).toHaveValue("150.00");
@@ -168,7 +169,7 @@ test("an Overspent Category is red in its Month and the next until an Assignment
   await page.getByRole("button", { name: "Next Month" }).click();
   await expectOverspent("November 2026");
 
-  await page.reload();
+  await reloadWhenSaved(page);
   await expectOverspent("November 2026");
 
   await assign(page, "Groceries", "50");
@@ -181,7 +182,7 @@ test("an Overspent Category is red in its Month and the next until an Assignment
   };
   await covered();
 
-  await page.reload();
+  await reloadWhenSaved(page);
   await covered();
 });
 
@@ -216,6 +217,6 @@ test("Category Groups show subtotals and collapse and expand", async ({
   await toggle.click();
   await expect(october.getByLabel("Assignment for Groceries")).toBeVisible();
 
-  await page.reload();
+  await reloadWhenSaved(page);
   await expectSubtotals();
 });

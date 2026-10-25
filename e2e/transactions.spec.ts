@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { reloadWhenSaved } from "./reload";
 
 async function createBudget(page: Page) {
   await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
@@ -61,7 +62,7 @@ test("a user records spending and income and sees Available, Ready to Assign and
   };
   await expectRecorded();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectRecorded();
 });
@@ -140,7 +141,7 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
   };
   await expectChanged();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectChanged();
 });
@@ -152,8 +153,13 @@ test("Payees used before are suggested", async ({ page }) => {
   await record.getByLabel("Amount").fill("2000");
   await record.getByLabel("Payee").fill("Employer");
   await record.getByRole("button", { name: "Record Transaction" }).click();
+  await expect(
+    page
+      .getByRole("table", { name: "Transactions in Checking" })
+      .getByRole("row", { name: /Employer/ }),
+  ).toBeVisible();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   const list = await record.getByLabel("Payee").getAttribute("list");
   const suggestions = page.locator(`datalist[id="${list}"] option`);
@@ -166,7 +172,7 @@ test("an Account with thousands of Transactions renders only the rows in view", 
 }) => {
   await createBudget(page);
   await seedTransactions(page, 3000);
-  await page.reload();
+  await reloadWhenSaved(page);
 
   const transactions = page.getByRole("table", {
     name: "Transactions in Checking",

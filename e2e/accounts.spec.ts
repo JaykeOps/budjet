@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { reloadWhenSaved } from "./reload";
 
 async function createBudgetWithFirstAccount(page: Page) {
   await page.goto("/");
@@ -45,7 +46,7 @@ test("a user adds more Accounts and sees each balance and the total", async ({
   };
   await expectAccounts();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectAccounts();
 });
@@ -143,7 +144,7 @@ test("a user re-declares a balance, Transfers an Account to $0, closes it and re
   };
   await expectClosed();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectClosed();
 });
