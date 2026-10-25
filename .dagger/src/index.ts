@@ -38,6 +38,7 @@ export class Budjet {
       defaultPath: "/",
       ignore: [
         "**/node_modules",
+        ".pnpm-store",
         "dist",
         "test-results",
         "playwright-report",
