@@ -6,7 +6,7 @@ import {
 import { money } from "../../kernel/money";
 import { month } from "../../kernel/month";
 import type { BudgetCreated } from "../budget-setup/records";
-import { setAssignment } from "./commands";
+import { copyLastMonth, moveMoney, setAssignment } from "./commands";
 import { assignment } from "./index";
 
 const october = month(2026, 10);
@@ -97,5 +97,142 @@ describe("Assignments", () => {
       }),
     ).toThrow(/in USD, the Budget's currency/);
     expect(assignment(changeLog.readAll(), "rent", october)).toBeUndefined();
+  });
+
+  describe("copy last Month", () => {
+    it("fills each Category that has no Assignment this Month with last Month's amount", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      setAssignment(writer, {
+        categoryId: "rent",
+        month: october,
+        amount: money(120000, "USD"),
+      });
+      setAssignment(writer, {
+        categoryId: "groceries",
+        month: october,
+        amount: money(35050, "USD"),
+      });
+
+      copyLastMonth(writer, { month: november });
+
+      const records = changeLog.readAll();
+      expect(assignment(records, "rent", november)).toEqual(
+        money(120000, "USD"),
+      );
+      expect(assignment(records, "groceries", november)).toEqual(
+        money(35050, "USD"),
+      );
+      expect(assignment(records, "power", november)).toBeUndefined();
+    });
+
+    it("never overwrites an Assignment already set this Month, even one of zero", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      for (const categoryId of ["rent", "power"]) {
+        setAssignment(writer, {
+          categoryId,
+          month: october,
+          amount: money(10000, "USD"),
+        });
+      }
+      setAssignment(writer, {
+        categoryId: "rent",
+        month: november,
+        amount: money(9000, "USD"),
+      });
+      setAssignment(writer, {
+        categoryId: "power",
+        month: november,
+        amount: money(0, "USD"),
+      });
+
+      copyLastMonth(writer, { month: november });
+
+      const records = changeLog.readAll();
+      expect(assignment(records, "rent", november)).toEqual(money(9000, "USD"));
+      expect(assignment(records, "power", november)).toEqual(money(0, "USD"));
+    });
+
+    it("copies only from the Month just before", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      setAssignment(writer, {
+        categoryId: "rent",
+        month: month(2026, 9),
+        amount: money(10000, "USD"),
+      });
+
+      copyLastMonth(writer, { month: november });
+
+      expect(assignment(changeLog.readAll(), "rent", november)).toBeUndefined();
+    });
+  });
+
+  describe("move money", () => {
+    it("lowers one Category's Assignment and raises another's by the same amount in the same Month", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      setAssignment(writer, {
+        categoryId: "dining-out",
+        month: october,
+        amount: money(20000, "USD"),
+      });
+      setAssignment(writer, {
+        categoryId: "groceries",
+        month: october,
+        amount: money(30000, "USD"),
+      });
+
+      moveMoney(writer, {
+        fromCategoryId: "dining-out",
+        toCategoryId: "groceries",
+        month: october,
+        amount: money(5000, "USD"),
+      });
+
+      const records = changeLog.readAll();
+      expect(assignment(records, "dining-out", october)).toEqual(
+        money(15000, "USD"),
+      );
+      expect(assignment(records, "groceries", october)).toEqual(
+        money(35000, "USD"),
+      );
+      expect(assignment(records, "groceries", november)).toBeUndefined();
+    });
+
+    it.each([
+      [
+        "to the same Category",
+        "groceries",
+        money(5000, "USD"),
+        /two different Categories/,
+      ],
+      ["nothing", "dining-out", money(0, "USD"), /more than zero/],
+      [
+        "a negative amount",
+        "dining-out",
+        money(-5000, "USD"),
+        /more than zero/,
+      ],
+      [
+        "another currency",
+        "dining-out",
+        money(5000, "EUR"),
+        /in USD, the Budget's currency/,
+      ],
+    ])(
+      "refuses to move %s and changes no Assignment",
+      (_, toCategoryId, amount, error) => {
+        const { changeLog, writer } = budgetIn("USD");
+        const before = changeLog.readAll();
+
+        expect(() =>
+          moveMoney(writer, {
+            fromCategoryId: "groceries",
+            toCategoryId,
+            month: october,
+            amount,
+          }),
+        ).toThrow(error);
+        expect(changeLog.readAll()).toEqual(before);
+      },
+    );
   });
 });
