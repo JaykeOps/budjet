@@ -7,7 +7,12 @@ import {
   parseMoney,
   typedMoney,
 } from "../../kernel/money";
-import { type Month, monthName } from "../../kernel/month";
+import {
+  type Month,
+  monthName,
+  nextMonth,
+  previousMonth,
+} from "../../kernel/month";
 import { useAssignment } from "../assignments";
 import { useAvailable, useReadyToAssign, useSpending } from "../budget-totals";
 import { type Category, useCategoryGroups } from "../categories";
@@ -15,17 +20,23 @@ import { type Category, useCategoryGroups } from "../categories";
 export type AssignInput = { categoryId: string; month: Month; amount: Money };
 
 /**
- * The Month screen: Ready to Assign, then every Category under its Category
- * Group with its Assignment, spending and Available for the Month. The app shell decides what
- * assigning does; an error it throws is shown on the screen.
+ * The Month screen: controls to step between Months, Ready to Assign, then
+ * every Category under its Category Group with its Assignment, spending and
+ * Available for the Month. The app shell decides where the Month is kept and
+ * what assigning does; an error it throws is shown on the screen. There is no
+ * stepping back past `firstMonth`.
  */
 export function MonthBudget({
   month,
+  firstMonth,
   currency,
+  onMonthChange,
   onAssign,
 }: {
   month: Month;
+  firstMonth: Month;
   currency: Currency;
+  onMonthChange: (month: Month) => void;
   onAssign: (input: AssignInput) => void;
 }) {
   const headingId = useId();
@@ -44,6 +55,18 @@ export function MonthBudget({
   return (
     <section aria-labelledby={headingId}>
       <h2 id={headingId}>{monthName(month)}</h2>
+      <nav aria-label="Months">
+        <button
+          type="button"
+          disabled={month <= firstMonth}
+          onClick={() => onMonthChange(previousMonth(month))}
+        >
+          Previous Month
+        </button>{" "}
+        <button type="button" onClick={() => onMonthChange(nextMonth(month))}>
+          Next Month
+        </button>
+      </nav>
       <ReadyToAssign />
       {error && <p role="alert">{error}</p>}
       <table aria-labelledby={headingId}>
@@ -64,7 +87,8 @@ export function MonthBudget({
             </tr>
             {group.categories.map((category) => (
               <CategoryRow
-                key={category.id}
+                // A new Month starts every row afresh, dropping unsaved drafts.
+                key={`${month}/${category.id}`}
                 category={category}
                 month={month}
                 currency={currency}

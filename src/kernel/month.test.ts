@@ -5,6 +5,7 @@ import {
   monthName,
   monthOf,
   nextMonth,
+  parseMonth,
   previousMonth,
 } from "./month";
 
@@ -26,6 +27,14 @@ describe("Month", () => {
   it("steps across the turn of the year", () => {
     expect(nextMonth(month(2026, 12))).toBe("2027-01");
     expect(previousMonth(month(2027, 1))).toBe("2026-12");
+  });
+
+  it("is read back from how it is written", () => {
+    expect(parseMonth("2026-12")).toBe(month(2026, 12));
+    expect(parseMonth("2026-13")).toBeUndefined();
+    expect(parseMonth("2026-1")).toBeUndefined();
+    expect(parseMonth("December")).toBeUndefined();
+    expect(parseMonth(null)).toBeUndefined();
   });
 
   it("rejects something that is not a calendar month", () => {
