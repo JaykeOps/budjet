@@ -5,7 +5,7 @@ import {
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
-import type { AccountOpened } from "../accounts/records";
+import type { AccountOpened, BalanceRedeclared } from "../accounts/records";
 import { type AssignmentSet, assignmentSubject } from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
 import type {
@@ -25,9 +25,9 @@ function budget() {
     { version: 1, currency: "USD" },
   );
   return {
-    openAccount(openingBalance: number) {
+    openAccount(openingBalance: number, id: string = crypto.randomUUID()) {
       writer.write<AccountOpened["type"], AccountOpened["payload"]>(
-        crypto.randomUUID(),
+        id,
         "AccountOpened",
         {
           version: 1,
@@ -86,6 +86,14 @@ function budget() {
         { version: 1 },
       );
     },
+    /** Re-declares the real balance of the Account Transactions go to. */
+    redeclare(balance: number) {
+      writer.write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+        "checking",
+        "BalanceRedeclared",
+        { version: 1, balance: money(balance, "USD") },
+      );
+    },
     readyToAssign: () => readyToAssign(changeLog.readAll()),
     spending: (categoryId: string, of: Month) =>
       spending(changeLog.readAll(), categoryId, of),
@@ -142,6 +150,24 @@ describe("Budget Totals", () => {
     totals.record("2026-10-13", 1000, "groceries");
 
     expect(totals.readyToAssign()).toEqual(money(400000, "USD"));
+  });
+
+  it("moves Ready to Assign by each Adjustment: the difference from the balance just before it", () => {
+    const totals = budget();
+    totals.openAccount(100000, "checking");
+    const groceries = totals.record("2026-10-12", -20000, "groceries");
+
+    // The balance is $800, so declaring $850 adds $50.
+    totals.redeclare(85000);
+    expect(totals.readyToAssign()).toEqual(money(105000, "USD"));
+
+    // Changes after it count on top: an edit to the earlier Transaction too.
+    totals.edit(groceries, "2026-10-12", -25000, "groceries");
+    totals.record("2026-10-20", 10000);
+    // The balance is now $850 - $50 + $100 = $900; declaring $800 takes $100.
+    totals.redeclare(80000);
+
+    expect(totals.readyToAssign()).toEqual(money(105000, "USD"));
   });
 
   it("calculates a Category's spending and Available in a Month from its Assignment and Transactions", () => {
