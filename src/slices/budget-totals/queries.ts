@@ -1,14 +1,14 @@
 import { type ChangeRecord, latestBySubject } from "../../kernel/change-log";
 import { addMoney, type Money, money, subtractMoney } from "../../kernel/money";
 import { type Month, monthOf } from "../../kernel/month";
-import { isAccountOpened } from "../accounts/records";
+import { adjustments, isAccountOpened } from "../accounts/records";
 import { isAssignmentSet } from "../assignments/records";
 import { isBudgetCreated } from "../budget-setup/records";
 import { currentTransactions } from "../transactions/records";
 
 /**
- * The money with no job yet: every Opening Balance and all money coming in
- * with no Category, less every Assignment in every Month. Undefined before a Budget exists. Can go below zero.
+ * The money with no job yet: every Opening Balance, every Adjustment and all
+ * money coming in with no Category, less every Assignment in every Month. Undefined before a Budget exists. Can go below zero.
  */
 export function readyToAssign(
   records: readonly ChangeRecord[],
@@ -20,6 +20,9 @@ export function readyToAssign(
     if (isAccountOpened(record)) {
       total = addMoney(total, record.payload.openingBalance);
     }
+  }
+  for (const { amount } of adjustments(records)) {
+    total = addMoney(total, amount);
   }
   for (const { amount, categoryId } of currentTransactions(records)) {
     if (!categoryId) total = addMoney(total, amount);

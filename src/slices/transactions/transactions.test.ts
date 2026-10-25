@@ -5,7 +5,7 @@ import {
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
-import type { AccountOpened } from "../accounts/records";
+import type { AccountClosed, AccountOpened } from "../accounts/records";
 import type { BudgetCreated } from "../budget-setup/records";
 import type {
   CategoryCreated,
@@ -325,6 +325,67 @@ describe("Transactions", () => {
         expect(transactions().map(({ payee }) => payee)).toEqual(payees);
       }
     });
+  });
+
+  it("keeps a closed Account's Transactions but takes no new ones, and no changes to them", () => {
+    const { changeLog, writer } = budget();
+    writer.write<AccountOpened["type"], AccountOpened["payload"]>(
+      "old",
+      "AccountOpened",
+      {
+        version: 1,
+        name: "Old checking",
+        kind: "checking",
+        openingBalance: money(0, "USD"),
+      },
+    );
+    const record = (accountId: string, cents: number) =>
+      recordTransaction(writer, {
+        accountId,
+        date: "2026-10-12",
+        amount: money(cents, "USD"),
+        categoryId: "groceries",
+      });
+    const refund = record("old", 1000);
+    const spent = record("old", -1000);
+    const inChecking = record("checking", -500);
+    writer.write<AccountClosed["type"], AccountClosed["payload"]>(
+      "old",
+      "AccountClosed",
+      { version: 1 },
+    );
+
+    expect(() => record("old", -200)).toThrow("Old checking is closed");
+    expect(() =>
+      editTransaction(writer, refund, {
+        accountId: "old",
+        date: "2026-10-12",
+        amount: money(2000, "USD"),
+        categoryId: "groceries",
+      }),
+    ).toThrow("Old checking is closed");
+    expect(() =>
+      editTransaction(writer, spent, {
+        accountId: "checking",
+        date: "2026-10-12",
+        amount: money(-1000, "USD"),
+        categoryId: "groceries",
+      }),
+    ).toThrow("Old checking is closed");
+    expect(() =>
+      editTransaction(writer, inChecking, {
+        accountId: "old",
+        date: "2026-10-12",
+        amount: money(-500, "USD"),
+        categoryId: "groceries",
+      }),
+    ).toThrow("Old checking is closed");
+    expect(() => deleteTransaction(writer, spent)).toThrow(
+      "Old checking is closed",
+    );
+    expect(
+      accountTransactions(changeLog.readAll(), "old").map(({ id }) => id),
+    ).toEqual([spent, refund]);
   });
 
   it("suggests each Payee used before once, in alphabetical order, from Transactions that still exist", () => {
