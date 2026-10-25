@@ -1,7 +1,7 @@
 import type { ChangeRecord } from "../../kernel/change-log";
 import { addMoney, type Money, money } from "../../kernel/money";
 import { isBudgetCreated } from "../budget-setup/records";
-import { isTransactionRecorded } from "../transactions/records";
+import { currentTransactions } from "../transactions/records";
 import { type AccountKind, isAccountOpened } from "./records";
 
 export type Account = {
@@ -14,7 +14,8 @@ export type Account = {
 
 /**
  * Every Account, in the order they were opened, with its balance: its Opening
- * Balance plus money coming in less money going out. Transfers and
+ * Balance plus money coming in less money going out, counting each
+ * Transaction as last edited. Transfers and
  * Adjustments join it as those slices arrive.
  */
 export function accounts(records: readonly ChangeRecord[]): Account[] {
@@ -30,11 +31,9 @@ export function accounts(records: readonly ChangeRecord[]): Account[] {
       });
     }
   }
-  for (const record of records) {
-    if (!isTransactionRecorded(record)) continue;
-    const account = byId.get(record.payload.accountId);
-    if (account)
-      account.balance = addMoney(account.balance, record.payload.amount);
+  for (const { accountId, amount } of currentTransactions(records)) {
+    const account = byId.get(accountId);
+    if (account) account.balance = addMoney(account.balance, amount);
   }
   return [...byId.values()];
 }
