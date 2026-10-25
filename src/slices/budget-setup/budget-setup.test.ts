@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { createInMemoryChangeLog, createWriter } from "../../kernel/change-log";
+import {
+  createChangeLogWriter,
+  createInMemoryChangeLog,
+} from "../../kernel/change-log";
 import { createBudget } from "./commands";
 import { budget } from "./index";
 
 function setUp() {
   const changeLog = createInMemoryChangeLog();
-  return { changeLog, writer: createWriter(changeLog, "this-device") };
+  return { changeLog, writer: createChangeLogWriter(changeLog, "this-device") };
 }
 
 describe("Budget Setup", () => {

@@ -1,23 +1,26 @@
-import type { Writer } from "./kernel/change-log";
-import { useWriter, WriterProvider } from "./kernel/use-change-log-query";
+import type { ChangeLogWriter } from "./kernel/change-log";
+import {
+  ChangeLogWriterProvider,
+  useChangeLogWriter,
+} from "./kernel/use-change-log-query";
 import { BudgetSetupForm, useBudget } from "./slices/budget-setup";
 import { createBudget } from "./slices/budget-setup/commands";
 
-export function App({ writer }: { writer: Writer }) {
+export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
-    <WriterProvider value={writer}>
+    <ChangeLogWriterProvider value={writer}>
       <main>
         <h1>budjet</h1>
         <Shell />
         <p>Version {__APP_VERSION__}</p>
       </main>
-    </WriterProvider>
+    </ChangeLogWriterProvider>
   );
 }
 
 /** Shows the setup flow until a Budget exists, then the Budget. */
 function Shell() {
-  const writer = useWriter();
+  const writer = useChangeLogWriter();
   const budget = useBudget();
 
   if (!budget) {
