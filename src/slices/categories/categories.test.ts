@@ -338,12 +338,26 @@ describe("Deleting Categories and Category Groups", () => {
     ]);
   });
 
+  it("deletes a Category whose Assignments are all zero, even one set and later cleared", () => {
+    const budget = budgetWithStarterSet();
+    const phone = budget.id("Phone");
+    const internet = budget.id("Internet");
+    budget.assign(phone, "2026-10", 0);
+    budget.assign(internet, "2026-10", 5000);
+    budget.assign(internet, "2026-10", 0);
+
+    deleteCategory(budget.writer, phone);
+    deleteCategory(budget.writer, internet);
+
+    expect(outline(budget.groups())[0]).toEqual(["Bills", ["Rent", "Power"]]);
+  });
+
   it("refuses to delete a Category with Transactions or Assignments, and offers to hide it instead", () => {
     const budget = budgetWithStarterSet();
     const phone = budget.id("Phone");
     const power = budget.id("Power");
     budget.spend(phone, "2026-10-02", 1000);
-    budget.assign(power, "2026-10", 0);
+    budget.assign(power, "2026-10", 2500);
 
     expect(() => deleteCategory(budget.writer, phone)).toThrow(
       CategoryInUseError,

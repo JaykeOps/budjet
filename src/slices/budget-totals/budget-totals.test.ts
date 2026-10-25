@@ -384,7 +384,7 @@ describe("Budget Totals", () => {
     ]);
   });
 
-  it("knows whether a Category was ever used, by a Transaction or an Assignment", () => {
+  it("knows whether a Category is used, by a Transaction or an Assignment other than zero", () => {
     const totals = budget();
     totals.openAccount(100000);
     totals.record("2026-10-01", 300000);
@@ -392,12 +392,26 @@ describe("Budget Totals", () => {
     expect(totals.used("rent")).toBe(false);
     expect(totals.used("groceries")).toBe(false);
 
-    totals.assign("rent", "2026-10", 0);
+    totals.assign("rent", "2026-10", 80000);
     totals.record("2026-10-12", -4550, "groceries");
+    totals.assign("gifts", "2026-10", 0);
 
     expect(totals.used("rent")).toBe(true);
     expect(totals.used("groceries")).toBe(true);
+    expect(totals.used("gifts")).toBe(false);
     expect(totals.used("dining-out")).toBe(false);
+  });
+
+  it("forgets an Assignment once it is cleared back to zero", () => {
+    const totals = budget();
+    totals.assign("rent", "2026-10", 80000);
+    totals.assign("rent", "2026-11", 80000);
+
+    totals.assign("rent", "2026-10", 0);
+    expect(totals.used("rent")).toBe(true);
+
+    totals.assign("rent", "2026-11", 0);
+    expect(totals.used("rent")).toBe(false);
   });
 
   it("forgets a Transaction's Category once the Transaction is deleted or moved to another Category", () => {
