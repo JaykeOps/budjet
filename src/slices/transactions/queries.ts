@@ -1,7 +1,7 @@
 import type { ChangeRecord } from "../../kernel/change-log";
 import { type Money, money } from "../../kernel/money";
 import { adjustments } from "../accounts";
-import { currentTransfers } from "../transfers";
+import { currentTransfers } from "../transfers/records";
 import { type CurrentTransaction, currentTransactions } from "./records";
 
 export type Transaction = CurrentTransaction;

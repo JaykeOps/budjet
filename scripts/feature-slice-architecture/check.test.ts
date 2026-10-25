@@ -30,6 +30,12 @@ describe("the feature slice architecture check", () => {
     ]);
   });
 
+  it("rejects a slice's records importing another slice, so records stay leaves", () => {
+    expect(findFeatureSliceViolations(example("records-import"))).toEqual([
+      'records of slice "transactions" may import only the kernel: slices/transactions/records.ts imports "../accounts"',
+    ]);
+  });
+
   it("allows the app shell to import any slice's commands", () => {
     expect(findFeatureSliceViolations(example("shell-commands"))).toEqual([]);
   });
