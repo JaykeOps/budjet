@@ -26,6 +26,7 @@ CI is the Dagger module in `.dagger/`; GitHub Actions only calls it. Before ever
 ```sh
 nix develop -c dagger call check
 nix develop -c dagger call end-to-end
+nix develop -c dagger call performance
 ```
 
 `dagger functions` lists the rest. New CI logic goes in the Dagger module so it runs locally first; the workflow YAML stays a thin `dagger call`. The one exception is the GitHub Pages deploy in `release.yml`, which uses GitHub's own actions for short-lived credentials.
