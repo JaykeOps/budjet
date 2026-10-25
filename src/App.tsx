@@ -1,4 +1,5 @@
 import type { ChangeLogWriter } from "./kernel/change-log";
+import { currentMonth } from "./kernel/month";
 import {
   ChangeLogWriterProvider,
   useChangeLogWriter,
@@ -9,10 +10,12 @@ import {
   useAccounts,
 } from "./slices/accounts";
 import { openAccount } from "./slices/accounts/commands";
+import { setAssignment } from "./slices/assignments/commands";
 import { BudgetSetupForm, useBudget } from "./slices/budget-setup";
 import { createBudget } from "./slices/budget-setup/commands";
 import { CategoryList } from "./slices/categories";
 import { addStarterSet } from "./slices/categories/commands";
+import { MonthBudget } from "./slices/month-budget-view";
 
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
@@ -56,6 +59,11 @@ function Shell() {
   }
   return (
     <>
+      <MonthBudget
+        month={currentMonth()}
+        currency={budget.currency}
+        onAssign={(input) => setAssignment(writer, input)}
+      />
       <section aria-labelledby="budget-heading">
         <h2 id="budget-heading">Budget</h2>
         <p>Kept in {budget.currency}.</p>
