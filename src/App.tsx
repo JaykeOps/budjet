@@ -11,7 +11,11 @@ import {
   useAccounts,
 } from "./slices/accounts";
 import { openAccount } from "./slices/accounts/commands";
-import { setAssignment } from "./slices/assignments/commands";
+import {
+  copyLastMonth,
+  moveMoney,
+  setAssignment,
+} from "./slices/assignments/commands";
 import { BudgetSetupForm, useBudget } from "./slices/budget-setup";
 import { createBudget } from "./slices/budget-setup/commands";
 import { CategoryList } from "./slices/categories";
@@ -66,6 +70,8 @@ function Shell() {
         firstMonth={budget.firstMonth}
         currency={budget.currency}
         onAssign={(input) => setAssignment(writer, input)}
+        onCopyLastMonth={(month) => copyLastMonth(writer, { month })}
+        onMoveMoney={(input) => moveMoney(writer, input)}
       />
       <section aria-labelledby="budget-heading">
         <h2 id="budget-heading">Budget</h2>
