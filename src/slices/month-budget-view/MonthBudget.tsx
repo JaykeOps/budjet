@@ -14,20 +14,34 @@ import {
   previousMonth,
 } from "../../kernel/month";
 import { useAssignment } from "../assignments";
-import { useAvailable, useReadyToAssign, useSpending } from "../budget-totals";
-import { type Category, useCategoryGroups } from "../categories";
+import {
+  useAvailable,
+  useOverspent,
+  useReadyToAssign,
+  useSpending,
+} from "../budget-totals";
+import {
+  type Category,
+  type CategoryGroup,
+  useCategoryGroups,
+} from "../categories";
+import { type GroupSubtotals, useGroupSubtotals } from "./group-subtotals";
 import { type MoveInput, MoveMoneyForm } from "./MoveMoneyForm";
+
+/** The red that marks money problems: Overspent Categories and a negative Ready to Assign. */
+const WARNING_RED = "#b22222";
 
 export type AssignInput = { categoryId: string; month: Month; amount: Money };
 export type MoveMoneyInput = MoveInput & { month: Month };
 
 /**
  * The Month screen: controls to step between Months, Ready to Assign, then
- * every Category under its Category Group with its Assignment, spending and
- * Available for the Month, and shortcuts to copy last Month's Assignments and
- * to move money. The app shell decides where the Month is kept and what
- * assigning does; an error it throws is shown on the screen. There is no
- * stepping back past `firstMonth`.
+ * the Month's Overspent Categories, then every Category under its Category
+ * Group with its Assignment, spending and Available for the Month, and
+ * shortcuts to copy last Month's Assignments and to move money. Each group
+ * shows subtotals and can be collapsed. The app shell decides where the Month
+ * is kept and what assigning does; an error it throws is shown on the screen.
+ * There is no stepping back past `firstMonth`.
  */
 export function MonthBudget({
   month,
@@ -48,7 +62,17 @@ export function MonthBudget({
 }) {
   const headingId = useId();
   const groups = useCategoryGroups();
+  const subtotals = useGroupSubtotals(month, currency);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string>();
+
+  function toggle(groupId: string) {
+    setCollapsed((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(groupId)) next.add(groupId);
+      return next;
+    });
+  }
 
   /** Runs a change, showing the error if it is refused; true when it went through. */
   function attempt(action: () => void): boolean {
@@ -78,6 +102,7 @@ export function MonthBudget({
         </button>
       </nav>
       <ReadyToAssign />
+      <OverspentCategories month={month} groups={groups} />
       {month > firstMonth && (
         <button
           type="button"
@@ -103,26 +128,28 @@ export function MonthBudget({
         </thead>
         {groups.map((group) => (
           <tbody key={group.id}>
-            <tr>
-              <th scope="rowgroup" colSpan={4}>
-                {group.name}
-              </th>
-            </tr>
-            {group.categories.map((category) => (
-              <CategoryRow
-                // A new Month starts every row afresh, dropping unsaved drafts.
-                key={`${month}/${category.id}`}
-                category={category}
-                month={month}
-                currency={currency}
-                onAssign={(amount) =>
-                  attempt(() =>
-                    onAssign({ categoryId: category.id, month, amount }),
-                  )
-                }
-                onError={setError}
-              />
-            ))}
+            <GroupRow
+              group={group}
+              subtotals={subtotals[group.id]}
+              expanded={!collapsed.has(group.id)}
+              onToggle={() => toggle(group.id)}
+            />
+            {!collapsed.has(group.id) &&
+              group.categories.map((category) => (
+                <CategoryRow
+                  // A new Month starts every row afresh, dropping unsaved drafts.
+                  key={`${month}/${category.id}`}
+                  category={category}
+                  month={month}
+                  currency={currency}
+                  onAssign={(amount) =>
+                    attempt(() =>
+                      onAssign({ categoryId: category.id, month, amount }),
+                    )
+                  }
+                  onError={setError}
+                />
+              ))}
           </tbody>
         ))}
       </table>
@@ -146,11 +173,85 @@ function ReadyToAssign() {
       }
     >
       <span id={labelId}>Ready to Assign</span>{" "}
-      <strong style={overassigned ? { color: "#b22222" } : undefined}>
+      <strong style={overassigned ? { color: WARNING_RED } : undefined}>
         {formatMoney(amount)}
       </strong>
       {overassigned && " You have assigned more money than you have."}
     </p>
+  );
+}
+
+/**
+ * The Categories whose Available is below zero this Month, in budget order.
+ * Shown only when there are any.
+ */
+function OverspentCategories({
+  month,
+  groups,
+}: {
+  month: Month;
+  groups: CategoryGroup[];
+}) {
+  const headingId = useId();
+  const overspent = useOverspent(month) ?? [];
+  if (overspent.length === 0) return null;
+  const availableById = new Map(
+    overspent.map(({ categoryId, available }) => [categoryId, available]),
+  );
+  const categories = groups
+    .flatMap((group) => group.categories)
+    .filter((category) => availableById.has(category.id));
+
+  return (
+    <section aria-labelledby={headingId}>
+      <h3 id={headingId}>Overspent Categories</h3>
+      <ul aria-labelledby={headingId}>
+        {categories.map((category) => {
+          const available = availableById.get(category.id);
+          return (
+            <li key={category.id}>
+              {category.name}{" "}
+              {available && <AvailableAmount amount={available} />}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** A Category Group's name, which collapses and expands it, and its subtotals. */
+function GroupRow({
+  group,
+  subtotals,
+  expanded,
+  onToggle,
+}: {
+  group: CategoryGroup;
+  subtotals: GroupSubtotals | undefined;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <tr>
+      <th scope="rowgroup">
+        <button type="button" aria-expanded={expanded} onClick={onToggle}>
+          {group.name}
+        </button>
+      </th>
+      <td>{subtotals && formatMoney(subtotals.assigned)}</td>
+      <td>{subtotals && formatMoney(subtotals.spent)}</td>
+      <td>{subtotals && <AvailableAmount amount={subtotals.available} />}</td>
+    </tr>
+  );
+}
+
+/** Available, in red when it is below zero. */
+function AvailableAmount({ amount }: { amount: Money }) {
+  return (
+    <span style={amount.minorUnits < 0 ? { color: WARNING_RED } : undefined}>
+      {formatMoney(amount)}
+    </span>
   );
 }
 
@@ -174,6 +275,7 @@ function CategoryRow({
   const assigned = useAssignment(category.id, month) ?? money(0, currency);
   const spent = useSpending(category.id, month) ?? money(0, currency);
   const available = useAvailable(category.id, month) ?? money(0, currency);
+  const overspent = available.minorUnits < 0;
   const [draft, setDraft] = useState<string>();
 
   function save() {
@@ -208,7 +310,12 @@ function CategoryRow({
         </form>
       </td>
       <td>{formatMoney(spent)}</td>
-      <td>{formatMoney(available)}</td>
+      <td
+        className={overspent ? "available overspent" : "available"}
+        style={overspent ? { color: WARNING_RED } : undefined}
+      >
+        {formatMoney(available)}
+      </td>
     </tr>
   );
 }

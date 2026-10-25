@@ -73,6 +73,26 @@ export type CurrentTransaction = { id: string } & TransactionFields;
  */
 export function currentTransactions(
   records: readonly ChangeRecord[],
+): readonly CurrentTransaction[] {
+  let current = currentBySnapshot.get(records);
+  if (!current) {
+    current = foldTransactions(records);
+    currentBySnapshot.set(records, current);
+  }
+  return current;
+}
+
+/**
+ * Kept per Change Log snapshot (`readAll` returns the same array until the
+ * next append), so every query reading the same records folds them once.
+ */
+const currentBySnapshot = new WeakMap<
+  readonly ChangeRecord[],
+  readonly CurrentTransaction[]
+>();
+
+function foldTransactions(
+  records: readonly ChangeRecord[],
 ): CurrentTransaction[] {
   const latest = latestBySubject(
     records.filter(
