@@ -63,6 +63,42 @@ export function available(
   return money(category ? availableIn(category, of) : 0, totals.currency);
 }
 
+/**
+ * Whether a Category was ever used: it has a Transaction, or an Assignment in
+ * any Month (even one of zero).
+ */
+export function categoryUsed(
+  records: readonly ChangeRecord[],
+  categoryId: string,
+): boolean {
+  return records.some(
+    (record) =>
+      (isAssignmentSet(record) || isTransactionRecorded(record)) &&
+      record.payload.categoryId === categoryId,
+  );
+}
+
+/** Whether a Category has an Assignment other than zero in any Month after `of`. */
+export function assignedAfter(
+  records: readonly ChangeRecord[],
+  categoryId: string,
+  of: Month,
+): boolean {
+  for (const assigned of latestBySubject(
+    records.filter(isAssignmentSet),
+  ).values()) {
+    const { payload } = assigned;
+    if (
+      payload.categoryId === categoryId &&
+      payload.month > of &&
+      payload.amount.minorUnits !== 0
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export type OverspentCategory = { categoryId: string; available: Money };
 
 /**

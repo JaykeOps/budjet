@@ -64,3 +64,95 @@ test("a user organises Categories into Category Groups and the order is kept", a
 
   await expect.poll(() => outline(page)).toEqual(organised);
 });
+
+test("a user hides, unhides and deletes Categories, and deletes an empty Category Group", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
+  await page.goto("/");
+  await page.getByLabel("Currency").selectOption("USD");
+  await page.getByRole("button", { name: "Create Budget" }).click();
+  const setup = page.getByRole("form", { name: "Add your first Account" });
+  await setup.getByLabel("Name").fill("Checking");
+  await setup.getByLabel("Opening Balance").fill("1000");
+  await setup.getByRole("button", { name: "Add Account" }).click();
+
+  const categories = page.getByRole("region", { name: "Categories" });
+  const alert = categories.getByRole("alert");
+  const month = page.getByRole("table", { name: "October 2026" });
+  const picker = page
+    .getByRole("form", { name: "Record a Transaction" })
+    .getByLabel("Category");
+  const assignRent = async (amount: string) => {
+    await page.getByLabel("Assignment for Rent").fill(amount);
+    await page.getByLabel("Assignment for Rent").press("Enter");
+  };
+
+  // Hiding is refused while Rent still has money Available.
+  await assignRent("50");
+  await categories.getByRole("button", { name: "Hide Rent" }).click();
+  await expect(alert).toContainText("Rent still has $50.00 Available");
+
+  // Rent was used, so deleting it is refused with an offer to hide it.
+  await assignRent("0");
+  await categories.getByRole("button", { name: "Delete Rent" }).click();
+  await expect(alert).toContainText("can't be deleted");
+  await alert.getByRole("button", { name: "Hide Rent instead" }).click();
+  await expect(alert).toBeHidden();
+
+  // Internet was never used, so it can go.
+  await categories.getByRole("button", { name: "Delete Internet" }).click();
+
+  // Savings can only go once it is empty.
+  await categories.getByRole("button", { name: "Delete Savings" }).click();
+  await expect(alert).toContainText("Savings still has Categories");
+  await categories
+    .getByRole("button", { name: "Delete Emergency Fund" })
+    .click();
+  await categories.getByRole("button", { name: "Delete Savings" }).click();
+
+  const expectRentHidden = async () => {
+    await expect(month.getByRole("rowheader")).toHaveText([
+      "Bills",
+      "Power",
+      "Phone",
+      "Everyday",
+      "Groceries",
+      "Transport",
+      "Dining Out",
+    ]);
+    await expect(picker.getByRole("option", { name: "Rent" })).toHaveCount(0);
+    await expect(
+      categories.getByRole("button", { name: "Unhide Rent" }),
+    ).toBeVisible();
+    await expect(
+      categories.getByRole("heading", { name: "Savings" }),
+    ).toHaveCount(0);
+  };
+  await expectRentHidden();
+
+  await page.reload();
+
+  await expectRentHidden();
+
+  await categories.getByRole("button", { name: "Unhide Rent" }).click();
+
+  const expectRentBack = async () => {
+    await expect(month.getByRole("rowheader")).toHaveText([
+      "Bills",
+      "Rent",
+      "Power",
+      "Phone",
+      "Everyday",
+      "Groceries",
+      "Transport",
+      "Dining Out",
+    ]);
+    await expect(picker.getByRole("option", { name: "Rent" })).toHaveCount(1);
+  };
+  await expectRentBack();
+
+  await page.reload();
+
+  await expectRentBack();
+});

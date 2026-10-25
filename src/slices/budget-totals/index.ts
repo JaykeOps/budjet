@@ -5,7 +5,9 @@ import type { Money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
 import {
+  assignedAfter,
   available,
+  categoryUsed,
   type OverspentCategory,
   overspent,
   readyToAssign,
@@ -13,7 +15,9 @@ import {
 } from "./queries";
 
 export {
+  assignedAfter,
   available,
+  categoryUsed,
   type OverspentCategory,
   overspent,
   readyToAssign,

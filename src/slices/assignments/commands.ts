@@ -30,17 +30,21 @@ export function setAssignment(
 /**
  * Copies last Month's Assignments into `month`, but only for Categories that
  * have no Assignment in `month` yet: one set there is never overwritten.
+ * Categories in `skipping` (the app shell passes the hidden ones; Assignments
+ * doesn't know which those are) are left out.
  */
 export function copyLastMonth(
   writer: ChangeLogWriter,
-  { month }: { month: Month },
+  { month, skipping = [] }: { month: Month; skipping?: Iterable<string> },
 ): void {
   const latest = latestBySubject(
     writer.changeLog.readAll().filter(isAssignmentSet),
   );
   const lastMonth = previousMonth(month);
+  const skipped = new Set(skipping);
   for (const { payload } of latest.values()) {
     if (payload.month !== lastMonth) continue;
+    if (skipped.has(payload.categoryId)) continue;
     if (latest.has(assignmentSubject(payload.categoryId, month))) continue;
     setAssignment(writer, {
       categoryId: payload.categoryId,

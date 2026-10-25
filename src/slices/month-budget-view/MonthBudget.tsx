@@ -20,13 +20,10 @@ import {
   useReadyToAssign,
   useSpending,
 } from "../budget-totals";
-import {
-  type Category,
-  type CategoryGroup,
-  useCategoryGroups,
-} from "../categories";
+import type { Category, CategoryGroup } from "../categories";
 import { type GroupSubtotals, useGroupSubtotals } from "./group-subtotals";
 import { type MoveInput, MoveMoneyForm } from "./MoveMoneyForm";
+import { useVisibleCategoryGroups } from "./visible-categories";
 
 /** The red that marks money problems: Overspent Categories and a negative Ready to Assign. */
 const WARNING_RED = "#b22222";
@@ -61,7 +58,7 @@ export function MonthBudget({
   onMoveMoney: (input: MoveMoneyInput) => void;
 }) {
   const headingId = useId();
-  const groups = useCategoryGroups();
+  const groups = useVisibleCategoryGroups();
   const subtotals = useGroupSubtotals(month, currency);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string>();
