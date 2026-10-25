@@ -18,7 +18,7 @@ import {
 } from "./slices/assignments/commands";
 import { BudgetSetupForm, useBudget } from "./slices/budget-setup";
 import { createBudget } from "./slices/budget-setup/commands";
-import { CategoryList } from "./slices/categories";
+import { CategoryList, categoryGroups } from "./slices/categories";
 import { addStarterSet } from "./slices/categories/commands";
 import { MonthBudget } from "./slices/month-budget-view";
 import { TransactionsScreen } from "./slices/transactions";
@@ -80,7 +80,9 @@ function Shell() {
         firstMonth={budget.firstMonth}
         currency={budget.currency}
         onAssign={(input) => setAssignment(writer, input)}
-        onCopyLastMonth={(month) => copyLastMonth(writer, { month })}
+        onCopyLastMonth={(month) =>
+          copyLastMonth(writer, { month, skipping: hiddenCategoryIds(writer) })
+        }
         onMoveMoney={(input) => moveMoney(writer, input)}
       />
       <section aria-labelledby="budget-heading">
@@ -106,6 +108,14 @@ function Shell() {
       />
     </>
   );
+}
+
+/** Copy last Month leaves hidden Categories out. */
+function hiddenCategoryIds(writer: ChangeLogWriter): string[] {
+  return categoryGroups(writer.changeLog.readAll())
+    .flatMap((group) => group.categories)
+    .filter(({ hidden }) => hidden)
+    .map(({ id }) => id);
 }
 
 /** The Month Budget view for the Month in the address bar. */
