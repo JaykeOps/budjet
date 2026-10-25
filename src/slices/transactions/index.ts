@@ -6,6 +6,7 @@ export {
   usePayees,
 } from "./hooks";
 export {
+  type AdjustmentEntry,
   accountTransactionList,
   accountTransactions,
   payees,
