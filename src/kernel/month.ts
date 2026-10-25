@@ -22,6 +22,17 @@ export function monthOf(date: string): Month {
   return month(Number(match[1]), Number(match[2]));
 }
 
+/** A Month written "YYYY-MM", as in the address bar, or undefined if it isn't one. */
+export function parseMonth(text: string | null | undefined): Month | undefined {
+  const match = /^(\d{4})-(\d{2})$/.exec(text ?? "");
+  if (!match) return undefined;
+  try {
+    return month(Number(match[1]), Number(match[2]));
+  } catch {
+    return undefined;
+  }
+}
+
 /** The Month this device's local date falls in. */
 export function currentMonth(now: Date = new Date()): Month {
   return month(now.getFullYear(), now.getMonth() + 1);
