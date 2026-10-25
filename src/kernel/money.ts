@@ -45,6 +45,18 @@ export function formatMoney(amount: Money, locale?: string): string {
   return format.format(amount.minorUnits / 10 ** minorDigits(amount.currency));
 }
 
+/**
+ * An amount as the user would type it, such as "1234.56": no currency sign or
+ * grouping, and read back exactly by `parseMoney`.
+ */
+export function typedMoney(amount: Money): string {
+  const digits = minorDigits(amount.currency);
+  const sign = amount.minorUnits < 0 ? "-" : "";
+  const units = String(Math.abs(amount.minorUnits)).padStart(digits + 1, "0");
+  if (digits === 0) return sign + units;
+  return `${sign}${units.slice(0, -digits)}.${units.slice(-digits)}`;
+}
+
 const TYPED_AMOUNT = /^(-?)(\d+)(?:[.,](\d+))?$/;
 
 /**

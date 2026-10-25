@@ -5,6 +5,7 @@ import {
   money,
   parseMoney,
   subtractMoney,
+  typedMoney,
 } from "./money";
 
 describe("Money", () => {
@@ -33,6 +34,16 @@ describe("Money", () => {
     expect(() => addMoney(money(1, "EUR"), money(1, "USD"))).toThrow(
       /EUR and USD/,
     );
+  });
+
+  it("writes an amount the way the user would type it, and reads it back", () => {
+    expect(typedMoney(money(123456, "USD"))).toBe("1234.56");
+    expect(typedMoney(money(-5, "USD"))).toBe("-0.05");
+    expect(typedMoney(money(0, "USD"))).toBe("0.00");
+    expect(typedMoney(money(-500, "JPY"))).toBe("-500");
+    for (const amount of [money(-105, "EUR"), money(7, "JPY")]) {
+      expect(parseMoney(typedMoney(amount), amount.currency)).toEqual(amount);
+    }
   });
 
   it("formats with the currency's own number of minor digits", () => {
