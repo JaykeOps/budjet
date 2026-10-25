@@ -2,7 +2,7 @@
  * The change records Transactions publishes. Other slices may read them; they
  * are versioned contracts, so changing one is a cross-slice change (docs/adr/0005).
  */
-import { type ChangeRecord, latestBySubject } from "../../kernel/change-log";
+import type { ChangeRecord } from "../../kernel/change-log";
 import type { Money } from "../../kernel/money";
 
 /** What a Transaction says: its Account, date, amount, and optional Category, Payee and memo. */
@@ -94,25 +94,29 @@ const currentBySnapshot = new WeakMap<
 function foldTransactions(
   records: readonly ChangeRecord[],
 ): CurrentTransaction[] {
-  const latest = latestBySubject(
-    records.filter(
-      (record) =>
-        isTransactionRecorded(record) ||
-        isTransactionEdited(record) ||
-        isTransactionDeleted(record),
-    ),
-  );
-  const current: CurrentTransaction[] = [];
+  // One pass over every record, ten years of them on a phone, so no copies:
+  // a Map keeps each Transaction where it was first recorded while its most
+  // recent record replaces the value. An edit or deletion before the
+  // Transaction's first TransactionRecorded is replaced by that record anyway.
+  const latest = new Map<
+    string,
+    TransactionRecorded | TransactionEdited | TransactionDeleted
+  >();
   for (const record of records) {
-    if (!isTransactionRecorded(record)) continue;
-    const now = latest.get(record.subjectId);
-    // Deleting drops it from `latest`, so a repeated TransactionRecorded is skipped too.
-    latest.delete(record.subjectId);
-    if (now === undefined || isTransactionDeleted(now)) continue;
-    const { version: _, ...fields } = (
-      now as TransactionRecorded | TransactionEdited
-    ).payload;
-    current.push({ id: record.subjectId, ...fields });
+    if (
+      isTransactionRecorded(record) ||
+      ((isTransactionEdited(record) || isTransactionDeleted(record)) &&
+        latest.has(record.subjectId))
+    ) {
+      latest.set(record.subjectId, record);
+    }
+  }
+  const current: CurrentTransaction[] = [];
+  for (const [id, now] of latest) {
+    if (isTransactionDeleted(now)) continue;
+    // Listed field by field: spreading the payload is several times slower.
+    const { accountId, date, amount, categoryId, payee, memo } = now.payload;
+    current.push({ id, accountId, date, amount, categoryId, payee, memo });
   }
   return current;
 }
