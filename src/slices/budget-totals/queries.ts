@@ -4,7 +4,7 @@ import { type Month, monthOf } from "../../kernel/month";
 import { isAccountOpened } from "../accounts/records";
 import { isAssignmentSet } from "../assignments/records";
 import { isBudgetCreated } from "../budget-setup/records";
-import { isTransactionRecorded } from "../transactions/records";
+import { currentTransactions } from "../transactions/records";
 
 /**
  * The money with no job yet: every Opening Balance and all money coming in
@@ -19,9 +19,10 @@ export function readyToAssign(
   for (const record of records) {
     if (isAccountOpened(record)) {
       total = addMoney(total, record.payload.openingBalance);
-    } else if (isTransactionRecorded(record) && !record.payload.categoryId) {
-      total = addMoney(total, record.payload.amount);
     }
+  }
+  for (const { amount, categoryId } of currentTransactions(records)) {
+    if (!categoryId) total = addMoney(total, amount);
   }
   for (const assigned of latestBySubject(
     records.filter(isAssignmentSet),
@@ -154,9 +155,7 @@ function calculateCategoryTotals(
   }
   // Many Transactions share a date, so each date is read into a Month once.
   const monthOfDate = new Map<string, Month>();
-  for (const record of records) {
-    if (!isTransactionRecorded(record)) continue;
-    const { categoryId, date, amount } = record.payload;
+  for (const { categoryId, date, amount } of currentTransactions(records)) {
     if (!categoryId) continue;
     let of = monthOfDate.get(date);
     if (!of) {
