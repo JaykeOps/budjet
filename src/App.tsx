@@ -1,9 +1,10 @@
+import type { ComponentProps } from "react";
 import type { ChangeLogWriter } from "./kernel/change-log";
-import { currentMonth } from "./kernel/month";
 import {
   ChangeLogWriterProvider,
   useChangeLogWriter,
 } from "./kernel/use-change-log-query";
+import { useMonthInUrl } from "./month-in-url";
 import {
   AccountsScreen,
   OpenAccountForm,
@@ -16,6 +17,8 @@ import { createBudget } from "./slices/budget-setup/commands";
 import { CategoryList } from "./slices/categories";
 import { addStarterSet } from "./slices/categories/commands";
 import { MonthBudget } from "./slices/month-budget-view";
+import { TransactionsScreen } from "./slices/transactions";
+import { recordTransaction } from "./slices/transactions/commands";
 
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
@@ -59,8 +62,8 @@ function Shell() {
   }
   return (
     <>
-      <MonthBudget
-        month={currentMonth()}
+      <BudgetMonth
+        firstMonth={budget.firstMonth}
         currency={budget.currency}
         onAssign={(input) => setAssignment(writer, input)}
       />
@@ -73,6 +76,26 @@ function Shell() {
         currency={budget.currency}
         onOpenAccount={(input) => openAccount(writer, input)}
       />
+      <TransactionsScreen
+        currency={budget.currency}
+        onRecord={(input) => recordTransaction(writer, input)}
+      />
     </>
+  );
+}
+
+/** The Month Budget view for the Month in the address bar. */
+function BudgetMonth({
+  firstMonth,
+  ...props
+}: Omit<ComponentProps<typeof MonthBudget>, "month" | "onMonthChange">) {
+  const [month, setMonth] = useMonthInUrl(firstMonth);
+  return (
+    <MonthBudget
+      month={month}
+      firstMonth={firstMonth}
+      onMonthChange={setMonth}
+      {...props}
+    />
   );
 }

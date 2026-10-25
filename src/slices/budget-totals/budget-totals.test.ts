@@ -8,7 +8,8 @@ import type { Month } from "../../kernel/month";
 import type { AccountOpened } from "../accounts/records";
 import { type AssignmentSet, assignmentSubject } from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
-import { readyToAssign } from "./index";
+import type { TransactionRecorded } from "../transactions/records";
+import { available, readyToAssign, spending } from "./index";
 
 /** A Budget in USD, seeded with the records other slices publish. */
 function budget() {
@@ -44,7 +45,25 @@ function budget() {
         },
       );
     },
+    /** Records a Transaction: a negative amount goes out, a positive one comes in. */
+    record(date: string, amount: number, categoryId?: string) {
+      writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+        crypto.randomUUID(),
+        "TransactionRecorded",
+        {
+          version: 1,
+          accountId: "checking",
+          date,
+          amount: money(amount, "USD"),
+          ...(categoryId && { categoryId }),
+        },
+      );
+    },
     readyToAssign: () => readyToAssign(changeLog.readAll()),
+    spending: (categoryId: string, of: Month) =>
+      spending(changeLog.readAll(), categoryId, of),
+    available: (categoryId: string, of: Month) =>
+      available(changeLog.readAll(), categoryId, of),
   };
 }
 
@@ -83,5 +102,52 @@ describe("Budget Totals", () => {
     totals.assign("rent", "2026-10", 60000);
 
     expect(totals.readyToAssign()).toEqual(money(40000, "USD"));
+  });
+
+  it("puts money coming in with no Category in Ready to Assign, and nothing else", () => {
+    const totals = budget();
+    totals.openAccount(100000);
+
+    totals.record("2026-10-25", 300000);
+    totals.record("2026-10-12", -4550, "groceries");
+    totals.record("2026-10-13", 1000, "groceries");
+
+    expect(totals.readyToAssign()).toEqual(money(400000, "USD"));
+  });
+
+  it("calculates a Category's spending and Available in a Month from its Assignment and Transactions", () => {
+    const totals = budget();
+    totals.openAccount(100000);
+    totals.assign("groceries", "2026-10", 40000);
+
+    totals.record("2026-10-01", -4550, "groceries");
+    totals.record("2026-10-31", -10000, "groceries");
+    totals.record("2026-10-15", 1000, "groceries");
+    // Other Months, other Categories and money with no Category don't count.
+    totals.record("2026-11-01", -2000, "groceries");
+    totals.record("2026-09-30", -3000, "groceries");
+    totals.record("2026-10-12", -7000, "rent");
+    totals.record("2026-10-25", 300000);
+
+    expect(totals.spending("groceries", "2026-10")).toEqual(
+      money(14550, "USD"),
+    );
+    // $400 assigned + $10 coming in − $145.50 going out.
+    expect(totals.available("groceries", "2026-10")).toEqual(
+      money(26450, "USD"),
+    );
+    expect(totals.spending("dining-out", "2026-10")).toEqual(money(0, "USD"));
+    expect(totals.available("dining-out", "2026-10")).toEqual(money(0, "USD"));
+  });
+
+  it("lets spending take a Category's Available below zero", () => {
+    const totals = budget();
+    totals.assign("groceries", "2026-10", 1000);
+
+    totals.record("2026-10-01", -4550, "groceries");
+
+    expect(totals.available("groceries", "2026-10")).toEqual(
+      money(-3550, "USD"),
+    );
   });
 });
