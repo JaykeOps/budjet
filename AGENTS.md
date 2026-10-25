@@ -36,6 +36,7 @@ Hooks and install scripts stay off (ADR 0002): commit with plain `git commit`, a
 
 - Commit messages follow Conventional Commits (`feat: …`, `fix(scope): …`); `dagger call check-commits` verifies them.
 - Branch names: `<type>/<slug>`, e.g. `feat/data-folder`. Work reaches `master` only through a PR.
+- Push over HTTPS: `git push https://github.com/JaykeOps/budjet.git <branch>`, then `gh pr create --head <branch>`. Agent sandboxes get GitHub credentials only on HTTPS, and `origin` may be an SSH remote.
 - PRs are squash-merged, so the **PR title** is the commit that lands and drives the release. Make it a Conventional Commit.
 - One PR is one change a single title describes. If the title needs "and", split the PR.
 - Aim for under ~400 changed lines, excluding lockfiles and generated files.
