@@ -16,12 +16,15 @@ import {
 import { useAssignment } from "../assignments";
 import { useReadyToAssign } from "../budget-totals";
 import { type Category, useCategoryGroups } from "../categories";
+import { type MoveInput, MoveMoneyForm } from "./MoveMoneyForm";
 
 export type AssignInput = { categoryId: string; month: Month; amount: Money };
+export type MoveMoneyInput = MoveInput & { month: Month };
 
 /**
  * The Month screen: controls to step between Months, Ready to Assign, then
- * every Category under its Category Group with its Assignment for the Month.
+ * every Category under its Category Group with its Assignment for the Month,
+ * and shortcuts to copy last Month's Assignments and to move money.
  * The app shell decides where the Month is kept and what assigning does; an
  * error it throws is shown on the screen. There is no stepping back past
  * `firstMonth`.
@@ -32,23 +35,30 @@ export function MonthBudget({
   currency,
   onMonthChange,
   onAssign,
+  onCopyLastMonth,
+  onMoveMoney,
 }: {
   month: Month;
   firstMonth: Month;
   currency: Currency;
   onMonthChange: (month: Month) => void;
   onAssign: (input: AssignInput) => void;
+  onCopyLastMonth: (month: Month) => void;
+  onMoveMoney: (input: MoveMoneyInput) => void;
 }) {
   const headingId = useId();
   const groups = useCategoryGroups();
   const [error, setError] = useState<string>();
 
-  function assign(input: AssignInput) {
+  /** Runs a change, showing the error if it is refused; true when it went through. */
+  function attempt(action: () => void): boolean {
     try {
-      onAssign(input);
+      action();
       setError(undefined);
+      return true;
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
+      return false;
     }
   }
 
@@ -68,6 +78,19 @@ export function MonthBudget({
         </button>
       </nav>
       <ReadyToAssign />
+      {month > firstMonth && (
+        <button
+          type="button"
+          onClick={() => attempt(() => onCopyLastMonth(month))}
+        >
+          Copy last Month
+        </button>
+      )}
+      <MoveMoneyForm
+        currency={currency}
+        onMove={(input) => attempt(() => onMoveMoney({ ...input, month }))}
+        onError={setError}
+      />
       {error && <p role="alert">{error}</p>}
       <table aria-labelledby={headingId}>
         <thead>
@@ -91,7 +114,9 @@ export function MonthBudget({
                 month={month}
                 currency={currency}
                 onAssign={(amount) =>
-                  assign({ categoryId: category.id, month, amount })
+                  attempt(() =>
+                    onAssign({ categoryId: category.id, month, amount }),
+                  )
                 }
                 onError={setError}
               />
