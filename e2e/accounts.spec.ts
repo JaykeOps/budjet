@@ -144,7 +144,7 @@ test("a user re-declares a balance, Transfers an Account to $0, closes it and re
   };
   await expectClosed();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectClosed();
 });
