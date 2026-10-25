@@ -1,9 +1,10 @@
+import type { ComponentProps } from "react";
 import type { ChangeLogWriter } from "./kernel/change-log";
-import { currentMonth } from "./kernel/month";
 import {
   ChangeLogWriterProvider,
   useChangeLogWriter,
 } from "./kernel/use-change-log-query";
+import { useMonthInUrl } from "./month-in-url";
 import {
   AccountsScreen,
   OpenAccountForm,
@@ -59,8 +60,8 @@ function Shell() {
   }
   return (
     <>
-      <MonthBudget
-        month={currentMonth()}
+      <BudgetMonth
+        firstMonth={budget.firstMonth}
         currency={budget.currency}
         onAssign={(input) => setAssignment(writer, input)}
       />
@@ -74,5 +75,21 @@ function Shell() {
         onOpenAccount={(input) => openAccount(writer, input)}
       />
     </>
+  );
+}
+
+/** The Month Budget view for the Month in the address bar. */
+function BudgetMonth({
+  firstMonth,
+  ...props
+}: Omit<ComponentProps<typeof MonthBudget>, "month" | "onMonthChange">) {
+  const [month, setMonth] = useMonthInUrl(firstMonth);
+  return (
+    <MonthBudget
+      month={month}
+      firstMonth={firstMonth}
+      onMonthChange={setMonth}
+      {...props}
+    />
   );
 }

@@ -6,9 +6,12 @@ import {
 import { createBudget } from "./commands";
 import { budget } from "./index";
 
-function setUp() {
+function setUp(now?: () => number) {
   const changeLog = createInMemoryChangeLog();
-  return { changeLog, writer: createChangeLogWriter(changeLog, "this-device") };
+  return {
+    changeLog,
+    writer: createChangeLogWriter(changeLog, "this-device", { now }),
+  };
 }
 
 describe("Budget Setup", () => {
@@ -38,5 +41,16 @@ describe("Budget Setup", () => {
       /already has a Budget/,
     );
     expect(budget(changeLog.readAll())).toMatchObject({ currency: "EUR" });
+  });
+
+  it("starts at the Month it was created in", () => {
+    const { changeLog, writer } = setUp(() =>
+      new Date(2026, 9, 31, 23, 59).getTime(),
+    );
+    createBudget(writer, { currency: "USD" });
+
+    expect(budget(changeLog.readAll())).toMatchObject({
+      firstMonth: "2026-10",
+    });
   });
 });
