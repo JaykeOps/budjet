@@ -94,8 +94,15 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
   await categories.getByRole("button", { name: "Hide Rent" }).click();
   await expect(alert).toContainText("Rent still has $50.00 Available");
 
-  // Rent was used, so deleting it is refused with an offer to hide it.
-  await assignRent("0");
+  // Paying the rent spends it, and a used Category can't be deleted: the
+  // refusal offers to hide it.
+  const record = page.getByRole("form", { name: "Record a Transaction" });
+  await record.getByLabel("Amount").fill("50");
+  await record.getByLabel("Category").selectOption({ label: "Rent" });
+  await record.getByRole("button", { name: "Record Transaction" }).click();
+  await expect(month.getByRole("row", { name: /Rent/ })).toContainText(
+    /\$50\.00.*\$0\.00/,
+  );
   await categories.getByRole("button", { name: "Delete Rent" }).click();
   await expect(alert).toContainText("can't be deleted");
   await alert.getByRole("button", { name: "Hide Rent instead" }).click();

@@ -73,17 +73,18 @@ export function available(
 }
 
 /**
- * Whether a Category was ever used: a Transaction is in it now, or it has an
- * Assignment in any Month (even one of zero).
+ * Whether a Category is in use: a Transaction is in it now, or its Assignment
+ * in some Month is other than zero now. Like a deleted Transaction, an
+ * Assignment set and later cleared back to zero leaves no trace.
  */
 export function categoryUsed(
   records: readonly ChangeRecord[],
   categoryId: string,
 ): boolean {
   return (
-    records.some(
-      (record) =>
-        isAssignmentSet(record) && record.payload.categoryId === categoryId,
+    [...latestBySubject(records.filter(isAssignmentSet)).values()].some(
+      ({ payload }) =>
+        payload.categoryId === categoryId && payload.amount.minorUnits !== 0,
     ) ||
     currentTransactions(records).some(
       (transaction) => transaction.categoryId === categoryId,
