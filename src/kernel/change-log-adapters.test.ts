@@ -5,7 +5,10 @@ import {
   type ChangeRecord,
   createInMemoryChangeLog,
 } from "./change-log";
-import { openIndexedDbChangeLog } from "./indexed-db-change-log";
+import {
+  openIndexedDbChangeLog,
+  openIndexedDbDeviceId,
+} from "./indexed-db-change-log";
 
 /**
  * Each adapter gives every test fresh storage, which `open` opens. Opening it
@@ -85,6 +88,54 @@ describe("IndexedDB Change Log", () => {
     database.close();
   });
 });
+
+describe("this device's id in IndexedDB", () => {
+  it("is the same every time the same storage is opened", async () => {
+    const indexedDB = new IDBFactory();
+    const first = await openIndexedDbDeviceId({ indexedDB });
+
+    const second = await openIndexedDbDeviceId({ indexedDB });
+
+    expect(second).toBe(first);
+  });
+
+  it("is new for fresh storage", async () => {
+    const one = await openIndexedDbDeviceId({ indexedDB: new IDBFactory() });
+    const other = await openIndexedDbDeviceId({ indexedDB: new IDBFactory() });
+
+    expect(other).not.toBe(one);
+  });
+
+  it("keeps records saved before the device id was stored", async () => {
+    const indexedDB = new IDBFactory();
+    await saveRecordsTheFirstWay(indexedDB, [later, earlier]);
+
+    await openIndexedDbDeviceId({ indexedDB });
+    const changeLog = await openIndexedDbChangeLog({ indexedDB });
+
+    expect(changeLog.readAll()).toEqual([earlier, later]);
+  });
+});
+
+/** Saves records as the first version of the database did: one store, keyed by record id. */
+function saveRecordsTheFirstWay(
+  indexedDB: IDBFactory,
+  records: ChangeRecord[],
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("budjet", 1);
+    request.onupgradeneeded = () => {
+      const store = request.result.createObjectStore("records");
+      for (const record of records)
+        store.put(JSON.stringify(record), record.id);
+    };
+    request.onsuccess = () => {
+      request.result.close();
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
 
 function openDatabase(indexedDB: IDBFactory): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {

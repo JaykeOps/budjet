@@ -82,3 +82,45 @@ test("a returning user's Budget opens with the network offline", async ({
     page.getByRole("heading", { name: "Create your Budget" }),
   ).toBeHidden();
 });
+
+test("changes made after a reload come from the same device", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Currency").selectOption("SEK");
+  await page.getByRole("button", { name: "Create Budget" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Add your first Account" }),
+  ).toBeVisible();
+
+  await reloadWhenSaved(page);
+  await addFirstAccount(page, "100");
+  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await reloadWhenSaved(page);
+
+  const deviceIds = await page.evaluate(
+    () =>
+      new Promise<string[]>((resolve, reject) => {
+        const opening = indexedDB.open("budjet");
+        opening.onerror = () => reject(opening.error);
+        opening.onsuccess = () => {
+          const database = opening.result;
+          const reading = database
+            .transaction("records")
+            .objectStore("records")
+            .getAll();
+          reading.onerror = () => reject(reading.error);
+          reading.onsuccess = () => {
+            database.close();
+            resolve(
+              reading.result.map(
+                (payload: string) => JSON.parse(payload).deviceId,
+              ),
+            );
+          };
+        };
+      }),
+  );
+  expect(deviceIds.length).toBeGreaterThan(1);
+  expect(new Set(deviceIds).size).toBe(1);
+});

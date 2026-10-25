@@ -77,14 +77,6 @@ export type ChangeLogWriter = {
   ): ChangeRecord<Type, Payload>;
 };
 
-let deviceId: string | undefined;
-
-/** This device's id, stamped on every record it writes. Lives only as long as the page for now. */
-export function thisDeviceId(): string {
-  deviceId ??= crypto.randomUUID();
-  return deviceId;
-}
-
 /** Appends records made on this device to the Change Log. */
 export function createChangeLogWriter(
   changeLog: ChangeLog,
