@@ -30,6 +30,13 @@ export function findFeatureSliceViolations(srcDir: string): string[] {
   for (const { file, specifier, target } of relativeImports(srcDir)) {
     const from = sliceOf(file);
     const to = sliceOf(target);
+    // Records are the leaves every slice may read, so they import only the kernel.
+    if (from?.module === "records" && to !== undefined) {
+      violations.push(
+        `records of slice "${from.name}" may import only the kernel: ${file} imports "${specifier}"`,
+      );
+      continue;
+    }
     if (to === undefined || from?.name === to.name) continue;
     if (PUBLIC_MODULES.has(to.module)) {
       if (from && to.module !== "records") {
