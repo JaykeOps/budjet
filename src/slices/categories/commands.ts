@@ -1,4 +1,7 @@
 import type { ChangeLogWriter } from "../../kernel/change-log";
+import { formatMoney } from "../../kernel/money";
+import type { Month } from "../../kernel/month";
+import { assignedAfter, available, categoryUsed } from "../budget-totals";
 import { categoryGroups } from "./queries";
 import type { CategoriesRecord } from "./records";
 
@@ -107,6 +110,84 @@ export function moveCategory(
   for (const [position, id] of placeAt(others, categoryId, toIndex)) {
     write(writer, id, "CategoryPlaced", { version: 1, groupId, position });
   }
+}
+
+/**
+ * Hides a Category: it leaves the Month Budget view and the Category pickers,
+ * and its history stays. Refused while it has money Available (or is
+ * Overspent) in the current Month, or has Assignments in later Months, so
+ * hiding never makes money vanish.
+ */
+export function hideCategory(
+  writer: ChangeLogWriter,
+  categoryId: string,
+  { currentMonth }: { currentMonth: Month },
+): void {
+  const { category } = findCategory(writer, categoryId);
+  const records = writer.changeLog.readAll();
+  const left = available(records, categoryId, currentMonth);
+  if (left && left.minorUnits !== 0) {
+    throw new Error(
+      `${category.name} still has ${formatMoney(left)} Available. Move it to another Category first.`,
+    );
+  }
+  if (assignedAfter(records, categoryId, currentMonth)) {
+    throw new Error(
+      `${category.name} has Assignments in later Months. Set them to zero first.`,
+    );
+  }
+  write(writer, categoryId, "CategoryHidden", { version: 1 });
+}
+
+/** Brings a hidden Category back. */
+export function unhideCategory(
+  writer: ChangeLogWriter,
+  categoryId: string,
+): void {
+  findCategory(writer, categoryId);
+  write(writer, categoryId, "CategoryUnhidden", { version: 1 });
+}
+
+/**
+ * Refuses to delete a used Category. The UI offers to hide it instead, so it
+ * can tell this refusal from the others.
+ */
+export class CategoryInUseError extends Error {
+  constructor(
+    readonly categoryId: string,
+    name: string,
+  ) {
+    super(
+      `${name} has Transactions or Assignments, so it can't be deleted. You can hide it instead.`,
+    );
+    this.name = "CategoryInUseError";
+  }
+}
+
+/** Deletes a Category that was never used. A used one can only be hidden. */
+export function deleteCategory(
+  writer: ChangeLogWriter,
+  categoryId: string,
+): void {
+  const { category } = findCategory(writer, categoryId);
+  if (categoryUsed(writer.changeLog.readAll(), categoryId)) {
+    throw new CategoryInUseError(categoryId, category.name);
+  }
+  write(writer, categoryId, "CategoryDeleted", { version: 1 });
+}
+
+/** Deletes a Category Group with no Categories in it, hidden ones included. */
+export function deleteCategoryGroup(
+  writer: ChangeLogWriter,
+  groupId: string,
+): void {
+  const group = findGroup(writer, groupId);
+  if (group.categories.length > 0) {
+    throw new Error(
+      `${group.name} still has Categories. Move or delete them first.`,
+    );
+  }
+  write(writer, groupId, "CategoryGroupDeleted", { version: 1 });
 }
 
 /**

@@ -13,7 +13,14 @@ import type {
   TransactionEdited,
   TransactionRecorded,
 } from "../transactions/records";
-import { available, overspent, readyToAssign, spending } from "./index";
+import {
+  assignedAfter,
+  available,
+  categoryUsed,
+  overspent,
+  readyToAssign,
+  spending,
+} from "./index";
 
 /** A Budget in USD, seeded with the records other slices publish. */
 function budget() {
@@ -100,6 +107,9 @@ function budget() {
     available: (categoryId: string, of: Month) =>
       available(changeLog.readAll(), categoryId, of),
     overspent: (of: Month) => overspent(changeLog.readAll(), of),
+    used: (categoryId: string) => categoryUsed(changeLog.readAll(), categoryId),
+    assignedAfter: (categoryId: string, of: Month) =>
+      assignedAfter(changeLog.readAll(), categoryId, of),
   };
 }
 
@@ -372,5 +382,44 @@ describe("Budget Totals", () => {
     expect(totals.overspent("2026-12")).toEqual([
       { categoryId: "dining-out", available: money(-30000, "USD") },
     ]);
+  });
+
+  it("knows whether a Category was ever used, by a Transaction or an Assignment", () => {
+    const totals = budget();
+    totals.openAccount(100000);
+    totals.record("2026-10-01", 300000);
+
+    expect(totals.used("rent")).toBe(false);
+    expect(totals.used("groceries")).toBe(false);
+
+    totals.assign("rent", "2026-10", 0);
+    totals.record("2026-10-12", -4550, "groceries");
+
+    expect(totals.used("rent")).toBe(true);
+    expect(totals.used("groceries")).toBe(true);
+    expect(totals.used("dining-out")).toBe(false);
+  });
+
+  it("forgets a Transaction's Category once the Transaction is deleted or moved to another Category", () => {
+    const totals = budget();
+    const shopping = totals.record("2026-10-12", -4550, "groceries");
+    const takeaway = totals.record("2026-10-13", -2000, "dining-out");
+
+    totals.delete(shopping);
+    totals.edit(takeaway, "2026-10-13", -2000, "groceries");
+
+    expect(totals.used("dining-out")).toBe(false);
+    expect(totals.used("groceries")).toBe(true);
+  });
+
+  it("knows whether a Category has Assignments in Months after a Month", () => {
+    const totals = budget();
+    totals.assign("rent", "2026-10", 80000);
+    totals.assign("gifts", "2026-12", 0);
+
+    expect(totals.assignedAfter("rent", "2026-09")).toBe(true);
+    expect(totals.assignedAfter("rent", "2026-10")).toBe(false);
+    // An Assignment of zero gives the Category no money in that Month.
+    expect(totals.assignedAfter("gifts", "2026-10")).toBe(false);
   });
 });

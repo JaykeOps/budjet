@@ -13,13 +13,20 @@ type Placed = { id: string; name: string; position: number };
 
 /**
  * The Category Groups in order, each with its Categories in order. Every
- * Category belongs to exactly one Category Group. Nothing is hidden yet.
+ * Category belongs to exactly one Category Group. Hidden Categories are
+ * listed, marked hidden; deleted ones and deleted Category Groups are gone.
+ * Category Groups are never hidden.
  */
 export function categoryGroups(
   records: readonly ChangeRecord[],
 ): CategoryGroup[] {
   const groups = new Map<string, Placed>();
-  const categories = new Map<string, Placed & { groupId: string }>();
+  const categories = new Map<
+    string,
+    Placed & { groupId: string; hidden: boolean }
+  >();
+  // Once deleted, a thing stays deleted, whatever other devices did to it.
+  const deleted = new Set<string>();
 
   // Records come oldest first, so each later record overwrites what it changes.
   for (const record of records) {
@@ -42,6 +49,7 @@ export function categoryGroups(
           id,
           ...pick(record.payload),
           groupId: record.payload.groupId,
+          hidden: false,
         });
         break;
       case "CategoryRenamed":
@@ -53,16 +61,25 @@ export function categoryGroups(
           category.position = record.payload.position;
         }
         break;
+      case "CategoryHidden":
+      case "CategoryUnhidden":
+        if (category) category.hidden = record.type === "CategoryHidden";
+        break;
+      case "CategoryDeleted":
+      case "CategoryGroupDeleted":
+        deleted.add(id);
+        break;
     }
   }
 
-  const all = [...categories.values()];
-  return inOrder([...groups.values()]).map((group) => ({
+  const all = [...categories.values()].filter(({ id }) => !deleted.has(id));
+  const kept = [...groups.values()].filter(({ id }) => !deleted.has(id));
+  return inOrder(kept).map((group) => ({
     id: group.id,
     name: group.name,
     hidden: false,
     categories: inOrder(all.filter(({ groupId }) => groupId === group.id)).map(
-      ({ id, name }) => ({ id, name, hidden: false }),
+      ({ id, name, hidden }) => ({ id, name, hidden }),
     ),
   }));
 }
