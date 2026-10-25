@@ -53,7 +53,8 @@ export class Budjet {
   }
 
   /**
-   * Run every check: commit messages, lint, typecheck, unit tests and the build.
+   * Run every check: commit messages, lint, slice boundaries, typecheck, unit
+   * tests and the build.
    * Pass --pr-title in CI, where the squash-merged PR title is the commit that lands.
    */
   @func()
@@ -61,6 +62,7 @@ export class Budjet {
     await Promise.all([
       this.checkCommits(prTitle),
       this.lint(),
+      this.boundaries(),
       this.typecheck(),
       this.test(),
       this.build().sync(),
@@ -99,6 +101,17 @@ export class Budjet {
   @func()
   async lint(): Promise<string> {
     return this.inDevShell(this.workspace(), ["pnpm", "lint"]).stdout();
+  }
+
+  /** Check feature slices only reach each other through their public code (docs/adr/0005). */
+  @func()
+  async boundaries(): Promise<string> {
+    return this.inDevShell(
+      this.toolchain().withDirectory("/src", this.source, {
+        include: ["scripts/check-slice-boundaries.ts", "src"],
+      }),
+      ["node", "scripts/check-slice-boundaries.ts"],
+    ).stdout();
   }
 
   /** Typecheck with tsc. */
