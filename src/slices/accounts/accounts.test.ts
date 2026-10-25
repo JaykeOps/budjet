@@ -5,6 +5,7 @@ import {
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import type { BudgetCreated } from "../budget-setup/records";
+import type { TransactionRecorded } from "../transactions/records";
 import { openAccount } from "./commands";
 import { accountBalance, accounts, accountsTotal } from "./index";
 
@@ -69,6 +70,44 @@ describe("Accounts", () => {
       "Wallet",
     ]);
     expect(accountsTotal(changeLog.readAll())).toEqual(money(344950, "SEK"));
+  });
+
+  it("counts money going out of and coming in to an Account in its balance", () => {
+    const { changeLog, writer } = budgetIn("USD");
+    const checking = openAccount(writer, {
+      name: "Checking",
+      kind: "checking",
+      openingBalance: money(100000, "USD"),
+    });
+    const savings = openAccount(writer, {
+      name: "Savings",
+      kind: "savings",
+      openingBalance: money(50000, "USD"),
+    });
+    const recordTransaction = (accountId: string, amount: number) =>
+      writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+        crypto.randomUUID(),
+        "TransactionRecorded",
+        {
+          version: 1,
+          accountId,
+          date: "2026-10-12",
+          amount: money(amount, "USD"),
+          categoryId: "groceries",
+        },
+      );
+
+    recordTransaction(checking, -4550);
+    recordTransaction(checking, 300000);
+    recordTransaction(savings, -1000);
+
+    expect(accountBalance(changeLog.readAll(), checking)).toEqual(
+      money(395450, "USD"),
+    );
+    expect(accountBalance(changeLog.readAll(), savings)).toEqual(
+      money(49000, "USD"),
+    );
+    expect(accountsTotal(changeLog.readAll())).toEqual(money(444450, "USD"));
   });
 
   it("needs a name for the Account", () => {
