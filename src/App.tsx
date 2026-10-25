@@ -1,17 +1,17 @@
 import type { Writer } from "./kernel/change-log";
-import { ChangeLogProvider, useWriter } from "./kernel/use-change-log-query";
+import { useWriter, WriterProvider } from "./kernel/use-change-log-query";
 import { BudgetSetupForm, useBudget } from "./slices/budget-setup";
 import { createBudget } from "./slices/budget-setup/commands";
 
 export function App({ writer }: { writer: Writer }) {
   return (
-    <ChangeLogProvider value={writer}>
+    <WriterProvider value={writer}>
       <main>
         <h1>budjet</h1>
         <Shell />
         <p>Version {__APP_VERSION__}</p>
       </main>
-    </ChangeLogProvider>
+    </WriterProvider>
   );
 }
 
