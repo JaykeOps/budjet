@@ -16,12 +16,12 @@ export type ChangeRecord<Type extends string = string, Payload = unknown> = {
   payload: Payload;
 };
 
-export interface ChangeLog {
+export type ChangeLog = {
   append(records: readonly ChangeRecord[]): void;
   /** Every record, oldest first. The same array comes back until the next append. */
   readAll(): readonly ChangeRecord[];
   subscribe(listener: () => void): () => void;
-}
+};
 
 /** Orders records oldest first: by timestamp, then device id, so every device agrees. */
 export function compareRecords(a: ChangeRecord, b: ChangeRecord): number {

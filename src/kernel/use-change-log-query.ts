@@ -9,11 +9,11 @@ import type { ChangeLog, ChangeRecord, Writer } from "./change-log";
 const WriterContext = createContext<Writer | null>(null);
 
 /** Gives the components below it this device's Writer and its Change Log. */
-export const ChangeLogProvider = WriterContext.Provider;
+export const WriterProvider = WriterContext.Provider;
 
 export function useWriter(): Writer {
   const writer = useContext(WriterContext);
-  if (!writer) throw new Error("useWriter needs a ChangeLogProvider above it");
+  if (!writer) throw new Error("useWriter needs a WriterProvider above it");
   return writer;
 }
 
