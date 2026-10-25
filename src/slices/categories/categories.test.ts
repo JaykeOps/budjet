@@ -4,14 +4,24 @@ import {
   createChangeLogWriter,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
+import { money } from "../../kernel/money";
+import type { Month } from "../../kernel/month";
+import { type AssignmentSet, assignmentSubject } from "../assignments/records";
+import type { BudgetCreated } from "../budget-setup/records";
+import type { TransactionRecorded } from "../transactions/records";
 import {
   addStarterSet,
+  CategoryInUseError,
   createCategory,
   createCategoryGroup,
+  deleteCategory,
+  deleteCategoryGroup,
+  hideCategory,
   moveCategory,
   moveCategoryGroup,
   renameCategory,
   renameCategoryGroup,
+  unhideCategory,
 } from "./commands";
 import { type CategoryGroup, categoryGroups } from "./index";
 
@@ -213,3 +223,166 @@ function deviceCopy(source: ChangeLog, deviceId: string, now: number) {
     writer: createChangeLogWriter(changeLog, deviceId, { now: () => now }),
   };
 }
+
+/** A Budget in USD with the starter set, and a way to seed the money records other slices publish. */
+function budgetWithStarterSet() {
+  const changeLog = createInMemoryChangeLog();
+  const writer = createChangeLogWriter(changeLog, "this-device");
+  writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+    "budget",
+    "BudgetCreated",
+    { version: 1, currency: "USD" },
+  );
+  addStarterSet(writer);
+  const groups = () => categoryGroups(changeLog.readAll());
+  const find = (name: string) => {
+    const category = groups()
+      .flatMap((group) => group.categories)
+      .find((category) => category.name === name);
+    if (!category) throw new Error(`No Category ${name}`);
+    return category;
+  };
+  return {
+    writer,
+    groups,
+    find,
+    id: (name: string) => find(name).id,
+    assign(categoryId: string, month: Month, amount: number) {
+      writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+        assignmentSubject(categoryId, month),
+        "AssignmentSet",
+        { version: 1, categoryId, month, amount: money(amount, "USD") },
+      );
+    },
+    spend(categoryId: string, date: string, amount: number) {
+      writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+        crypto.randomUUID(),
+        "TransactionRecorded",
+        {
+          version: 1,
+          accountId: "checking",
+          date,
+          amount: money(-amount, "USD"),
+          categoryId,
+        },
+      );
+    },
+  };
+}
+
+describe("Hiding Categories", () => {
+  it("hides a Category with nothing Available and nothing assigned later, and keeps it listed as hidden", () => {
+    const budget = budgetWithStarterSet();
+    const phone = budget.id("Phone");
+    budget.assign(phone, "2026-09", 5000);
+    budget.spend(phone, "2026-09-20", 5000);
+
+    hideCategory(budget.writer, phone, { currentMonth: "2026-10" });
+
+    expect(budget.find("Phone").hidden).toBe(true);
+    expect(budget.find("Rent").hidden).toBe(false);
+  });
+
+  it("brings a hidden Category back when it is unhidden", () => {
+    const budget = budgetWithStarterSet();
+    const phone = budget.id("Phone");
+    hideCategory(budget.writer, phone, { currentMonth: "2026-10" });
+
+    unhideCategory(budget.writer, phone);
+
+    expect(budget.find("Phone").hidden).toBe(false);
+  });
+
+  it("refuses to hide a Category that has money Available this Month", () => {
+    const budget = budgetWithStarterSet();
+    const phone = budget.id("Phone");
+    budget.assign(phone, "2026-09", 5000);
+
+    expect(() =>
+      hideCategory(budget.writer, phone, { currentMonth: "2026-10" }),
+    ).toThrow(/Phone still has \$50\.00 Available/);
+    expect(budget.find("Phone").hidden).toBe(false);
+  });
+
+  it("refuses to hide an Overspent Category", () => {
+    const budget = budgetWithStarterSet();
+    const phone = budget.id("Phone");
+    budget.spend(phone, "2026-10-02", 1000);
+
+    expect(() =>
+      hideCategory(budget.writer, phone, { currentMonth: "2026-10" }),
+    ).toThrow(/Phone still has -\$10\.00 Available/);
+  });
+
+  it("refuses to hide a Category with Assignments in later Months", () => {
+    const budget = budgetWithStarterSet();
+    const phone = budget.id("Phone");
+    budget.assign(phone, "2026-12", 5000);
+
+    expect(() =>
+      hideCategory(budget.writer, phone, { currentMonth: "2026-10" }),
+    ).toThrow(/Phone has Assignments in later Months/);
+    expect(budget.find("Phone").hidden).toBe(false);
+  });
+});
+
+describe("Deleting Categories and Category Groups", () => {
+  it("deletes a Category that was never used", () => {
+    const budget = budgetWithStarterSet();
+
+    deleteCategory(budget.writer, budget.id("Phone"));
+
+    expect(outline(budget.groups())[0]).toEqual([
+      "Bills",
+      ["Rent", "Power", "Internet"],
+    ]);
+  });
+
+  it("refuses to delete a Category with Transactions or Assignments, and offers to hide it instead", () => {
+    const budget = budgetWithStarterSet();
+    const phone = budget.id("Phone");
+    const power = budget.id("Power");
+    budget.spend(phone, "2026-10-02", 1000);
+    budget.assign(power, "2026-10", 0);
+
+    expect(() => deleteCategory(budget.writer, phone)).toThrow(
+      CategoryInUseError,
+    );
+    expect(() => deleteCategory(budget.writer, power)).toThrow(
+      "Power has Transactions or Assignments, so it can't be deleted. You can hide it instead.",
+    );
+    expect(outline(budget.groups())[0]).toEqual([
+      "Bills",
+      ["Rent", "Power", "Phone", "Internet"],
+    ]);
+  });
+
+  it("deletes an empty Category Group, but not one with Categories in it", () => {
+    const budget = budgetWithStarterSet();
+    const [, , savings] = budget.groups();
+
+    expect(() => deleteCategoryGroup(budget.writer, savings.id)).toThrow(
+      "Savings still has Categories. Move or delete them first.",
+    );
+
+    deleteCategory(budget.writer, budget.id("Emergency Fund"));
+    deleteCategoryGroup(budget.writer, savings.id);
+
+    expect(outline(budget.groups()).map(([name]) => name)).toEqual([
+      "Bills",
+      "Everyday",
+    ]);
+  });
+
+  it("counts a hidden Category as being in its Category Group", () => {
+    const budget = budgetWithStarterSet();
+    const [, , savings] = budget.groups();
+    hideCategory(budget.writer, budget.id("Emergency Fund"), {
+      currentMonth: "2026-10",
+    });
+
+    expect(() => deleteCategoryGroup(budget.writer, savings.id)).toThrow(
+      /still has Categories/,
+    );
+  });
+});

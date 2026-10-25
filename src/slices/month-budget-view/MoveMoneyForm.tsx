@@ -1,6 +1,6 @@
 import { type FormEvent, useId, useState } from "react";
 import { type Currency, type Money, parseMoney } from "../../kernel/money";
-import { useCategoryGroups } from "../categories";
+import { useVisibleCategoryGroups } from "./visible-categories";
 
 export type MoveInput = {
   fromCategoryId: string;
@@ -22,7 +22,7 @@ export function MoveMoneyForm({
   onError: (message: string | undefined) => void;
 }) {
   const headingId = useId();
-  const groups = useCategoryGroups();
+  const groups = useVisibleCategoryGroups();
   const firstCategoryId = groups.flatMap((group) => group.categories)[0]?.id;
   const [from, setFrom] = useState<string>();
   const [to, setTo] = useState<string>();

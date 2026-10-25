@@ -1,31 +1,83 @@
 import { type FormEvent, type ReactNode, useState } from "react";
+import { currentMonth } from "../../kernel/month";
 import {
   useChangeLogQuery,
   useChangeLogWriter,
 } from "../../kernel/use-change-log-query";
 import {
+  CategoryInUseError,
   createCategory,
   createCategoryGroup,
+  deleteCategory,
+  deleteCategoryGroup,
+  hideCategory,
   moveCategory,
   moveCategoryGroup,
   renameCategory,
   renameCategoryGroup,
+  unhideCategory,
 } from "./commands";
 import { type Category, type CategoryGroup, categoryGroups } from "./queries";
 
-/** The Category Groups and their Categories, to create, rename, reorder and move. */
+/** Runs a change, showing why if it is refused. */
+type Attempt = (action: () => void) => void;
+
+/** A refused change: why, and for a used Category, the offer to hide it instead. */
+type Refusal = { message: string; hide?: { categoryId: string; name: string } };
+
+/**
+ * The Category Groups and their Categories, to create, rename, reorder, move,
+ * hide, unhide and delete. Hidden Categories stay listed so they can be
+ * unhidden.
+ */
 export function CategoryList() {
   const writer = useChangeLogWriter();
   const groups = useChangeLogQuery(categoryGroups);
+  const [refusal, setRefusal] = useState<Refusal>();
+
+  const attempt: Attempt = (action) => {
+    try {
+      action();
+      setRefusal(undefined);
+    } catch (failure) {
+      if (failure instanceof CategoryInUseError) {
+        const name = categoryName(groups, failure.categoryId);
+        setRefusal({
+          message: failure.message,
+          hide: { categoryId: failure.categoryId, name },
+        });
+      } else {
+        setRefusal({
+          message: failure instanceof Error ? failure.message : String(failure),
+        });
+      }
+    }
+  };
 
   return (
     <section aria-labelledby="categories-heading">
       <h2 id="categories-heading">Categories</h2>
+      {refusal && (
+        <div role="alert">
+          {refusal.message}
+          {refusal.hide && (
+            <>
+              {" "}
+              <HideButton
+                categoryId={refusal.hide.categoryId}
+                label={`Hide ${refusal.hide.name} instead`}
+                attempt={attempt}
+              />
+            </>
+          )}
+        </div>
+      )}
       {groups.map((group, index) => (
         <GroupSection
           key={group.id}
           group={group}
           groups={groups}
+          attempt={attempt}
           onMove={(toIndex) => moveCategoryGroup(writer, group.id, { toIndex })}
           canMoveUp={index > 0}
           canMoveDown={index < groups.length - 1}
@@ -41,9 +93,47 @@ export function CategoryList() {
   );
 }
 
+function categoryName(groups: CategoryGroup[], categoryId: string): string {
+  return (
+    groups
+      .flatMap((group) => group.categories)
+      .find(({ id }) => id === categoryId)?.name ?? "it"
+  );
+}
+
+function HideButton({
+  categoryId,
+  label,
+  text = label,
+  attempt,
+}: {
+  categoryId: string;
+  /** Its accessible name. */
+  label: string;
+  /** What it shows, when shorter than its label. */
+  text?: string;
+  attempt: Attempt;
+}) {
+  const writer = useChangeLogWriter();
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={() =>
+        attempt(() =>
+          hideCategory(writer, categoryId, { currentMonth: currentMonth() }),
+        )
+      }
+    >
+      {text}
+    </button>
+  );
+}
+
 function GroupSection({
   group,
   groups,
+  attempt,
   index,
   canMoveUp,
   canMoveDown,
@@ -51,6 +141,7 @@ function GroupSection({
 }: {
   group: CategoryGroup;
   groups: CategoryGroup[];
+  attempt: Attempt;
   index: number;
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -73,6 +164,13 @@ function GroupSection({
         canMoveDown={canMoveDown}
         onMove={(by) => onMove(index + by)}
       />
+      <button
+        type="button"
+        aria-label={`Delete ${group.name}`}
+        onClick={() => attempt(() => deleteCategoryGroup(writer, group.id))}
+      >
+        Delete
+      </button>
       <ul>
         {group.categories.map((category, position) => (
           <CategoryRow
@@ -81,6 +179,7 @@ function GroupSection({
             group={group}
             groups={groups}
             position={position}
+            attempt={attempt}
           />
         ))}
       </ul>
@@ -98,11 +197,13 @@ function CategoryRow({
   group,
   groups,
   position,
+  attempt,
 }: {
   category: Category;
   group: CategoryGroup;
   groups: CategoryGroup[];
   position: number;
+  attempt: Attempt;
 }) {
   const writer = useChangeLogWriter();
 
@@ -113,6 +214,7 @@ function CategoryRow({
         onRename={(name) => renameCategory(writer, category.id, { name })}
       >
         <span className="category-name">{category.name}</span>
+        {category.hidden && " (hidden)"}
       </Renamable>
       <MoveButtons
         name={category.name}
@@ -142,7 +244,30 @@ function CategoryRow({
             {name}
           </option>
         ))}
-      </select>
+      </select>{" "}
+      {category.hidden ? (
+        <button
+          type="button"
+          aria-label={`Unhide ${category.name}`}
+          onClick={() => attempt(() => unhideCategory(writer, category.id))}
+        >
+          Unhide
+        </button>
+      ) : (
+        <HideButton
+          categoryId={category.id}
+          label={`Hide ${category.name}`}
+          text="Hide"
+          attempt={attempt}
+        />
+      )}{" "}
+      <button
+        type="button"
+        aria-label={`Delete ${category.name}`}
+        onClick={() => attempt(() => deleteCategory(writer, category.id))}
+      >
+        Delete
+      </button>
     </li>
   );
 }
