@@ -3,6 +3,12 @@ import {
   ChangeLogWriterProvider,
   useChangeLogWriter,
 } from "./kernel/use-change-log-query";
+import {
+  AccountsScreen,
+  OpenAccountForm,
+  useAccounts,
+} from "./slices/accounts";
+import { openAccount } from "./slices/accounts/commands";
 import { BudgetSetupForm, useBudget } from "./slices/budget-setup";
 import { createBudget } from "./slices/budget-setup/commands";
 import { CategoryList } from "./slices/categories";
@@ -20,10 +26,14 @@ export function App({ writer }: { writer: ChangeLogWriter }) {
   );
 }
 
-/** Shows the setup flow until a Budget exists, then the Budget. */
+/**
+ * Walks a new user through setup (the Budget, then its first Account), then
+ * shows the Budget.
+ */
 function Shell() {
   const writer = useChangeLogWriter();
   const budget = useBudget();
+  const accounts = useAccounts();
 
   if (!budget) {
     return (
@@ -35,11 +45,26 @@ function Shell() {
       />
     );
   }
+  if (accounts.length === 0) {
+    return (
+      <OpenAccountForm
+        heading="Add your first Account"
+        currency={budget.currency}
+        onOpen={(input) => openAccount(writer, input)}
+      />
+    );
+  }
   return (
-    <section aria-labelledby="budget-heading">
-      <h2 id="budget-heading">Budget</h2>
-      <p>Kept in {budget.currency}. It has no Accounts yet.</p>
-      <CategoryList />
-    </section>
+    <>
+      <section aria-labelledby="budget-heading">
+        <h2 id="budget-heading">Budget</h2>
+        <p>Kept in {budget.currency}.</p>
+        <CategoryList />
+      </section>
+      <AccountsScreen
+        currency={budget.currency}
+        onOpenAccount={(input) => openAccount(writer, input)}
+      />
+    </>
   );
 }

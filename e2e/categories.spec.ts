@@ -23,6 +23,10 @@ test("a user organises Categories into Category Groups and the order is kept", a
   await page.goto("/");
   await page.getByLabel("Currency").selectOption("SEK");
   await page.getByRole("button", { name: "Create Budget" }).click();
+  const setup = page.getByRole("form", { name: "Add your first Account" });
+  await setup.getByLabel("Name").fill("Checking");
+  await setup.getByLabel("Opening Balance").fill("0");
+  await setup.getByRole("button", { name: "Add Account" }).click();
 
   await expect
     .poll(() => outline(page))
