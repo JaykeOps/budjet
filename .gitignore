@@ -1,7 +1,34 @@
+# Dependencies
 node_modules/
+.pnpm-store/
+
+# Build output
 dist/
+dev-dist/
+*.tsbuildinfo
+
+# Test output
 test-results/
 playwright-report/
+blob-report/
+coverage/
+
+# Nix
 .direnv/
 result
-*.tsbuildinfo
+result-*
+
+# Local env and secrets
+.env
+.env.*
+!.env.example
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/worktrees/
+
+# Logs and OS/editor clutter
+*.log
+.DS_Store
+.idea/
+.vscode/
