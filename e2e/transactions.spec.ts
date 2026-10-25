@@ -141,7 +141,7 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
   };
   await expectChanged();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectChanged();
 });
@@ -154,7 +154,7 @@ test("Payees used before are suggested", async ({ page }) => {
   await record.getByLabel("Payee").fill("Employer");
   await record.getByRole("button", { name: "Record Transaction" }).click();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   const list = await record.getByLabel("Payee").getAttribute("list");
   const suggestions = page.locator(`datalist[id="${list}"] option`);
@@ -167,7 +167,7 @@ test("an Account with thousands of Transactions renders only the rows in view", 
 }) => {
   await createBudget(page);
   await seedTransactions(page, 3000);
-  await page.reload();
+  await reloadWhenSaved(page);
 
   const transactions = page.getByRole("table", {
     name: "Transactions in Checking",
