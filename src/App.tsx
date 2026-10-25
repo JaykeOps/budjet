@@ -5,6 +5,8 @@ import {
 } from "./kernel/use-change-log-query";
 import { BudgetSetupForm, useBudget } from "./slices/budget-setup";
 import { createBudget } from "./slices/budget-setup/commands";
+import { CategoryList } from "./slices/categories";
+import { addStarterSet } from "./slices/categories/commands";
 
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
@@ -26,14 +28,18 @@ function Shell() {
   if (!budget) {
     return (
       <BudgetSetupForm
-        onCreate={({ currency }) => createBudget(writer, { currency })}
+        onCreate={({ currency }) => {
+          createBudget(writer, { currency });
+          addStarterSet(writer);
+        }}
       />
     );
   }
   return (
     <section aria-labelledby="budget-heading">
       <h2 id="budget-heading">Budget</h2>
-      <p>Kept in {budget.currency}. It has no Accounts or Categories yet.</p>
+      <p>Kept in {budget.currency}. It has no Accounts yet.</p>
+      <CategoryList />
     </section>
   );
 }
