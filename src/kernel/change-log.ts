@@ -68,7 +68,7 @@ export function createInMemoryChangeLog(): ChangeLog {
   };
 }
 
-export type Writer = {
+export type ChangeLogWriter = {
   readonly changeLog: ChangeLog;
   write<Type extends string, Payload>(
     subjectId: string,
@@ -78,11 +78,11 @@ export type Writer = {
 };
 
 /** Appends records made on this device to the Change Log. */
-export function createWriter(
+export function createChangeLogWriter(
   changeLog: ChangeLog,
   deviceId: string,
   { now = Date.now }: { now?: () => number } = {},
-): Writer {
+): ChangeLogWriter {
   return {
     changeLog,
     write(subjectId, type, payload) {

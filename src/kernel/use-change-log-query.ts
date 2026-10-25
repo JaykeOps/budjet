@@ -4,16 +4,19 @@ import {
   useMemo,
   useSyncExternalStore,
 } from "react";
-import type { ChangeLog, ChangeRecord, Writer } from "./change-log";
+import type { ChangeLog, ChangeLogWriter, ChangeRecord } from "./change-log";
 
-const WriterContext = createContext<Writer | null>(null);
+const ChangeLogWriterContext = createContext<ChangeLogWriter | null>(null);
 
-/** Gives the components below it this device's Writer and its Change Log. */
-export const WriterProvider = WriterContext.Provider;
+/** Gives the components below it this device's ChangeLogWriter, which they read and write the Change Log through. */
+export const ChangeLogWriterProvider = ChangeLogWriterContext.Provider;
 
-export function useWriter(): Writer {
-  const writer = useContext(WriterContext);
-  if (!writer) throw new Error("useWriter needs a WriterProvider above it");
+export function useChangeLogWriter(): ChangeLogWriter {
+  const writer = useContext(ChangeLogWriterContext);
+  if (!writer)
+    throw new Error(
+      "useChangeLogWriter needs a ChangeLogWriterProvider above it",
+    );
   return writer;
 }
 
@@ -25,7 +28,7 @@ type Query<Result> = (records: readonly ChangeRecord[]) => Result;
  * (a module-level query), not an inline one.
  */
 export function useChangeLogQuery<Result>(query: Query<Result>): Result {
-  const { changeLog } = useWriter();
+  const { changeLog } = useChangeLogWriter();
   const getSnapshot = useMemo(
     () => cachedQuery(changeLog, query),
     [changeLog, query],

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   type ChangeRecord,
+  createChangeLogWriter,
   createInMemoryChangeLog,
-  createWriter,
   latestBySubject,
 } from "./change-log";
 
@@ -20,7 +20,11 @@ function fakeClock(start: number) {
 describe("Change Log", () => {
   it("returns records in timestamp order, whatever order they were appended in", () => {
     const clock = fakeClock(1_000);
-    const phone = createWriter(createInMemoryChangeLog(), "phone", clock);
+    const phone = createChangeLogWriter(
+      createInMemoryChangeLog(),
+      "phone",
+      clock,
+    );
     const first = phone.write("thing", "Named", { name: "first" });
     clock.set(2_000);
     const second = phone.write("thing", "Named", { name: "second" });
@@ -34,7 +38,7 @@ describe("Change Log", () => {
 
   it("notifies subscribers on append until they unsubscribe", () => {
     const log = createInMemoryChangeLog();
-    const phone = createWriter(log, "phone");
+    const phone = createChangeLogWriter(log, "phone");
     let notifications = 0;
     const unsubscribe = log.subscribe(() => {
       notifications++;
@@ -52,13 +56,13 @@ describe("Change Log", () => {
       // The laptop's clock runs an hour fast.
       const laptopClock = fakeClock(10 * HOUR);
       const laptopLog = createInMemoryChangeLog();
-      const laptop = createWriter(laptopLog, "laptop", laptopClock);
+      const laptop = createChangeLogWriter(laptopLog, "laptop", laptopClock);
       const earlier = laptop.write("thing", "Named", { name: "from laptop" });
 
       // Five minutes later the phone has synced the laptop's edit, then edits.
       const phoneLog = createInMemoryChangeLog();
       phoneLog.append([earlier]);
-      const phone = createWriter(
+      const phone = createChangeLogWriter(
         phoneLog,
         "phone",
         fakeClock(9 * HOUR + 5 * MINUTE),
@@ -71,12 +75,12 @@ describe("Change Log", () => {
 
     it("with the device id breaking a tie", () => {
       const sameTime = { now: () => 1_000 };
-      const apple = createWriter(
+      const apple = createChangeLogWriter(
         createInMemoryChangeLog(),
         "device-a",
         sameTime,
       );
-      const banana = createWriter(
+      const banana = createChangeLogWriter(
         createInMemoryChangeLog(),
         "device-b",
         sameTime,
@@ -90,7 +94,7 @@ describe("Change Log", () => {
 
     it("keeping each thing's own latest record", () => {
       const log = createInMemoryChangeLog();
-      const phone = createWriter(log, "phone");
+      const phone = createChangeLogWriter(log, "phone");
       phone.write("rent", "Named", { name: "Rent" });
       const power = phone.write("power", "Named", { name: "Power" });
       const rent = phone.write("rent", "Named", { name: "Housing" });
