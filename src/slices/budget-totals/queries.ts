@@ -5,8 +5,8 @@ import { isAccountOpened } from "../accounts/records";
 import { assignmentSubject, isAssignmentSet } from "../assignments/records";
 import { isBudgetCreated } from "../budget-setup/records";
 import {
-  isTransactionRecorded,
-  type TransactionRecorded,
+  type CurrentTransaction,
+  currentTransactions,
 } from "../transactions/records";
 
 /**
@@ -22,9 +22,10 @@ export function readyToAssign(
   for (const record of records) {
     if (isAccountOpened(record)) {
       total = addMoney(total, record.payload.openingBalance);
-    } else if (isTransactionRecorded(record) && !record.payload.categoryId) {
-      total = addMoney(total, record.payload.amount);
     }
+  }
+  for (const { amount, categoryId } of currentTransactions(records)) {
+    if (!categoryId) total = addMoney(total, amount);
   }
   for (const assigned of latestBySubject(
     records.filter(isAssignmentSet),
@@ -74,18 +75,14 @@ export function available(
   return total;
 }
 
-/** The payloads of the Transactions in a Category in a Month. */
+/** The Transactions in a Category in a Month, as last edited. */
 function transactionsIn(
   records: readonly ChangeRecord[],
   categoryId: string,
   of: Month,
-): TransactionRecorded["payload"][] {
-  return records
-    .filter(isTransactionRecorded)
-    .map(({ payload }) => payload)
-    .filter(
-      (transaction) =>
-        transaction.categoryId === categoryId &&
-        monthOf(transaction.date) === of,
-    );
+): CurrentTransaction[] {
+  return currentTransactions(records).filter(
+    (transaction) =>
+      transaction.categoryId === categoryId && monthOf(transaction.date) === of,
+  );
 }

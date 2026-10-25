@@ -8,7 +8,11 @@ import type { Month } from "../../kernel/month";
 import type { AccountOpened } from "../accounts/records";
 import { type AssignmentSet, assignmentSubject } from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
-import type { TransactionRecorded } from "../transactions/records";
+import type {
+  TransactionDeleted,
+  TransactionEdited,
+  TransactionRecorded,
+} from "../transactions/records";
 import { available, readyToAssign, spending } from "./index";
 
 /** A Budget in USD, seeded with the records other slices publish. */
@@ -46,9 +50,10 @@ function budget() {
       );
     },
     /** Records a Transaction: a negative amount goes out, a positive one comes in. */
-    record(date: string, amount: number, categoryId?: string) {
+    record(date: string, amount: number, categoryId?: string): string {
+      const id = crypto.randomUUID();
       writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
-        crypto.randomUUID(),
+        id,
         "TransactionRecorded",
         {
           version: 1,
@@ -57,6 +62,28 @@ function budget() {
           amount: money(amount, "USD"),
           ...(categoryId && { categoryId }),
         },
+      );
+      return id;
+    },
+    /** Edits a Transaction to say this instead. */
+    edit(id: string, date: string, amount: number, categoryId?: string) {
+      writer.write<TransactionEdited["type"], TransactionEdited["payload"]>(
+        id,
+        "TransactionEdited",
+        {
+          version: 1,
+          accountId: "checking",
+          date,
+          amount: money(amount, "USD"),
+          ...(categoryId && { categoryId }),
+        },
+      );
+    },
+    delete(id: string) {
+      writer.write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
+        id,
+        "TransactionDeleted",
+        { version: 1 },
       );
     },
     readyToAssign: () => readyToAssign(changeLog.readAll()),
@@ -149,5 +176,49 @@ describe("Budget Totals", () => {
     expect(totals.available("groceries", "2026-10")).toEqual(
       money(-3550, "USD"),
     );
+  });
+
+  it("counts a Transaction in the Month of its date, even a future one", () => {
+    const totals = budget();
+    totals.assign("gifts", "2026-12", 20000);
+
+    totals.record("2026-12-20", -15000, "gifts");
+
+    expect(totals.spending("gifts", "2026-12")).toEqual(money(15000, "USD"));
+    expect(totals.available("gifts", "2026-12")).toEqual(money(5000, "USD"));
+    expect(totals.spending("gifts", "2026-10")).toEqual(money(0, "USD"));
+  });
+
+  it("counts back-dated edits and deletions in the Month they change, and in Ready to Assign", () => {
+    const totals = budget();
+    totals.openAccount(100000);
+    totals.assign("groceries", "2026-09", 40000);
+    const shopping = totals.record("2026-09-12", -4550, "groceries");
+    const salary = totals.record("2026-09-25", 300000);
+    const refund = totals.record("2026-09-20", 1000, "groceries");
+    totals.record("2026-10-03", -2000, "groceries");
+
+    // Recorded in the wrong Month, for the wrong amount.
+    totals.edit(shopping, "2026-08-31", -5000, "groceries");
+    totals.edit(salary, "2026-09-25", 250000);
+    totals.delete(refund);
+
+    expect(totals.spending("groceries", "2026-09")).toEqual(money(0, "USD"));
+    expect(totals.available("groceries", "2026-09")).toEqual(
+      money(40000, "USD"),
+    );
+    expect(totals.spending("groceries", "2026-08")).toEqual(money(5000, "USD"));
+    expect(totals.spending("groceries", "2026-10")).toEqual(money(2000, "USD"));
+    // $1,000 Opening Balance + $2,500 salary − $400 assigned.
+    expect(totals.readyToAssign()).toEqual(money(310000, "USD"));
+  });
+
+  it("drops a deleted inflow with no Category from Ready to Assign", () => {
+    const totals = budget();
+    const salary = totals.record("2026-09-25", 300000);
+
+    totals.delete(salary);
+
+    expect(totals.readyToAssign()).toEqual(money(0, "USD"));
   });
 });
