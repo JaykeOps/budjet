@@ -14,26 +14,31 @@ import type { Transaction } from "./queries";
 
 /**
  * An Account's Transactions, newest first, with a form to record another in
- * it and a way to edit or delete each one, unless the Account is closed. The app shell decides what
- * recording, editing and deleting do; an error it throws is shown on the form.
+ * it and a way to edit or delete each one, unless the Account is closed. The
+ * app shell keeps which Account is selected (the first one when it names
+ * none it knows) and decides what recording, editing and deleting do; an
+ * error it throws is shown on the form.
  */
 export function TransactionsScreen({
   currency,
+  selectedAccountId,
+  onSelectAccount,
   onRecord,
   onEdit,
   onDelete,
 }: {
   currency: Currency;
+  selectedAccountId?: string;
+  onSelectAccount: (accountId: string) => void;
   onRecord: (input: TransactionInput) => void;
   onEdit: (id: string, input: TransactionInput) => void;
   onDelete: (id: string) => void;
 }) {
   const headingId = useId();
   const accounts = useAccounts();
-  const [selectedId, setSelectedId] = useState<string>();
   const [editing, setEditing] = useState<Transaction>();
   const account =
-    accounts.find(({ id }) => id === selectedId) ?? accounts.at(0);
+    accounts.find(({ id }) => id === selectedAccountId) ?? accounts.at(0);
   if (!account) return null;
 
   return (
@@ -44,7 +49,7 @@ export function TransactionsScreen({
         <select
           value={account.id}
           onChange={(event) => {
-            setSelectedId(event.target.value);
+            onSelectAccount(event.target.value);
             setEditing(undefined);
           }}
         >
