@@ -10,8 +10,9 @@ import type {
   CategoryCreated,
   CategoryGroupCreated,
 } from "../categories/records";
+import type { TransferDeleted, TransferMade } from "../transfers/records";
 import { recordTransaction } from "./commands";
-import { accountTransactions } from "./index";
+import { accountTransactionList, accountTransactions } from "./index";
 
 /** A Budget in USD with one Account ("checking") and one Category ("groceries"). */
 function budget() {
@@ -45,6 +46,8 @@ function budget() {
   return {
     writer,
     transactions: () => accountTransactions(changeLog.readAll(), "checking"),
+    transactionList: () =>
+      accountTransactionList(changeLog.readAll(), "checking"),
   };
 }
 
@@ -155,6 +158,69 @@ describe("Transactions", () => {
         date: "2026-09-30",
         amount: money(-200, "USD"),
         categoryId: "groceries",
+      },
+    ]);
+  });
+
+  it("lists an Account's Transfers among its Transactions, signed for that Account", () => {
+    const { writer, transactionList } = budget();
+    const transfer = (
+      id: string,
+      fromAccountId: string,
+      toAccountId: string,
+      date: string,
+      cents: number,
+    ) =>
+      writer.write<TransferMade["type"], TransferMade["payload"]>(
+        id,
+        "TransferMade",
+        {
+          version: 1,
+          fromAccountId,
+          toAccountId,
+          date,
+          amount: money(cents, "USD"),
+          ...(id === "to-savings" && { memo: "Rainy day" }),
+        },
+      );
+    transfer("to-savings", "checking", "savings", "2026-10-12", 20000);
+    const groceries = recordTransaction(writer, {
+      accountId: "checking",
+      date: "2026-10-12",
+      amount: money(-4550, "USD"),
+      categoryId: "groceries",
+    });
+    transfer("from-savings", "savings", "checking", "2026-10-20", 5000);
+    transfer("deleted", "checking", "savings", "2026-10-21", 100);
+    writer.write<TransferDeleted["type"], TransferDeleted["payload"]>(
+      "deleted",
+      "TransferDeleted",
+      { version: 1 },
+    );
+
+    expect(transactionList()).toEqual([
+      {
+        kind: "transfer",
+        id: "from-savings",
+        date: "2026-10-20",
+        amount: money(5000, "USD"),
+        otherAccountId: "savings",
+      },
+      {
+        kind: "transaction",
+        id: groceries,
+        accountId: "checking",
+        date: "2026-10-12",
+        amount: money(-4550, "USD"),
+        categoryId: "groceries",
+      },
+      {
+        kind: "transfer",
+        id: "to-savings",
+        date: "2026-10-12",
+        amount: money(-20000, "USD"),
+        otherAccountId: "savings",
+        memo: "Rainy day",
       },
     ]);
   });

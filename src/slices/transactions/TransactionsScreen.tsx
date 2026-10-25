@@ -8,7 +8,7 @@ import {
 import { type Account, useAccounts } from "../accounts";
 import { type CategoryGroup, useCategoryGroups } from "../categories";
 import type { TransactionInput } from "./commands";
-import { useAccountTransactions } from "./hooks";
+import { useAccountTransactionList } from "./hooks";
 
 /**
  * An Account's Transactions, newest first, and a form to record another in
@@ -197,7 +197,8 @@ function CategoryPicker({
 
 function TransactionList({ account }: { account: Account }) {
   const headingId = useId();
-  const transactions = useAccountTransactions(account.id);
+  const entries = useAccountTransactionList(account.id);
+  const accountNames = new Map(useAccounts().map(({ id, name }) => [id, name]));
   const groups = useCategoryGroups();
   const categoryNames = new Map(
     groups.flatMap(({ categories }) =>
@@ -219,19 +220,34 @@ function TransactionList({ account }: { account: Account }) {
           </tr>
         </thead>
         <tbody>
-          {transactions.map((transaction) => (
-            <tr key={transaction.id}>
-              <td>{transaction.date}</td>
-              <td>{transaction.payee}</td>
-              <td>
-                {transaction.categoryId
-                  ? categoryNames.get(transaction.categoryId)
-                  : "Ready to Assign"}
-              </td>
-              <td>{transaction.memo}</td>
-              <td>{formatMoney(transaction.amount)}</td>
-            </tr>
-          ))}
+          {entries.map((entry) =>
+            entry.kind === "transfer" ? (
+              <tr key={entry.id}>
+                <td>{entry.date}</td>
+                <td>
+                  {entry.amount.minorUnits < 0
+                    ? "Transfer to "
+                    : "Transfer from "}
+                  {accountNames.get(entry.otherAccountId)}
+                </td>
+                <td />
+                <td>{entry.memo}</td>
+                <td>{formatMoney(entry.amount)}</td>
+              </tr>
+            ) : (
+              <tr key={entry.id}>
+                <td>{entry.date}</td>
+                <td>{entry.payee}</td>
+                <td>
+                  {entry.categoryId
+                    ? categoryNames.get(entry.categoryId)
+                    : "Ready to Assign"}
+                </td>
+                <td>{entry.memo}</td>
+                <td>{formatMoney(entry.amount)}</td>
+              </tr>
+            ),
+          )}
         </tbody>
       </table>
     </>
