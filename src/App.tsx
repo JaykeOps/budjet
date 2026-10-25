@@ -27,6 +27,12 @@ import {
   editTransaction,
   recordTransaction,
 } from "./slices/transactions/commands";
+import { TransfersScreen } from "./slices/transfers";
+import {
+  deleteTransfer,
+  editTransfer,
+  makeTransfer,
+} from "./slices/transfers/commands";
 
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
@@ -91,6 +97,12 @@ function Shell() {
         onRecord={(input) => recordTransaction(writer, input)}
         onEdit={(id, input) => editTransaction(writer, id, input)}
         onDelete={(id) => deleteTransaction(writer, id)}
+      />
+      <TransfersScreen
+        currency={budget.currency}
+        onMake={(input) => makeTransfer(writer, input)}
+        onEdit={(id, input) => editTransfer(writer, id, input)}
+        onDelete={(id) => deleteTransfer(writer, id)}
       />
     </>
   );
