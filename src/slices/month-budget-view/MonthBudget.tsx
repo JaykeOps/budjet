@@ -14,17 +14,17 @@ import {
   previousMonth,
 } from "../../kernel/month";
 import { useAssignment } from "../assignments";
-import { useReadyToAssign } from "../budget-totals";
+import { useAvailable, useReadyToAssign, useSpending } from "../budget-totals";
 import { type Category, useCategoryGroups } from "../categories";
 
 export type AssignInput = { categoryId: string; month: Month; amount: Money };
 
 /**
  * The Month screen: controls to step between Months, Ready to Assign, then
- * every Category under its Category Group with its Assignment for the Month.
- * The app shell decides where the Month is kept and what assigning does; an
- * error it throws is shown on the screen. There is no stepping back past
- * `firstMonth`.
+ * every Category under its Category Group with its Assignment, spending and
+ * Available for the Month. The app shell decides where the Month is kept and
+ * what assigning does; an error it throws is shown on the screen. There is no
+ * stepping back past `firstMonth`.
  */
 export function MonthBudget({
   month,
@@ -74,12 +74,14 @@ export function MonthBudget({
           <tr>
             <th scope="col">Category</th>
             <th scope="col">Assigned</th>
+            <th scope="col">Spent</th>
+            <th scope="col">Available</th>
           </tr>
         </thead>
         {groups.map((group) => (
           <tbody key={group.id}>
             <tr>
-              <th scope="rowgroup" colSpan={2}>
+              <th scope="rowgroup" colSpan={4}>
                 {group.name}
               </th>
             </tr>
@@ -127,7 +129,10 @@ function ReadyToAssign() {
   );
 }
 
-/** A Category and its Assignment, set by typing an amount and pressing Enter or leaving the field. */
+/**
+ * A Category with its spending and Available, and its Assignment, set by
+ * typing an amount and pressing Enter or leaving the field.
+ */
 function CategoryRow({
   category,
   month,
@@ -142,6 +147,8 @@ function CategoryRow({
   onError: (message: string | undefined) => void;
 }) {
   const assigned = useAssignment(category.id, month) ?? money(0, currency);
+  const spent = useSpending(category.id, month) ?? money(0, currency);
+  const available = useAvailable(category.id, month) ?? money(0, currency);
   const [draft, setDraft] = useState<string>();
 
   function save() {
@@ -175,6 +182,8 @@ function CategoryRow({
           />
         </form>
       </td>
+      <td>{formatMoney(spent)}</td>
+      <td>{formatMoney(available)}</td>
     </tr>
   );
 }
