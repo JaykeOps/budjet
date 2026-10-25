@@ -21,6 +21,8 @@ import { createBudget } from "./slices/budget-setup/commands";
 import { CategoryList } from "./slices/categories";
 import { addStarterSet } from "./slices/categories/commands";
 import { MonthBudget } from "./slices/month-budget-view";
+import { TransactionsScreen } from "./slices/transactions";
+import { recordTransaction } from "./slices/transactions/commands";
 
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
@@ -79,6 +81,10 @@ function Shell() {
       <AccountsScreen
         currency={budget.currency}
         onOpenAccount={(input) => openAccount(writer, input)}
+      />
+      <TransactionsScreen
+        currency={budget.currency}
+        onRecord={(input) => recordTransaction(writer, input)}
       />
     </>
   );
