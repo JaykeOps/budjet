@@ -9,6 +9,16 @@ Every tool comes from `flake.nix` (ADR 0001). Run project commands as `nix devel
 - No `nix` on the machine: install it with the Determinate Systems installer (`curl -sSfL https://install.determinate.systems/nix | sh -s -- install`; in a container without systemd add `linux --init none`), then use `nix develop -c` as above.
 - A tool is missing: add it to the flake's dev shell. The flake is also what Dagger runs inside, so a tool installed any other way works on your machine and fails in CI.
 
+## Feature slices
+
+Code is organised as feature slices (ADR 0005). A slice lives in `src/slices/<slice>/`, and only these files are reachable from outside it:
+
+- `index.ts`: the public entry point. Its public queries, the hooks that wrap them, and its UI. Another slice imports it as `../<slice>`.
+- `records.ts`: the change record types it publishes. Any slice may read them.
+- `commands.ts` (or `commands/`): its commands. Only the app shell (code in `src/` outside `src/slices/`) may import them.
+
+Everything else in a slice is private. Query dependencies (one slice importing another's `index.ts`) must not form a cycle. `dagger call check-feature-slices` enforces all of this with `scripts/feature-slice-architecture/check.ts`, and it runs as part of `dagger call check`.
+
 ## Checks
 
 CI is the Dagger module in `.dagger/`; GitHub Actions only calls it. Before every push, run and pass:
