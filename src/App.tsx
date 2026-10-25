@@ -10,7 +10,12 @@ import {
   OpenAccountForm,
   useAccounts,
 } from "./slices/accounts";
-import { openAccount } from "./slices/accounts/commands";
+import {
+  closeAccount,
+  openAccount,
+  redeclareBalance,
+  renameAccount,
+} from "./slices/accounts/commands";
 import {
   copyLastMonth,
   moveMoney,
@@ -91,6 +96,13 @@ function Shell() {
       <AccountsScreen
         currency={budget.currency}
         onOpenAccount={(input) => openAccount(writer, input)}
+        onRedeclareBalance={(accountId, balance) =>
+          redeclareBalance(writer, accountId, { balance })
+        }
+        onRename={(accountId, name) =>
+          renameAccount(writer, accountId, { name })
+        }
+        onClose={(accountId) => closeAccount(writer, accountId)}
       />
       <TransactionsScreen
         currency={budget.currency}

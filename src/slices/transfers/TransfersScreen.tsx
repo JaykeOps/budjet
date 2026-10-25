@@ -30,6 +30,10 @@ export function TransfersScreen({
   const all = useAccounts();
   const open = all.filter(({ closed }) => !closed);
   const names = new Map(all.map(({ id, name }) => [id, name]));
+  const openIds = new Set(open.map(({ id }) => id));
+  /** A Transfer touching a closed Account stays as it is. */
+  const touchesOpenAccountsOnly = (transfer: Transfer) =>
+    openIds.has(transfer.fromAccountId) && openIds.has(transfer.toAccountId);
   const transfers = useChangeLogQuery(allTransfers);
   const [editing, setEditing] = useState<Transfer>();
   const [error, setError] = useState<string>();
@@ -80,27 +84,31 @@ export function TransfersScreen({
               <td>{transfer.memo}</td>
               <td>{formatMoney(transfer.amount)}</td>
               <td>
-                <button type="button" onClick={() => setEditing(transfer)}>
-                  Edit
-                </button>{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    try {
-                      onDelete(transfer.id);
-                      setError(undefined);
-                    } catch (failure) {
-                      setError(
-                        failure instanceof Error
-                          ? failure.message
-                          : String(failure),
-                      );
-                    }
-                    if (editing?.id === transfer.id) setEditing(undefined);
-                  }}
-                >
-                  Delete
-                </button>
+                {touchesOpenAccountsOnly(transfer) && (
+                  <>
+                    <button type="button" onClick={() => setEditing(transfer)}>
+                      Edit
+                    </button>{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          onDelete(transfer.id);
+                          setError(undefined);
+                        } catch (failure) {
+                          setError(
+                            failure instanceof Error
+                              ? failure.message
+                              : String(failure),
+                          );
+                        }
+                        if (editing?.id === transfer.id) setEditing(undefined);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
               </td>
             </tr>
           ))}
