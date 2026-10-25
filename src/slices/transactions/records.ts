@@ -2,7 +2,11 @@
  * The change records Transactions publishes. Other slices may read them; they
  * are versioned contracts, so changing one is a cross-slice change (docs/adr/0005).
  */
-import { type ChangeRecord, latestBySubject } from "../../kernel/change-log";
+import {
+  type ChangeRecord,
+  latestBySubject,
+  perSnapshot,
+} from "../../kernel/change-log";
 import type { Money } from "../../kernel/money";
 
 /** What a Transaction says: its Account, date, amount, and optional Category, Payee and memo. */
@@ -70,30 +74,16 @@ export type CurrentTransaction = { id: string } & TransactionFields;
  * For each one the most recent record wins (docs/adr/0004): an edit replaces
  * it and a deletion removes it. Every slice that counts Transactions reads
  * them through this. Expects records oldest first, as `readAll` returns them.
+ *
+ * It lives here, not in queries.ts, only because Budget Totals reads it:
+ * Budget Totals depending on Transactions' index would close the cycle
+ * Transactions → Categories → Budget Totals → Transactions.
  */
-export function currentTransactions(
-  records: readonly ChangeRecord[],
-): readonly CurrentTransaction[] {
-  let current = currentBySnapshot.get(records);
-  if (!current) {
-    current = foldTransactions(records);
-    currentBySnapshot.set(records, current);
-  }
-  return current;
-}
-
-/**
- * Kept per Change Log snapshot (`readAll` returns the same array until the
- * next append), so every query reading the same records folds them once.
- */
-const currentBySnapshot = new WeakMap<
-  readonly ChangeRecord[],
-  readonly CurrentTransaction[]
->();
+export const currentTransactions = perSnapshot(foldTransactions);
 
 function foldTransactions(
   records: readonly ChangeRecord[],
-): CurrentTransaction[] {
+): readonly CurrentTransaction[] {
   const latest = latestBySubject(
     records.filter(
       (record) =>
