@@ -5,7 +5,11 @@ import {
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import type { BudgetCreated } from "../budget-setup/records";
-import type { TransactionRecorded } from "../transactions/records";
+import type {
+  TransactionDeleted,
+  TransactionEdited,
+  TransactionRecorded,
+} from "../transactions/records";
 import { openAccount } from "./commands";
 import { accountBalance, accounts, accountsTotal } from "./index";
 
@@ -108,6 +112,55 @@ describe("Accounts", () => {
       money(49000, "USD"),
     );
     expect(accountsTotal(changeLog.readAll())).toEqual(money(444450, "USD"));
+  });
+
+  it("counts a Transaction as last edited, in whichever Account it now belongs to, and not at all once deleted", () => {
+    const { changeLog, writer } = budgetIn("USD");
+    const checking = openAccount(writer, {
+      name: "Checking",
+      kind: "checking",
+      openingBalance: money(100000, "USD"),
+    });
+    const savings = openAccount(writer, {
+      name: "Savings",
+      kind: "savings",
+      openingBalance: money(50000, "USD"),
+    });
+    const transaction = {
+      version: 1 as const,
+      accountId: checking,
+      date: "2026-10-12",
+      amount: money(-4550, "USD"),
+      categoryId: "groceries",
+    };
+    writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      "moved",
+      "TransactionRecorded",
+      transaction,
+    );
+    writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      "deleted",
+      "TransactionRecorded",
+      transaction,
+    );
+
+    writer.write<TransactionEdited["type"], TransactionEdited["payload"]>(
+      "moved",
+      "TransactionEdited",
+      { ...transaction, accountId: savings, amount: money(-1000, "USD") },
+    );
+    writer.write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
+      "deleted",
+      "TransactionDeleted",
+      { version: 1 },
+    );
+
+    expect(accountBalance(changeLog.readAll(), checking)).toEqual(
+      money(100000, "USD"),
+    );
+    expect(accountBalance(changeLog.readAll(), savings)).toEqual(
+      money(49000, "USD"),
+    );
   });
 
   it("needs a name for the Account", () => {

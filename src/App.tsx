@@ -22,7 +22,11 @@ import { CategoryList } from "./slices/categories";
 import { addStarterSet } from "./slices/categories/commands";
 import { MonthBudget } from "./slices/month-budget-view";
 import { TransactionsScreen } from "./slices/transactions";
-import { recordTransaction } from "./slices/transactions/commands";
+import {
+  deleteTransaction,
+  editTransaction,
+  recordTransaction,
+} from "./slices/transactions/commands";
 import { TransfersScreen } from "./slices/transfers";
 import {
   deleteTransfer,
@@ -91,6 +95,8 @@ function Shell() {
       <TransactionsScreen
         currency={budget.currency}
         onRecord={(input) => recordTransaction(writer, input)}
+        onEdit={(id, input) => editTransaction(writer, id, input)}
+        onDelete={(id) => deleteTransaction(writer, id)}
       />
       <TransfersScreen
         currency={budget.currency}

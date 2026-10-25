@@ -8,8 +8,12 @@ import type { Month } from "../../kernel/month";
 import type { AccountOpened } from "../accounts/records";
 import { type AssignmentSet, assignmentSubject } from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
-import type { TransactionRecorded } from "../transactions/records";
-import { available, readyToAssign, spending } from "./index";
+import type {
+  TransactionDeleted,
+  TransactionEdited,
+  TransactionRecorded,
+} from "../transactions/records";
+import { available, overspent, readyToAssign, spending } from "./index";
 
 /** A Budget in USD, seeded with the records other slices publish. */
 function budget() {
@@ -46,9 +50,10 @@ function budget() {
       );
     },
     /** Records a Transaction: a negative amount goes out, a positive one comes in. */
-    record(date: string, amount: number, categoryId?: string) {
+    record(date: string, amount: number, categoryId?: string): string {
+      const id = crypto.randomUUID();
       writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
-        crypto.randomUUID(),
+        id,
         "TransactionRecorded",
         {
           version: 1,
@@ -58,18 +63,42 @@ function budget() {
           ...(categoryId && { categoryId }),
         },
       );
+      return id;
+    },
+    /** Edits a Transaction to say this instead. */
+    edit(id: string, date: string, amount: number, categoryId?: string) {
+      writer.write<TransactionEdited["type"], TransactionEdited["payload"]>(
+        id,
+        "TransactionEdited",
+        {
+          version: 1,
+          accountId: "checking",
+          date,
+          amount: money(amount, "USD"),
+          ...(categoryId && { categoryId }),
+        },
+      );
+    },
+    delete(id: string) {
+      writer.write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
+        id,
+        "TransactionDeleted",
+        { version: 1 },
+      );
     },
     readyToAssign: () => readyToAssign(changeLog.readAll()),
     spending: (categoryId: string, of: Month) =>
       spending(changeLog.readAll(), categoryId, of),
     available: (categoryId: string, of: Month) =>
       available(changeLog.readAll(), categoryId, of),
+    overspent: (of: Month) => overspent(changeLog.readAll(), of),
   };
 }
 
 describe("Budget Totals", () => {
   it("has no Ready to Assign before a Budget exists", () => {
     expect(readyToAssign([])).toBeUndefined();
+    expect(overspent([], "2026-10")).toBeUndefined();
   });
 
   it("puts every Opening Balance in Ready to Assign", () => {
@@ -123,9 +152,9 @@ describe("Budget Totals", () => {
     totals.record("2026-10-01", -4550, "groceries");
     totals.record("2026-10-31", -10000, "groceries");
     totals.record("2026-10-15", 1000, "groceries");
-    // Other Months, other Categories and money with no Category don't count.
+    // Later Months, other Categories and money with no Category don't count.
     totals.record("2026-11-01", -2000, "groceries");
-    totals.record("2026-09-30", -3000, "groceries");
+    totals.record("2026-12-31", -3000, "groceries");
     totals.record("2026-10-12", -7000, "rent");
     totals.record("2026-10-25", 300000);
 
@@ -149,5 +178,173 @@ describe("Budget Totals", () => {
     expect(totals.available("groceries", "2026-10")).toEqual(
       money(-3550, "USD"),
     );
+  });
+
+  it("counts a Transaction in the Month of its date, even a future one", () => {
+    const totals = budget();
+    totals.assign("gifts", "2026-12", 20000);
+
+    totals.record("2026-12-20", -15000, "gifts");
+
+    expect(totals.spending("gifts", "2026-12")).toEqual(money(15000, "USD"));
+    expect(totals.available("gifts", "2026-12")).toEqual(money(5000, "USD"));
+    expect(totals.spending("gifts", "2026-10")).toEqual(money(0, "USD"));
+  });
+
+  it("counts back-dated edits and deletions in the Month they change, and in Ready to Assign", () => {
+    const totals = budget();
+    totals.openAccount(100000);
+    totals.assign("groceries", "2026-09", 40000);
+    const shopping = totals.record("2026-09-12", -4550, "groceries");
+    const salary = totals.record("2026-09-25", 300000);
+    const refund = totals.record("2026-09-20", 1000, "groceries");
+    totals.record("2026-10-03", -2000, "groceries");
+
+    // Recorded in the wrong Month, for the wrong amount.
+    totals.edit(shopping, "2026-08-31", -5000, "groceries");
+    totals.edit(salary, "2026-09-25", 250000);
+    totals.delete(refund);
+
+    expect(totals.spending("groceries", "2026-09")).toEqual(money(0, "USD"));
+    // $400 assigned less the −$50 carried forward from August.
+    expect(totals.available("groceries", "2026-09")).toEqual(
+      money(35000, "USD"),
+    );
+    expect(totals.spending("groceries", "2026-08")).toEqual(money(5000, "USD"));
+    expect(totals.spending("groceries", "2026-10")).toEqual(money(2000, "USD"));
+    // $1,000 Opening Balance + $2,500 salary − $400 assigned.
+    expect(totals.readyToAssign()).toEqual(money(310000, "USD"));
+  });
+
+  it("drops a deleted inflow with no Category from Ready to Assign", () => {
+    const totals = budget();
+    const salary = totals.record("2026-09-25", 300000);
+
+    totals.delete(salary);
+
+    expect(totals.readyToAssign()).toEqual(money(0, "USD"));
+  });
+
+  it("carries a Category's leftover Available forward through later Months", () => {
+    const totals = budget();
+    totals.assign("groceries", "2026-10", 40000);
+    totals.record("2026-10-05", -30000, "groceries");
+    totals.assign("groceries", "2026-11", 20000);
+    totals.record("2026-11-20", 2500, "groceries");
+    totals.record("2026-11-21", -5000, "groceries");
+
+    // October: $400 − $300 leaves $100.
+    expect(totals.available("groceries", "2026-10")).toEqual(
+      money(10000, "USD"),
+    );
+    // November: $100 carried + $200 assigned + $25 back − $50 spent.
+    expect(totals.available("groceries", "2026-11")).toEqual(
+      money(27500, "USD"),
+    );
+    // December and January: nothing new, so all of it carries on.
+    expect(totals.available("groceries", "2026-12")).toEqual(
+      money(27500, "USD"),
+    );
+    expect(totals.available("groceries", "2027-01")).toEqual(
+      money(27500, "USD"),
+    );
+    // Spending is the Month's own, never carried.
+    expect(totals.spending("groceries", "2026-12")).toEqual(money(0, "USD"));
+  });
+
+  it("carries a negative Available forward until an Assignment covers it", () => {
+    const totals = budget();
+    totals.assign("dining-out", "2026-10", 5000);
+    totals.record("2026-10-10", -8000, "dining-out");
+
+    expect(totals.available("dining-out", "2026-10")).toEqual(
+      money(-3000, "USD"),
+    );
+    expect(totals.available("dining-out", "2026-11")).toEqual(
+      money(-3000, "USD"),
+    );
+    expect(totals.available("dining-out", "2026-12")).toEqual(
+      money(-3000, "USD"),
+    );
+
+    totals.assign("dining-out", "2026-12", 3000);
+
+    expect(totals.available("dining-out", "2026-11")).toEqual(
+      money(-3000, "USD"),
+    );
+    expect(totals.available("dining-out", "2026-12")).toEqual(money(0, "USD"));
+    expect(totals.available("dining-out", "2027-01")).toEqual(money(0, "USD"));
+  });
+
+  it("flows a back-dated change forward into every later Month", () => {
+    const totals = budget();
+    totals.assign("rent", "2026-11", 80000);
+    totals.record("2026-11-01", -80000, "rent");
+    expect(totals.available("rent", "2027-02")).toEqual(money(0, "USD"));
+
+    totals.record("2026-09-15", -1000, "rent");
+    totals.assign("rent", "2026-10", 5000);
+
+    expect(totals.available("rent", "2026-09")).toEqual(money(-1000, "USD"));
+    expect(totals.available("rent", "2027-02")).toEqual(money(4000, "USD"));
+  });
+
+  it("lists the Overspent Categories in a Month until each is covered", () => {
+    const totals = budget();
+    totals.assign("groceries", "2026-10", 10000);
+    totals.record("2026-10-03", -15000, "groceries");
+    totals.assign("rent", "2026-10", 80000);
+    totals.record("2026-10-01", -80000, "rent");
+    totals.record("2026-11-02", -2000, "dining-out");
+
+    expect(totals.overspent("2026-09")).toEqual([]);
+    expect(totals.overspent("2026-10")).toEqual([
+      { categoryId: "groceries", available: money(-5000, "USD") },
+    ]);
+    expect(totals.overspent("2026-11")).toEqual([
+      { categoryId: "dining-out", available: money(-2000, "USD") },
+      { categoryId: "groceries", available: money(-5000, "USD") },
+    ]);
+
+    totals.assign("groceries", "2026-11", 5000);
+
+    expect(totals.overspent("2026-11")).toEqual([
+      { categoryId: "dining-out", available: money(-2000, "USD") },
+    ]);
+    expect(totals.overspent("2026-10")).toHaveLength(1);
+  });
+
+  it("carries an edited or deleted Transaction's change into every later Month", () => {
+    const totals = budget();
+    totals.assign("groceries", "2026-09", 40000);
+    const shopping = totals.record("2026-09-12", -10000, "groceries");
+    const takeaway = totals.record("2026-09-18", -5000, "groceries");
+    expect(totals.available("groceries", "2026-12")).toEqual(
+      money(25000, "USD"),
+    );
+
+    totals.edit(shopping, "2026-09-12", -30000, "groceries");
+
+    expect(totals.available("groceries", "2026-12")).toEqual(
+      money(5000, "USD"),
+    );
+
+    totals.delete(takeaway);
+
+    expect(totals.available("groceries", "2026-10")).toEqual(
+      money(10000, "USD"),
+    );
+    expect(totals.available("groceries", "2026-12")).toEqual(
+      money(10000, "USD"),
+    );
+
+    totals.edit(shopping, "2026-09-12", -30000, "dining-out");
+
+    expect(totals.available("groceries", "2026-12")).toEqual(
+      money(40000, "USD"),
+    );
+    expect(totals.overspent("2026-12")).toEqual([
+      { categoryId: "dining-out", available: money(-30000, "USD") },
+    ]);
   });
 });

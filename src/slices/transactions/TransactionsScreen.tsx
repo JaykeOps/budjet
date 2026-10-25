@@ -4,27 +4,34 @@ import {
   formatMoney,
   money,
   parseMoney,
+  typedMoney,
 } from "../../kernel/money";
 import { type Account, useAccounts } from "../accounts";
 import { type CategoryGroup, useCategoryGroups } from "../categories";
 import type { TransactionInput } from "./commands";
-import { useAccountTransactionList } from "./hooks";
+import { useAccountTransactionList, usePayees } from "./hooks";
+import type { Transaction } from "./queries";
 
 /**
- * An Account's Transactions, newest first, and a form to record another in
- * it. The app shell decides what recording does; an error it throws is shown
- * on the form.
+ * An Account's Transactions, newest first, with a form to record another in
+ * it and a way to edit or delete each one. The app shell decides what
+ * recording, editing and deleting do; an error it throws is shown on the form.
  */
 export function TransactionsScreen({
   currency,
   onRecord,
+  onEdit,
+  onDelete,
 }: {
   currency: Currency;
   onRecord: (input: TransactionInput) => void;
+  onEdit: (id: string, input: TransactionInput) => void;
+  onDelete: (id: string) => void;
 }) {
   const headingId = useId();
   const accounts = useAccounts().filter(({ closed }) => !closed);
   const [selectedId, setSelectedId] = useState<string>();
+  const [editing, setEditing] = useState<Transaction>();
   const account =
     accounts.find(({ id }) => id === selectedId) ?? accounts.at(0);
   if (!account) return null;
@@ -36,7 +43,10 @@ export function TransactionsScreen({
         Account{" "}
         <select
           value={account.id}
-          onChange={(event) => setSelectedId(event.target.value)}
+          onChange={(event) => {
+            setSelectedId(event.target.value);
+            setEditing(undefined);
+          }}
         >
           {accounts.map(({ id, name }) => (
             <option key={id} value={id}>
@@ -45,36 +55,82 @@ export function TransactionsScreen({
           ))}
         </select>
       </label>
-      <RecordTransactionForm
-        accountId={account.id}
-        currency={currency}
-        onRecord={onRecord}
+      {editing ? (
+        <TransactionForm
+          key={editing.id}
+          heading="Edit Transaction"
+          submitLabel="Save Transaction"
+          accountId={editing.accountId}
+          currency={currency}
+          initial={editing}
+          onSubmit={(input) => {
+            onEdit(editing.id, input);
+            setEditing(undefined);
+          }}
+          onCancel={() => setEditing(undefined)}
+        />
+      ) : (
+        <TransactionForm
+          key={account.id}
+          heading="Record a Transaction"
+          submitLabel="Record Transaction"
+          accountId={account.id}
+          currency={currency}
+          onSubmit={onRecord}
+        />
+      )}
+      <TransactionList
+        account={account}
+        onEdit={setEditing}
+        onDelete={(id) => {
+          if (editing?.id === id) setEditing(undefined);
+          onDelete(id);
+        }}
       />
-      <TransactionList account={account} />
     </section>
   );
 }
 
 type Direction = "out" | "in";
 
-function RecordTransactionForm({
+/**
+ * Records a new Transaction, or edits one when given its `initial` values.
+ * After recording, the form clears for the next one.
+ */
+function TransactionForm({
+  heading,
+  submitLabel,
   accountId,
   currency,
-  onRecord,
+  initial,
+  onSubmit,
+  onCancel,
 }: {
+  heading: string;
+  submitLabel: string;
   accountId: string;
   currency: Currency;
-  onRecord: (input: TransactionInput) => void;
+  initial?: Transaction;
+  onSubmit: (input: TransactionInput) => void;
+  onCancel?: () => void;
 }) {
   const headingId = useId();
   const categoryFieldId = useId();
+  const payeesId = useId();
   const groups = useCategoryGroups();
-  const [date, setDate] = useState(today);
-  const [direction, setDirection] = useState<Direction>("out");
-  const [amount, setAmount] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [payee, setPayee] = useState("");
-  const [memo, setMemo] = useState("");
+  const payees = usePayees();
+  const [date, setDate] = useState(initial?.date ?? today);
+  const [direction, setDirection] = useState<Direction>(
+    initial && initial.amount.minorUnits > 0 ? "in" : "out",
+  );
+  const [amount, setAmount] = useState(
+    initial
+      ? typedMoney(money(Math.abs(initial.amount.minorUnits), currency))
+      : "",
+  );
+  const [categoryId, setCategoryId] = useState(initial?.categoryId ?? "");
+  const [payee, setPayee] = useState(initial?.payee ?? "");
+  const [memo, setMemo] = useState(initial?.memo ?? "");
   const [error, setError] = useState<string>();
 
   function submit(event: FormEvent) {
@@ -86,7 +142,7 @@ function RecordTransactionForm({
     }
     const sign = direction === "out" ? -1 : 1;
     try {
-      onRecord({
+      onSubmit({
         accountId,
         date,
         amount: money(sign * typed.minorUnits, currency),
@@ -108,7 +164,7 @@ function RecordTransactionForm({
 
   return (
     <form aria-labelledby={headingId} onSubmit={submit}>
-      <h3 id={headingId}>Record a Transaction</h3>
+      <h3 id={headingId}>{heading}</h3>
       <label>
         Date{" "}
         <input
@@ -147,21 +203,39 @@ function RecordTransactionForm({
       <label>
         Payee{" "}
         <input
+          list={payeesId}
+          autoComplete="off"
           value={payee}
           onChange={(event) => setPayee(event.target.value)}
         />
-      </label>{" "}
+      </label>
+      <datalist id={payeesId}>
+        {payees.map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>{" "}
       <label>
         Memo{" "}
         <input value={memo} onChange={(event) => setMemo(event.target.value)} />
       </label>{" "}
-      <button type="submit">Record Transaction</button>
+      <button type="submit">{submitLabel}</button>
+      {onCancel && (
+        <>
+          {" "}
+          <button type="button" onClick={onCancel}>
+            Cancel
+          </button>
+        </>
+      )}
       {error && <p role="alert">{error}</p>}
     </form>
   );
 }
 
-/** Every Category still in use, under its Category Group. No Category means Ready to Assign. */
+/**
+ * Every Category still in use, under its Category Group, plus the one already
+ * chosen even if it has since been hidden. No Category means Ready to Assign.
+ */
 function CategoryPicker({
   id,
   groups,
@@ -183,7 +257,7 @@ function CategoryPicker({
       {groups.map((group) => (
         <optgroup key={group.id} label={group.name}>
           {group.categories
-            .filter(({ hidden }) => !hidden)
+            .filter(({ id, hidden }) => !hidden || id === value)
             .map(({ id, name }) => (
               <option key={id} value={id}>
                 {name}
@@ -195,61 +269,123 @@ function CategoryPicker({
   );
 }
 
-function TransactionList({ account }: { account: Account }) {
+/** Every row is this tall, so the list knows which rows are in view without measuring them. */
+const ROW_HEIGHT = 40;
+/** How tall the list may grow before it scrolls. */
+const VIEW_HEIGHT = 480;
+/** Rows rendered beyond each edge of the view, so fast scrolling shows no gaps. */
+const OVERSCAN = 10;
+
+/**
+ * An Account's Transactions and Transfers with virtual scrolling: only the
+ * rows in view (and a few either side) are rendered, so years of history
+ * scroll smoothly. Transfer rows are 40px like the rest; they are edited on
+ * the Transfers screen.
+ */
+function TransactionList({
+  account,
+  onEdit,
+  onDelete,
+}: {
+  account: Account;
+  onEdit: (transaction: Transaction) => void;
+  onDelete: (id: string) => void;
+}) {
   const headingId = useId();
   const entries = useAccountTransactionList(account.id);
   const accountNames = new Map(useAccounts().map(({ id, name }) => [id, name]));
   const groups = useCategoryGroups();
+  const [scrollTop, setScrollTop] = useState(0);
   const categoryNames = new Map(
     groups.flatMap(({ categories }) =>
       categories.map(({ id, name }) => [id, name]),
     ),
   );
+  const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+  const last = Math.min(
+    entries.length,
+    Math.ceil((scrollTop + VIEW_HEIGHT) / ROW_HEIGHT) + OVERSCAN,
+  );
+  const cell = { height: ROW_HEIGHT, padding: "0 0.5em" } as const;
 
   return (
     <>
       <h3 id={headingId}>Transactions in {account.name}</h3>
-      <table aria-labelledby={headingId}>
-        <thead>
-          <tr>
-            <th scope="col">Date</th>
-            <th scope="col">Payee</th>
-            <th scope="col">Category</th>
-            <th scope="col">Memo</th>
-            <th scope="col">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry) =>
-            entry.kind === "transfer" ? (
-              <tr key={entry.id}>
-                <td>{entry.date}</td>
-                <td>
-                  {entry.amount.minorUnits < 0
-                    ? "Transfer to "
-                    : "Transfer from "}
-                  {accountNames.get(entry.otherAccountId)}
-                </td>
-                <td />
-                <td>{entry.memo}</td>
-                <td>{formatMoney(entry.amount)}</td>
-              </tr>
-            ) : (
-              <tr key={entry.id}>
-                <td>{entry.date}</td>
-                <td>{entry.payee}</td>
-                <td>
-                  {entry.categoryId
-                    ? categoryNames.get(entry.categoryId)
-                    : "Ready to Assign"}
-                </td>
-                <td>{entry.memo}</td>
-                <td>{formatMoney(entry.amount)}</td>
-              </tr>
-            ),
-          )}
-        </tbody>
-      </table>
+      <div
+        style={{ maxHeight: VIEW_HEIGHT, overflowY: "auto" }}
+        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      >
+        <table
+          aria-labelledby={headingId}
+          aria-rowcount={entries.length + 1}
+          style={{ borderCollapse: "collapse", whiteSpace: "nowrap" }}
+        >
+          <thead style={{ position: "sticky", top: 0, background: "Canvas" }}>
+            <tr aria-rowindex={1}>
+              <th scope="col">Date</th>
+              <th scope="col">Payee</th>
+              <th scope="col">Category</th>
+              <th scope="col">Memo</th>
+              <th scope="col">Amount</th>
+              <th scope="col" aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {first > 0 && (
+              <tr aria-hidden style={{ height: first * ROW_HEIGHT }} />
+            )}
+            {entries.slice(first, last).map((entry, index) =>
+              entry.kind === "transfer" ? (
+                <tr key={entry.id} aria-rowindex={first + index + 2}>
+                  <td style={cell}>{entry.date}</td>
+                  <td style={cell}>
+                    {entry.amount.minorUnits < 0
+                      ? "Transfer to "
+                      : "Transfer from "}
+                    {accountNames.get(entry.otherAccountId)}
+                  </td>
+                  <td style={cell} />
+                  <td style={cell}>{entry.memo}</td>
+                  <td style={cell}>{formatMoney(entry.amount)}</td>
+                  <td style={cell} />
+                </tr>
+              ) : (
+                <tr key={entry.id} aria-rowindex={first + index + 2}>
+                  <td style={cell}>{entry.date}</td>
+                  <td style={cell}>{entry.payee}</td>
+                  <td style={cell}>
+                    {entry.categoryId
+                      ? categoryNames.get(entry.categoryId)
+                      : "Ready to Assign"}
+                  </td>
+                  <td style={cell}>{entry.memo}</td>
+                  <td style={cell}>{formatMoney(entry.amount)}</td>
+                  <td style={cell}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const { kind: _, ...transaction } = entry;
+                        onEdit(transaction);
+                      }}
+                    >
+                      Edit
+                    </button>{" "}
+                    <button type="button" onClick={() => onDelete(entry.id)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ),
+            )}
+            {last < entries.length && (
+              <tr
+                aria-hidden
+                style={{ height: (entries.length - last) * ROW_HEIGHT }}
+              />
+            )}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

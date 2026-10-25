@@ -4,6 +4,7 @@ import { useChangeLogQuery } from "../../kernel/use-change-log-query";
 import {
   accountTransactionList,
   accountTransactions,
+  payees,
   type Transaction,
   type TransactionListEntry,
 } from "./queries";
@@ -30,4 +31,9 @@ export function useAccountTransactionList(
       [accountId],
     ),
   );
+}
+
+/** Every Payee used before, for suggesting as the user types one. */
+export function usePayees(): string[] {
+  return useChangeLogQuery(payees);
 }
