@@ -28,7 +28,14 @@ export type Account = {
 };
 
 /** The money a re-declared balance added to (above zero) or took from an Account. */
-export type Adjustment = { accountId: string; amount: Money };
+export type Adjustment = {
+  /** The id of the record that re-declared the balance. */
+  id: string;
+  accountId: string;
+  /** The day the balance was re-declared, on this device's calendar, "YYYY-MM-DD". */
+  date: string;
+  amount: Money;
+};
 
 /**
  * Every Account, in the order they were opened, with its latest name, whether
@@ -141,7 +148,9 @@ const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
         balance.minorUnits - (balances.get(record.subjectId) ?? 0);
       move(record.subjectId, difference);
       found.push({
+        id: record.id,
         accountId: record.subjectId,
+        date: localDate(record.timestamp.wallTime),
         amount: money(difference, balance.currency),
       });
     } else if (isTransactionRecorded(record) || isTransactionEdited(record)) {
@@ -159,3 +168,9 @@ const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
   }
   return { balances, adjustments: found };
 });
+
+function localDate(wallTime: number): string {
+  const day = new Date(wallTime);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+}
