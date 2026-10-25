@@ -40,13 +40,32 @@ export type CategoryPlaced = ChangeRecord<
   { version: 1; groupId: string; position: number }
 >;
 
+/** A Category leaves the Month Budget view and the Category pickers; its history stays. */
+export type CategoryHidden = ChangeRecord<"CategoryHidden", { version: 1 }>;
+
+/** A hidden Category comes back. */
+export type CategoryUnhidden = ChangeRecord<"CategoryUnhidden", { version: 1 }>;
+
+/** A Category that was never used is gone for good. */
+export type CategoryDeleted = ChangeRecord<"CategoryDeleted", { version: 1 }>;
+
+/** An empty Category Group is gone for good. */
+export type CategoryGroupDeleted = ChangeRecord<
+  "CategoryGroupDeleted",
+  { version: 1 }
+>;
+
 export type CategoriesRecord =
   | CategoryGroupCreated
   | CategoryGroupRenamed
   | CategoryGroupPlaced
   | CategoryCreated
   | CategoryRenamed
-  | CategoryPlaced;
+  | CategoryPlaced
+  | CategoryHidden
+  | CategoryUnhidden
+  | CategoryDeleted
+  | CategoryGroupDeleted;
 
 const types = new Set<string>([
   "CategoryGroupCreated",
@@ -55,6 +74,10 @@ const types = new Set<string>([
   "CategoryCreated",
   "CategoryRenamed",
   "CategoryPlaced",
+  "CategoryHidden",
+  "CategoryUnhidden",
+  "CategoryDeleted",
+  "CategoryGroupDeleted",
 ] satisfies CategoriesRecord["type"][]);
 
 export function isCategoriesRecord(

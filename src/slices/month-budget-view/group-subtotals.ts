@@ -6,6 +6,7 @@ import { useChangeLogQuery } from "../../kernel/use-change-log-query";
 import { assignment } from "../assignments";
 import { available, spending } from "../budget-totals";
 import { categoryGroups } from "../categories";
+import { visibleCategoryGroups } from "./visible-categories";
 
 export type GroupSubtotals = {
   assigned: Money;
@@ -15,7 +16,7 @@ export type GroupSubtotals = {
 
 /**
  * Each Category Group's Assignment, spending and Available in a Month, summed
- * over its Categories and keyed by group id.
+ * over its visible Categories and keyed by group id.
  */
 function groupSubtotals(
   records: readonly ChangeRecord[],
@@ -24,7 +25,7 @@ function groupSubtotals(
 ): Record<string, GroupSubtotals> {
   const zero = money(0, currency);
   const result: Record<string, GroupSubtotals> = {};
-  for (const group of categoryGroups(records)) {
+  for (const group of visibleCategoryGroups(categoryGroups(records))) {
     const subtotals = { assigned: zero, spent: zero, available: zero };
     for (const { id } of group.categories) {
       subtotals.assigned = addMoney(

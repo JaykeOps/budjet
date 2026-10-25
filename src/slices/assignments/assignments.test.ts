@@ -152,6 +152,25 @@ describe("Assignments", () => {
       expect(assignment(records, "power", november)).toEqual(money(0, "USD"));
     });
 
+    it("leaves out the Categories it is told to skip, such as hidden ones", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      for (const categoryId of ["rent", "phone"]) {
+        setAssignment(writer, {
+          categoryId,
+          month: october,
+          amount: money(10000, "USD"),
+        });
+      }
+
+      copyLastMonth(writer, { month: november, skipping: ["phone"] });
+
+      const records = changeLog.readAll();
+      expect(assignment(records, "rent", november)).toEqual(
+        money(10000, "USD"),
+      );
+      expect(assignment(records, "phone", november)).toBeUndefined();
+    });
+
     it("copies only from the Month just before", () => {
       const { changeLog, writer } = budgetIn("USD");
       setAssignment(writer, {
