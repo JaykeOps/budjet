@@ -1,10 +1,10 @@
-import type { Writer } from "../../kernel/change-log";
+import type { ChangeLogWriter } from "../../kernel/change-log";
 import { type Currency, isCurrency } from "../../kernel/money";
 import { budget } from "./queries";
 import type { BudgetCreated } from "./records";
 
 export function createBudget(
-  writer: Writer,
+  writer: ChangeLogWriter,
   { currency }: { currency: Currency },
 ): void {
   if (!isCurrency(currency)) {
