@@ -32,6 +32,10 @@ export function addMoney(a: Money, b: Money): Money {
   return money(a.minorUnits + b.minorUnits, a.currency);
 }
 
+export function subtractMoney(a: Money, b: Money): Money {
+  return addMoney(a, money(-b.minorUnits, b.currency));
+}
+
 /** For display only: the one place minor units become a decimal number. */
 export function formatMoney(amount: Money, locale?: string): string {
   const format = new Intl.NumberFormat(locale, {

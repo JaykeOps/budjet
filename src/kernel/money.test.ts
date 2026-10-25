@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { addMoney, formatMoney, money, parseMoney } from "./money";
+import {
+  addMoney,
+  formatMoney,
+  money,
+  parseMoney,
+  subtractMoney,
+} from "./money";
 
 describe("Money", () => {
   it("is a whole number of minor units", () => {
@@ -11,6 +17,15 @@ describe("Money", () => {
     // 0.1 + 0.2 in floating point is 0.30000000000000004.
     expect(addMoney(money(10, "EUR"), money(20, "EUR"))).toEqual(
       money(30, "EUR"),
+    );
+  });
+
+  it("subtracts amounts in the same currency, going below zero", () => {
+    expect(subtractMoney(money(100, "USD"), money(250, "USD"))).toEqual(
+      money(-150, "USD"),
+    );
+    expect(() => subtractMoney(money(1, "EUR"), money(1, "USD"))).toThrow(
+      /EUR and USD/,
     );
   });
 
