@@ -1,12 +1,20 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import {
+  createChangeLogWriter,
+  createInMemoryChangeLog,
+  thisDeviceId,
+} from "./kernel/change-log";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing from index.html");
 
+// In memory only for now: the Budget is lost on reload until it is saved to the browser.
+const writer = createChangeLogWriter(createInMemoryChangeLog(), thisDeviceId());
+
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <App writer={writer} />
   </StrictMode>,
 );
