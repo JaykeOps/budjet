@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { reloadWhenSaved } from "./reload";
 
 async function createBudget(page: Page) {
   await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
@@ -61,7 +62,7 @@ test("a user records spending and income and sees Available, Ready to Assign and
   };
   await expectRecorded();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectRecorded();
 });

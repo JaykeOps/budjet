@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { reloadWhenSaved } from "./reload";
 
 test("a user assigns money to Categories and sees Ready to Assign change", async ({
   page,
@@ -36,7 +37,7 @@ test("a user assigns money to Categories and sees Ready to Assign change", async
   };
   await expectAssigned();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectAssigned();
 });
@@ -111,7 +112,7 @@ test("a user copies last Month's Assignments and moves money between Categories"
   };
   await expectNovember();
 
-  await page.reload();
+  await reloadWhenSaved(page);
 
   await expectNovember();
 });
