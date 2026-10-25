@@ -1,7 +1,12 @@
-import { type ChangeRecord, latestBySubject } from "../../kernel/change-log";
+import {
+  type ChangeRecord,
+  latestBySubject,
+  perSnapshot,
+} from "../../kernel/change-log";
 import { addMoney, type Money, money, subtractMoney } from "../../kernel/money";
 import { type Month, monthOf } from "../../kernel/month";
-import { adjustments, isAccountOpened } from "../accounts/records";
+import { adjustments } from "../accounts";
+import { isAccountOpened } from "../accounts/records";
 import { isAssignmentSet } from "../assignments/records";
 import { isBudgetCreated } from "../budget-setup/records";
 import { currentTransactions } from "../transactions/records";
@@ -151,23 +156,10 @@ type CategoryTotals = {
 };
 
 /**
- * One pass over the records, kept per Change Log snapshot (`readAll` returns
- * the same array until the next append), so every Category row of a Month
- * shares it instead of reading every record again.
+ * One pass over the records, kept per Change Log snapshot, so every Category
+ * row of a Month shares it instead of reading every record again.
  */
-const totalsBySnapshot = new WeakMap<
-  readonly ChangeRecord[],
-  CategoryTotals | undefined
->();
-
-function categoryTotals(
-  records: readonly ChangeRecord[],
-): CategoryTotals | undefined {
-  if (totalsBySnapshot.has(records)) return totalsBySnapshot.get(records);
-  const totals = calculateCategoryTotals(records);
-  totalsBySnapshot.set(records, totals);
-  return totals;
-}
+const categoryTotals = perSnapshot(calculateCategoryTotals);
 
 function calculateCategoryTotals(
   records: readonly ChangeRecord[],
