@@ -28,7 +28,6 @@ const NIX_CONFIG = [
 // cz exit codes: https://commitizen-tools.github.io/commitizen/exit_codes/
 const CZ_NO_COMMITS_FOUND = 3;
 const CZ_NO_COMMITS_TO_BUMP = 21;
-const GIT_NO_TAG_FOUND = 128;
 
 @object()
 export class Budjet {
@@ -172,16 +171,20 @@ export class Budjet {
     const dist = this.build(tag);
 
     // With no CHANGELOG.md in the repo (docs/adr/0003), bound the notes by the
-    // previous tag or cz repeats the whole history in every release.
-    const previousTag = await stdoutOr(
-      this.inDevShell(
-        this.withHistory(),
-        ["git", "describe", "--tags", "--abbrev=0", "--match", "v*"],
-        ReturnType.Any,
-      ),
-      { [GIT_NO_TAG_FOUND]: "" },
-    );
-    const since = previousTag ? ["--start-rev", previousTag.trim()] : [];
+    // previous tag or cz repeats the whole history in every release. Before the
+    // first Release there is no tag; `git describe` would exit 128 there, which
+    // Dagger fails on even with ReturnType.Any, so list the tags instead.
+    const tags = await this.inDevShell(this.withHistory(), [
+      "git",
+      "tag",
+      "--list",
+      "v*",
+      "--merged",
+      "HEAD",
+      "--sort=-v:refname",
+    ]).stdout();
+    const previousTag = tags.split("\n")[0].trim();
+    const since = previousTag ? ["--start-rev", previousTag] : [];
     const notes = this.inDevShell(this.withHistory(), [
       "cz",
       "changelog",
