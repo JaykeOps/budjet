@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { addMoney, formatMoney, money, parseMoney } from "./money";
+import {
+  addMoney,
+  formatMoney,
+  money,
+  parseMoney,
+  subtractMoney,
+  typedMoney,
+} from "./money";
 
 describe("Money", () => {
   it("is a whole number of minor units", () => {
@@ -14,10 +21,29 @@ describe("Money", () => {
     );
   });
 
+  it("subtracts amounts in the same currency, going below zero", () => {
+    expect(subtractMoney(money(100, "USD"), money(250, "USD"))).toEqual(
+      money(-150, "USD"),
+    );
+    expect(() => subtractMoney(money(1, "EUR"), money(1, "USD"))).toThrow(
+      /EUR and USD/,
+    );
+  });
+
   it("refuses to add amounts in different currencies", () => {
     expect(() => addMoney(money(1, "EUR"), money(1, "USD"))).toThrow(
       /EUR and USD/,
     );
+  });
+
+  it("writes an amount the way the user would type it, and reads it back", () => {
+    expect(typedMoney(money(123456, "USD"))).toBe("1234.56");
+    expect(typedMoney(money(-5, "USD"))).toBe("-0.05");
+    expect(typedMoney(money(0, "USD"))).toBe("0.00");
+    expect(typedMoney(money(-500, "JPY"))).toBe("-500");
+    for (const amount of [money(-105, "EUR"), money(7, "JPY")]) {
+      expect(parseMoney(typedMoney(amount), amount.currency)).toEqual(amount);
+    }
   });
 
   it("formats with the currency's own number of minor digits", () => {
