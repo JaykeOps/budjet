@@ -5,7 +5,7 @@ import {
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import { accountBalance } from "../accounts";
-import type { AccountOpened } from "../accounts/records";
+import type { AccountClosed, AccountOpened } from "../accounts/records";
 import type { AssignmentSet } from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
 import { available, readyToAssign } from "../budget-totals";
@@ -185,6 +185,47 @@ describe("Transfers", () => {
     expect(balance("checking")).toEqual(money(100000, "USD"));
     expect(balance("savings")).toEqual(money(50000, "USD"));
     expect(transfers(changeLog.readAll())).toEqual([]);
+  });
+
+  it("keeps Transfers of a closed Account, but makes, edits and deletes none touching it", () => {
+    const { changeLog, writer, balance } = budget();
+    const emptiedSavings = makeTransfer(writer, {
+      fromAccountId: "savings",
+      toAccountId: "checking",
+      date: "2026-10-12",
+      amount: money(50000, "USD"),
+    });
+    writer.write<AccountClosed["type"], AccountClosed["payload"]>(
+      "savings",
+      "AccountClosed",
+      { version: 1 },
+    );
+    const transfer = {
+      fromAccountId: "checking",
+      toAccountId: "savings",
+      date: "2026-10-13",
+      amount: money(100, "USD"),
+    };
+
+    expect(() => makeTransfer(writer, transfer)).toThrow("Savings is closed");
+    expect(() =>
+      makeTransfer(writer, {
+        ...transfer,
+        fromAccountId: "savings",
+        toAccountId: "checking",
+      }),
+    ).toThrow("Savings is closed");
+    expect(() => editTransfer(writer, emptiedSavings, transfer)).toThrow(
+      "Savings is closed",
+    );
+    expect(() => deleteTransfer(writer, emptiedSavings)).toThrow(
+      "Savings is closed",
+    );
+    expect(transfers(changeLog.readAll()).map(({ id }) => id)).toEqual([
+      emptiedSavings,
+    ]);
+    expect(balance("savings")).toEqual(money(0, "USD"));
+    expect(balance("checking")).toEqual(money(150000, "USD"));
   });
 
   it("refuses to edit or delete a Transfer that isn't in the Budget", () => {

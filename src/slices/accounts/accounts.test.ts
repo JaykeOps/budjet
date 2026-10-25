@@ -10,7 +10,12 @@ import type {
   TransactionEdited,
   TransactionRecorded,
 } from "../transactions/records";
-import { openAccount } from "./commands";
+import {
+  closeAccount,
+  openAccount,
+  redeclareBalance,
+  renameAccount,
+} from "./commands";
 import { accountBalance, accounts, accountsTotal } from "./index";
 
 function budgetIn(currency: string) {
@@ -161,6 +166,81 @@ describe("Accounts", () => {
     expect(accountBalance(changeLog.readAll(), savings)).toEqual(
       money(49000, "USD"),
     );
+  });
+
+  it("re-declares a balance higher or lower, so the balance becomes the declared one", () => {
+    const { changeLog, writer } = budgetIn("USD");
+    const checking = openAccount(writer, {
+      name: "Checking",
+      kind: "checking",
+      openingBalance: money(100000, "USD"),
+    });
+
+    redeclareBalance(writer, checking, { balance: money(112500, "USD") });
+    expect(accountBalance(changeLog.readAll(), checking)).toEqual(
+      money(112500, "USD"),
+    );
+
+    redeclareBalance(writer, checking, { balance: money(90000, "USD") });
+    expect(accountBalance(changeLog.readAll(), checking)).toEqual(
+      money(90000, "USD"),
+    );
+  });
+
+  it("renames an Account, the latest name winning", () => {
+    const { changeLog, writer } = budgetIn("USD");
+    const id = openAccount(writer, {
+      name: "Checking",
+      kind: "checking",
+      openingBalance: money(0, "USD"),
+    });
+
+    renameAccount(writer, id, { name: "  Bills account " });
+    expect(accounts(changeLog.readAll()).map(({ name }) => name)).toEqual([
+      "Bills account",
+    ]);
+    renameAccount(writer, id, { name: "Everyday" });
+    expect(accounts(changeLog.readAll()).map(({ name }) => name)).toEqual([
+      "Everyday",
+    ]);
+
+    expect(() => renameAccount(writer, id, { name: " " })).toThrow(
+      /needs a name/,
+    );
+    expect(() => renameAccount(writer, "missing", { name: "X" })).toThrow(
+      /No Account missing/,
+    );
+  });
+
+  it("closes an Account only once its balance is zero, pointing to Transfers", () => {
+    const { changeLog, writer } = budgetIn("USD");
+    const id = openAccount(writer, {
+      name: "Old savings",
+      kind: "savings",
+      openingBalance: money(5000, "USD"),
+    });
+
+    expect(() => closeAccount(writer, id)).toThrow(
+      /Transfer the \$50\.00 in Old savings to another Account first/,
+    );
+    expect(accounts(changeLog.readAll())[0].closed).toBe(false);
+
+    redeclareBalance(writer, id, { balance: money(0, "USD") });
+    closeAccount(writer, id);
+
+    expect(accounts(changeLog.readAll())).toEqual([
+      {
+        id,
+        name: "Old savings",
+        kind: "savings",
+        closed: true,
+        balance: money(0, "USD"),
+      },
+    ]);
+    expect(() => closeAccount(writer, id)).toThrow(/Old savings is closed/);
+    expect(() =>
+      redeclareBalance(writer, id, { balance: money(100, "USD") }),
+    ).toThrow(/Old savings is closed/);
   });
 
   it("needs a name for the Account", () => {
