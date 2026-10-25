@@ -9,7 +9,7 @@ import {
 import { type Account, useAccounts } from "../accounts";
 import { type CategoryGroup, useCategoryGroups } from "../categories";
 import type { TransactionInput } from "./commands";
-import { useAccountTransactions, usePayees } from "./hooks";
+import { useAccountTransactionList, usePayees } from "./hooks";
 import type { Transaction } from "./queries";
 
 /**
@@ -277,8 +277,10 @@ const VIEW_HEIGHT = 480;
 const OVERSCAN = 10;
 
 /**
- * An Account's Transactions with virtual scrolling: only the rows in view
- * (and a few either side) are rendered, so years of history scroll smoothly.
+ * An Account's Transactions and Transfers with virtual scrolling: only the
+ * rows in view (and a few either side) are rendered, so years of history
+ * scroll smoothly. Transfer rows are 40px like the rest; they are edited on
+ * the Transfers screen.
  */
 function TransactionList({
   account,
@@ -290,7 +292,8 @@ function TransactionList({
   onDelete: (id: string) => void;
 }) {
   const headingId = useId();
-  const transactions = useAccountTransactions(account.id);
+  const entries = useAccountTransactionList(account.id);
+  const accountNames = new Map(useAccounts().map(({ id, name }) => [id, name]));
   const groups = useCategoryGroups();
   const [scrollTop, setScrollTop] = useState(0);
   const categoryNames = new Map(
@@ -300,7 +303,7 @@ function TransactionList({
   );
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
   const last = Math.min(
-    transactions.length,
+    entries.length,
     Math.ceil((scrollTop + VIEW_HEIGHT) / ROW_HEIGHT) + OVERSCAN,
   );
   const cell = { height: ROW_HEIGHT, padding: "0 0.5em" } as const;
@@ -314,7 +317,7 @@ function TransactionList({
       >
         <table
           aria-labelledby={headingId}
-          aria-rowcount={transactions.length + 1}
+          aria-rowcount={entries.length + 1}
           style={{ borderCollapse: "collapse", whiteSpace: "nowrap" }}
         >
           <thead style={{ position: "sticky", top: 0, background: "Canvas" }}>
@@ -331,34 +334,53 @@ function TransactionList({
             {first > 0 && (
               <tr aria-hidden style={{ height: first * ROW_HEIGHT }} />
             )}
-            {transactions.slice(first, last).map((transaction, index) => (
-              <tr key={transaction.id} aria-rowindex={first + index + 2}>
-                <td style={cell}>{transaction.date}</td>
-                <td style={cell}>{transaction.payee}</td>
-                <td style={cell}>
-                  {transaction.categoryId
-                    ? categoryNames.get(transaction.categoryId)
-                    : "Ready to Assign"}
-                </td>
-                <td style={cell}>{transaction.memo}</td>
-                <td style={cell}>{formatMoney(transaction.amount)}</td>
-                <td style={cell}>
-                  <button type="button" onClick={() => onEdit(transaction)}>
-                    Edit
-                  </button>{" "}
-                  <button
-                    type="button"
-                    onClick={() => onDelete(transaction.id)}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {last < transactions.length && (
+            {entries.slice(first, last).map((entry, index) =>
+              entry.kind === "transfer" ? (
+                <tr key={entry.id} aria-rowindex={first + index + 2}>
+                  <td style={cell}>{entry.date}</td>
+                  <td style={cell}>
+                    {entry.amount.minorUnits < 0
+                      ? "Transfer to "
+                      : "Transfer from "}
+                    {accountNames.get(entry.otherAccountId)}
+                  </td>
+                  <td style={cell} />
+                  <td style={cell}>{entry.memo}</td>
+                  <td style={cell}>{formatMoney(entry.amount)}</td>
+                  <td style={cell} />
+                </tr>
+              ) : (
+                <tr key={entry.id} aria-rowindex={first + index + 2}>
+                  <td style={cell}>{entry.date}</td>
+                  <td style={cell}>{entry.payee}</td>
+                  <td style={cell}>
+                    {entry.categoryId
+                      ? categoryNames.get(entry.categoryId)
+                      : "Ready to Assign"}
+                  </td>
+                  <td style={cell}>{entry.memo}</td>
+                  <td style={cell}>{formatMoney(entry.amount)}</td>
+                  <td style={cell}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const { kind: _, ...transaction } = entry;
+                        onEdit(transaction);
+                      }}
+                    >
+                      Edit
+                    </button>{" "}
+                    <button type="button" onClick={() => onDelete(entry.id)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ),
+            )}
+            {last < entries.length && (
               <tr
                 aria-hidden
-                style={{ height: (transactions.length - last) * ROW_HEIGHT }}
+                style={{ height: (entries.length - last) * ROW_HEIGHT }}
               />
             )}
           </tbody>
