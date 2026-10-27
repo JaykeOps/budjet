@@ -91,6 +91,12 @@ test("a user re-declares a balance, Transfers an Account to $0, closes it and re
     accounts.getByRole("row", { name: /Everyday checking/ }),
   ).toContainText("$1,300.00");
   await expect(readyToAssign).toHaveText(/\$4,300\.00/);
+  // The Account's history explains the new balance, and it can't be edited.
+  const adjustment = page
+    .getByRole("table", { name: "Transactions in Everyday checking" })
+    .getByRole("row", { name: /Balance adjustment/ });
+  await expect(adjustment).toContainText(/Ready to Assign.*\$49\.50/);
+  await expect(adjustment.getByRole("button")).toHaveCount(0);
 
   await accounts.getByRole("button", { name: "Close Rainy day" }).click();
   await expect(accountsRegion.getByRole("alert")).toContainText(

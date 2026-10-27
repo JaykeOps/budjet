@@ -346,7 +346,16 @@ function TransactionList({
               <tr aria-hidden style={{ height: first * ROW_HEIGHT }} />
             )}
             {entries.slice(first, last).map((entry, index) =>
-              entry.kind === "transfer" ? (
+              entry.kind === "adjustment" ? (
+                <tr key={entry.id} aria-rowindex={first + index + 2}>
+                  <td style={cell}>{entry.date}</td>
+                  <td style={cell}>Balance adjustment</td>
+                  <td style={cell}>Ready to Assign</td>
+                  <td style={cell} />
+                  <td style={cell}>{formatMoney(entry.amount)}</td>
+                  <td style={cell} />
+                </tr>
+              ) : entry.kind === "transfer" ? (
                 <tr key={entry.id} aria-rowindex={first + index + 2}>
                   <td style={cell}>{entry.date}</td>
                   <td style={cell}>
