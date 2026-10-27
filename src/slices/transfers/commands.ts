@@ -52,7 +52,7 @@ export function editTransfer(
   );
 }
 
-/** Takes a Transfer out of the Budget. */
+/** Takes a Transfer out of the Budget, unless it touches a closed Account. */
 export function deleteTransfer(writer: ChangeLogWriter, id: string): void {
   requireTransfer(writer.changeLog.readAll(), id);
   writer.write<TransferDeleted["type"], TransferDeleted["payload"]>(
@@ -62,9 +62,27 @@ export function deleteTransfer(writer: ChangeLogWriter, id: string): void {
   );
 }
 
+/**
+ * Checks the Transfer is in the Budget and both its Accounts are open: a
+ * closed Account's history stays as it is.
+ */
 function requireTransfer(records: readonly ChangeRecord[], id: string): void {
-  if (!currentTransfers(records).has(id)) {
-    throw new RangeError(`No Transfer ${id}`);
+  const transfer = currentTransfers(records).get(id);
+  if (!transfer) throw new RangeError(`No Transfer ${id}`);
+  requireOpen(records, [transfer.fromAccountId, transfer.toAccountId]);
+}
+
+function requireOpen(
+  records: readonly ChangeRecord[],
+  accountIds: readonly string[],
+): void {
+  const all = accounts(records);
+  for (const accountId of accountIds) {
+    const account = all.find(({ id }) => id === accountId);
+    if (!account) throw new RangeError(`No Account ${accountId}`);
+    if (account.closed) {
+      throw new RangeError(`${account.name} is closed`);
+    }
   }
 }
 
@@ -81,14 +99,7 @@ function validTransfer(
       "A Transfer moves money between two different Accounts",
     );
   }
-  const all = accounts(records);
-  for (const accountId of [fromAccountId, toAccountId]) {
-    const account = all.find(({ id }) => id === accountId);
-    if (!account) throw new RangeError(`No Account ${accountId}`);
-    if (account.closed) {
-      throw new RangeError(`${account.name} is closed`);
-    }
-  }
+  requireOpen(records, [fromAccountId, toAccountId]);
   monthOf(date);
   if (amount.currency !== currency) {
     throw new RangeError(

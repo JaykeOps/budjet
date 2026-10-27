@@ -42,7 +42,7 @@ export function recordTransaction(
 
 /**
  * Replaces everything a Transaction says, in any Month, under the same rules
- * as recording one.
+ * as recording one. A Transaction in a closed Account can't be changed.
  */
 export function editTransaction(
   writer: ChangeLogWriter,
@@ -50,7 +50,7 @@ export function editTransaction(
   input: TransactionInput,
 ): void {
   const records = writer.changeLog.readAll();
-  checkExists(records, id);
+  checkChangeable(records, id);
   writer.write<TransactionEdited["type"], TransactionEdited["payload"]>(
     id,
     "TransactionEdited",
@@ -58,9 +58,9 @@ export function editTransaction(
   );
 }
 
-/** Removes a Transaction, in any Month. */
+/** Removes a Transaction, in any Month, unless its Account is closed. */
 export function deleteTransaction(writer: ChangeLogWriter, id: string): void {
-  checkExists(writer.changeLog.readAll(), id);
+  checkChangeable(writer.changeLog.readAll(), id);
   writer.write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
     id,
     "TransactionDeleted",
@@ -68,12 +68,22 @@ export function deleteTransaction(writer: ChangeLogWriter, id: string): void {
   );
 }
 
-function checkExists(records: readonly ChangeRecord[], id: string): void {
-  if (
-    !currentTransactions(records).some((transaction) => transaction.id === id)
-  ) {
-    throw new RangeError(`No Transaction ${id}`);
-  }
+/**
+ * Checks the Transaction is in the Budget and its Account is open: a closed
+ * Account's history stays as it is.
+ */
+function checkChangeable(records: readonly ChangeRecord[], id: string): void {
+  const transaction = currentTransactions(records).find(
+    (transaction) => transaction.id === id,
+  );
+  if (!transaction) throw new RangeError(`No Transaction ${id}`);
+  checkOpen(records, transaction.accountId);
+}
+
+function checkOpen(records: readonly ChangeRecord[], accountId: string): void {
+  const account = accounts(records).find(({ id }) => id === accountId);
+  if (!account) throw new RangeError(`No Account ${accountId}`);
+  if (account.closed) throw new RangeError(`${account.name} is closed`);
 }
 
 /** The payload for a Transaction that keeps every rule, or the first rule it breaks. */
@@ -84,9 +94,7 @@ function checkedPayload(
   const budget = records.findLast(isBudgetCreated);
   if (!budget) throw new Error("Create a Budget first");
   const { currency } = budget.payload;
-  if (!accounts(records).some(({ id }) => id === accountId)) {
-    throw new RangeError(`No Account ${accountId}`);
-  }
+  checkOpen(records, accountId);
   monthOf(date);
   if (amount.currency !== currency) {
     throw new RangeError(

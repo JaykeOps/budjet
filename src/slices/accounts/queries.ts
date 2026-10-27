@@ -3,7 +3,13 @@ import { addMoney, type Money, money, subtractMoney } from "../../kernel/money";
 import { isBudgetCreated } from "../budget-setup/records";
 import { currentTransactions } from "../transactions/records";
 import { currentTransfers } from "../transfers/records";
-import { type AccountKind, isAccountOpened } from "./records";
+import {
+  type AccountKind,
+  adjustments,
+  isAccountClosed,
+  isAccountOpened,
+  isAccountRenamed,
+} from "./records";
 
 export type Account = {
   id: string;
@@ -14,10 +20,11 @@ export type Account = {
 };
 
 /**
- * Every Account, in the order they were opened, with its balance: its Opening
- * Balance plus money coming in less money going out, counting each
- * Transaction as last edited, plus Transfers in less Transfers out.
- * Adjustments join it as that slice arrives.
+ * Every Account, in the order they were opened, with its latest name, whether
+ * it is closed, and its balance: its Opening
+ * Balance plus its Adjustments, plus money coming in less money going out,
+ * counting each Transaction as last edited, plus Transfers in less Transfers
+ * out.
  */
 export function accounts(records: readonly ChangeRecord[]): Account[] {
   const byId = new Map<string, Account>();
@@ -30,9 +37,18 @@ export function accounts(records: readonly ChangeRecord[]): Account[] {
         closed: false,
         balance: record.payload.openingBalance,
       });
+    } else if (isAccountRenamed(record)) {
+      const account = byId.get(record.subjectId);
+      if (account) account.name = record.payload.name;
+    } else if (isAccountClosed(record)) {
+      const account = byId.get(record.subjectId);
+      if (account) account.closed = true;
     }
   }
-  for (const { accountId, amount } of currentTransactions(records)) {
+  for (const { accountId, amount } of [
+    ...adjustments(records),
+    ...currentTransactions(records),
+  ]) {
     const account = byId.get(accountId);
     if (account) account.balance = addMoney(account.balance, amount);
   }
