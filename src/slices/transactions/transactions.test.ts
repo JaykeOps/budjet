@@ -5,7 +5,11 @@ import {
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
-import type { AccountClosed, AccountOpened } from "../accounts/records";
+import type {
+  AccountClosed,
+  AccountOpened,
+  BalanceRedeclared,
+} from "../accounts/records";
 import type { BudgetCreated } from "../budget-setup/records";
 import type {
   CategoryCreated,
@@ -478,6 +482,34 @@ describe("Transactions", () => {
         amount: money(-20000, "USD"),
         otherAccountId: "savings",
         memo: "Rainy day",
+      },
+    ]);
+  });
+
+  it("lists an Account's Adjustments among its Transactions, on the day the balance was re-declared", () => {
+    const { changeLog, writer, transactionList } = budget();
+    const groceries = recordTransaction(writer, {
+      accountId: "checking",
+      date: "2100-01-15",
+      amount: money(-4550, "USD"),
+      categoryId: "groceries",
+    });
+    // A clock ahead of the records already written, which the Change Log keeps in order.
+    const redeclared = createChangeLogWriter(changeLog, "this-device", {
+      now: () => new Date(2100, 0, 14, 12).getTime(),
+    }).write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+      "checking",
+      "BalanceRedeclared",
+      { version: 1, balance: money(95000, "USD") },
+    );
+
+    expect(transactionList()).toEqual([
+      expect.objectContaining({ kind: "transaction", id: groceries }),
+      {
+        kind: "adjustment",
+        id: redeclared.id,
+        date: "2100-01-14",
+        amount: money(-450, "USD"),
       },
     ]);
   });
