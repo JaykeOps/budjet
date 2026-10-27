@@ -146,6 +146,39 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
   await expectChanged();
 });
 
+test("the selected Account stays selected after a reload and Back returns to the one before", async ({
+  page,
+}) => {
+  await createBudget(page);
+  const add = page.getByRole("form", { name: "Add an Account" });
+  await add.getByLabel("Name").fill("Savings");
+  await add.getByLabel("Opening Balance").fill("500");
+  await add.getByRole("button", { name: "Add Account" }).click();
+  const account = page
+    .getByRole("region", { name: "Transactions", exact: true })
+    .getByRole("combobox", { name: /^Account/ });
+  await expect(account.getByRole("option")).toHaveCount(2);
+  await expect(
+    page.getByRole("table", { name: "Transactions in Checking" }),
+  ).toBeVisible();
+
+  await account.selectOption({ label: "Savings" });
+  await expect(
+    page.getByRole("table", { name: "Transactions in Savings" }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/account=/);
+
+  await reloadWhenSaved(page);
+  await expect(
+    page.getByRole("table", { name: "Transactions in Savings" }),
+  ).toBeVisible();
+
+  await page.goBack();
+  await expect(
+    page.getByRole("table", { name: "Transactions in Checking" }),
+  ).toBeVisible();
+});
+
 test("Payees used before are suggested", async ({ page }) => {
   await createBudget(page);
   const record = page.getByRole("form", { name: "Record a Transaction" });
@@ -153,6 +186,11 @@ test("Payees used before are suggested", async ({ page }) => {
   await record.getByLabel("Amount").fill("2000");
   await record.getByLabel("Payee").fill("Employer");
   await record.getByRole("button", { name: "Record Transaction" }).click();
+  await expect(
+    page
+      .getByRole("table", { name: "Transactions in Checking" })
+      .getByRole("row", { name: /Employer/ }),
+  ).toBeVisible();
 
   await reloadWhenSaved(page);
 
