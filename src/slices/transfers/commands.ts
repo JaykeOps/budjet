@@ -3,12 +3,12 @@ import type { Money } from "../../kernel/money";
 import { monthOf } from "../../kernel/month";
 import { accounts } from "../accounts";
 import { isBudgetCreated } from "../budget-setup/records";
-import {
-  currentTransfers,
-  type TransferDeleted,
-  type TransferDetails,
-  type TransferEdited,
-  type TransferMade,
+import { currentTransfers } from "./queries";
+import type {
+  TransferDeleted,
+  TransferDetails,
+  TransferEdited,
+  TransferMade,
 } from "./records";
 
 export type TransferInput = {
