@@ -126,6 +126,18 @@ export class Budjet {
     return this.inDevShell(this.workspace(), ["pnpm", "test"]).stdout();
   }
 
+  /**
+   * Run the Vitest performance tests. Not part of `check`: they time
+   * wall-clock runs, so they need the machine to themselves.
+   */
+  @func()
+  async performance(): Promise<string> {
+    return this.inDevShell(this.workspace(), [
+      "pnpm",
+      "test:performance",
+    ]).stdout();
+  }
+
   /** Build the app, stamping `tag` into it when given. */
   @func()
   build(tag?: string): Directory {

@@ -9,7 +9,8 @@
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "test": "vitest run",
+    "test": "vitest run --project unit",
+    "test:performance": "vitest run --project performance",
     "e2e": "playwright test"
   },
   "dependencies": {

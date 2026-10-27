@@ -32,12 +32,58 @@ export function addMoney(a: Money, b: Money): Money {
   return money(a.minorUnits + b.minorUnits, a.currency);
 }
 
+export function subtractMoney(a: Money, b: Money): Money {
+  return addMoney(a, money(-b.minorUnits, b.currency));
+}
+
 /** For display only: the one place minor units become a decimal number. */
 export function formatMoney(amount: Money, locale?: string): string {
   const format = new Intl.NumberFormat(locale, {
     style: "currency",
     currency: amount.currency,
   });
-  const digits = format.resolvedOptions().maximumFractionDigits ?? 0;
-  return format.format(amount.minorUnits / 10 ** digits);
+  return format.format(amount.minorUnits / 10 ** minorDigits(amount.currency));
+}
+
+/**
+ * An amount as the user would type it, such as "1234.56": no currency sign or
+ * grouping, and read back exactly by `parseMoney`.
+ */
+export function typedMoney(amount: Money): string {
+  const digits = minorDigits(amount.currency);
+  const sign = amount.minorUnits < 0 ? "-" : "";
+  const units = String(Math.abs(amount.minorUnits)).padStart(digits + 1, "0");
+  if (digits === 0) return sign + units;
+  return `${sign}${units.slice(0, -digits)}.${units.slice(-digits)}`;
+}
+
+const TYPED_AMOUNT = /^(-?)(\d+)(?:[.,](\d+))?$/;
+
+/**
+ * Reads an amount the user typed, such as "1234.56" or "-50,5", without ever
+ * going through a floating-point number. Undefined when the text isn't an
+ * amount, or has more decimals than the currency has minor units.
+ */
+export function parseMoney(
+  text: string,
+  currency: Currency,
+): Money | undefined {
+  const match = TYPED_AMOUNT.exec(text.trim());
+  if (!match) return undefined;
+  const [, sign, whole, fraction = ""] = match;
+  const digits = minorDigits(currency);
+  if (fraction.length > digits) return undefined;
+  const minorUnits = Number(whole + fraction.padEnd(digits, "0"));
+  if (!Number.isSafeInteger(minorUnits)) return undefined;
+  return money(sign && minorUnits ? -minorUnits : minorUnits, currency);
+}
+
+/** How many digits the currency's minor units take: 2 for USD, 0 for JPY. */
+function minorDigits(currency: Currency): number {
+  return (
+    new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+    }).resolvedOptions().maximumFractionDigits ?? 0
+  );
 }
