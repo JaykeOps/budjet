@@ -1,14 +1,19 @@
-import { type ChangeRecord, latestBySubject } from "../../kernel/change-log";
+import {
+  type ChangeRecord,
+  latestBySubject,
+  perSnapshot,
+} from "../../kernel/change-log";
 import { addMoney, type Money, money, subtractMoney } from "../../kernel/money";
 import { type Month, monthOf } from "../../kernel/month";
+import { adjustments } from "../accounts";
 import { isAccountOpened } from "../accounts/records";
 import { isAssignmentSet } from "../assignments/records";
 import { isBudgetCreated } from "../budget-setup/records";
 import { currentTransactions } from "../transactions/records";
 
 /**
- * The money with no job yet: every Opening Balance and all money coming in
- * with no Category, less every Assignment in every Month. Undefined before a Budget exists. Can go below zero.
+ * The money with no job yet: every Opening Balance, every Adjustment and all
+ * money coming in with no Category, less every Assignment in every Month. Undefined before a Budget exists. Can go below zero.
  */
 export function readyToAssign(
   records: readonly ChangeRecord[],
@@ -20,6 +25,9 @@ export function readyToAssign(
     if (isAccountOpened(record)) {
       total = addMoney(total, record.payload.openingBalance);
     }
+  }
+  for (const { amount } of adjustments(records)) {
+    total = addMoney(total, amount);
   }
   for (const { amount, categoryId } of currentTransactions(records)) {
     if (!categoryId) total = addMoney(total, amount);
@@ -148,23 +156,10 @@ type CategoryTotals = {
 };
 
 /**
- * One pass over the records, kept per Change Log snapshot (`readAll` returns
- * the same array until the next append), so every Category row of a Month
- * shares it instead of reading every record again.
+ * One pass over the records, kept per Change Log snapshot, so every Category
+ * row of a Month shares it instead of reading every record again.
  */
-const totalsBySnapshot = new WeakMap<
-  readonly ChangeRecord[],
-  CategoryTotals | undefined
->();
-
-function categoryTotals(
-  records: readonly ChangeRecord[],
-): CategoryTotals | undefined {
-  if (totalsBySnapshot.has(records)) return totalsBySnapshot.get(records);
-  const totals = calculateCategoryTotals(records);
-  totalsBySnapshot.set(records, totals);
-  return totals;
-}
+const categoryTotals = perSnapshot(calculateCategoryTotals);
 
 function calculateCategoryTotals(
   records: readonly ChangeRecord[],

@@ -14,26 +14,31 @@ import type { Transaction } from "./queries";
 
 /**
  * An Account's Transactions, newest first, with a form to record another in
- * it and a way to edit or delete each one. The app shell decides what
- * recording, editing and deleting do; an error it throws is shown on the form.
+ * it and a way to edit or delete each one, unless the Account is closed. The
+ * app shell keeps which Account is selected (the first one when it names
+ * none it knows) and decides what recording, editing and deleting do; an
+ * error it throws is shown on the form.
  */
 export function TransactionsScreen({
   currency,
+  selectedAccountId,
+  onSelectAccount,
   onRecord,
   onEdit,
   onDelete,
 }: {
   currency: Currency;
+  selectedAccountId?: string;
+  onSelectAccount: (accountId: string) => void;
   onRecord: (input: TransactionInput) => void;
   onEdit: (id: string, input: TransactionInput) => void;
   onDelete: (id: string) => void;
 }) {
   const headingId = useId();
-  const accounts = useAccounts().filter(({ closed }) => !closed);
-  const [selectedId, setSelectedId] = useState<string>();
+  const accounts = useAccounts();
   const [editing, setEditing] = useState<Transaction>();
   const account =
-    accounts.find(({ id }) => id === selectedId) ?? accounts.at(0);
+    accounts.find(({ id }) => id === selectedAccountId) ?? accounts.at(0);
   if (!account) return null;
 
   return (
@@ -44,18 +49,24 @@ export function TransactionsScreen({
         <select
           value={account.id}
           onChange={(event) => {
-            setSelectedId(event.target.value);
+            onSelectAccount(event.target.value);
             setEditing(undefined);
           }}
         >
-          {accounts.map(({ id, name }) => (
+          {accounts.map(({ id, name, closed }) => (
             <option key={id} value={id}>
               {name}
+              {closed && " (closed)"}
             </option>
           ))}
         </select>
       </label>
-      {editing ? (
+      {account.closed ? (
+        <p>
+          {account.name} is closed: its history stays, but it takes no new
+          Transactions.
+        </p>
+      ) : editing ? (
         <TransactionForm
           key={editing.id}
           heading="Edit Transaction"
@@ -335,7 +346,16 @@ function TransactionList({
               <tr aria-hidden style={{ height: first * ROW_HEIGHT }} />
             )}
             {entries.slice(first, last).map((entry, index) =>
-              entry.kind === "transfer" ? (
+              entry.kind === "adjustment" ? (
+                <tr key={entry.id} aria-rowindex={first + index + 2}>
+                  <td style={cell}>{entry.date}</td>
+                  <td style={cell}>Balance adjustment</td>
+                  <td style={cell}>Ready to Assign</td>
+                  <td style={cell} />
+                  <td style={cell}>{formatMoney(entry.amount)}</td>
+                  <td style={cell} />
+                </tr>
+              ) : entry.kind === "transfer" ? (
                 <tr key={entry.id} aria-rowindex={first + index + 2}>
                   <td style={cell}>{entry.date}</td>
                   <td style={cell}>
@@ -361,18 +381,25 @@ function TransactionList({
                   <td style={cell}>{entry.memo}</td>
                   <td style={cell}>{formatMoney(entry.amount)}</td>
                   <td style={cell}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const { kind: _, ...transaction } = entry;
-                        onEdit(transaction);
-                      }}
-                    >
-                      Edit
-                    </button>{" "}
-                    <button type="button" onClick={() => onDelete(entry.id)}>
-                      Delete
-                    </button>
+                    {!account.closed && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const { kind: _, ...transaction } = entry;
+                            onEdit(transaction);
+                          }}
+                        >
+                          Edit
+                        </button>{" "}
+                        <button
+                          type="button"
+                          onClick={() => onDelete(entry.id)}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ),

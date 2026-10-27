@@ -10,7 +10,12 @@ import {
   OpenAccountForm,
   useAccounts,
 } from "./slices/accounts";
-import { openAccount } from "./slices/accounts/commands";
+import {
+  closeAccount,
+  openAccount,
+  redeclareBalance,
+  renameAccount,
+} from "./slices/accounts/commands";
 import {
   copyLastMonth,
   moveMoney,
@@ -33,6 +38,7 @@ import {
   editTransfer,
   makeTransfer,
 } from "./slices/transfers/commands";
+import { useUrlParameter } from "./url-parameter";
 
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
@@ -93,8 +99,15 @@ function Shell() {
       <AccountsScreen
         currency={budget.currency}
         onOpenAccount={(input) => openAccount(writer, input)}
+        onRedeclareBalance={(accountId, balance) =>
+          redeclareBalance(writer, accountId, { balance })
+        }
+        onRename={(accountId, name) =>
+          renameAccount(writer, accountId, { name })
+        }
+        onClose={(accountId) => closeAccount(writer, accountId)}
       />
-      <TransactionsScreen
+      <AccountTransactions
         currency={budget.currency}
         onRecord={(input) => recordTransaction(writer, input)}
         onEdit={(id, input) => editTransaction(writer, id, input)}
@@ -107,6 +120,23 @@ function Shell() {
         onDelete={(id) => deleteTransfer(writer, id)}
       />
     </>
+  );
+}
+
+/** The Transactions screen for the Account in the address bar (`?account=<id>`). */
+function AccountTransactions(
+  props: Omit<
+    ComponentProps<typeof TransactionsScreen>,
+    "selectedAccountId" | "onSelectAccount"
+  >,
+) {
+  const [accountId, setAccountId] = useUrlParameter("account");
+  return (
+    <TransactionsScreen
+      selectedAccountId={accountId ?? undefined}
+      onSelectAccount={(id) => setAccountId(id, "push")}
+      {...props}
+    />
   );
 }
 

@@ -121,3 +121,20 @@ function nextTimestamp(
   }
   return { wallTime: newestSeen.wallTime, counter: newestSeen.counter + 1 };
 }
+
+/**
+ * Wraps a fold over every record so it runs once per Change Log snapshot:
+ * `readAll` returns the same array until the next append, so every query
+ * reading the same records shares one result.
+ */
+export function perSnapshot<Result>(
+  fold: (records: readonly ChangeRecord[]) => Result,
+): (records: readonly ChangeRecord[]) => Result {
+  const results = new WeakMap<readonly ChangeRecord[], Result>();
+  return (records) => {
+    if (results.has(records)) return results.get(records) as Result;
+    const result = fold(records);
+    results.set(records, result);
+    return result;
+  };
+}

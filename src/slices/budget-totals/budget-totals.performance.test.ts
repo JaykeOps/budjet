@@ -94,17 +94,25 @@ function calculateMonth(records: readonly ChangeRecord[], of: Month) {
 it("calculates a Month from ten years of records within 50 ms", () => {
   const records = tenYearsOfRecords();
   expect(records.length).toBeGreaterThan(48000);
-  // Warm up the code paths on a different snapshot of the same records.
-  calculateMonth([...records], month(2025, 12));
+  // Warm up the code paths (JIT) on other snapshots of the same records.
+  for (let run = 0; run < 3; run += 1) {
+    calculateMonth([...records], month(2025, 12));
+  }
 
-  // A new snapshot, as after an append, so nothing calculated before is reused.
-  const snapshot = [...records];
-  const started = performance.now();
-  const result = calculateMonth(snapshot, month(2025, 12));
-  const elapsed = performance.now() - started;
+  // Each run gets a new snapshot, as after an append, so nothing calculated
+  // before is reused. The median ignores a run slowed by a busy machine (GC,
+  // other test files) while still needing most runs to be fast.
+  const timings: number[] = [];
+  for (let run = 0; run < 7; run += 1) {
+    const snapshot = [...records];
+    const started = performance.now();
+    const result = calculateMonth(snapshot, month(2025, 12));
+    timings.push(performance.now() - started);
+    expect(result.available).toHaveLength(CATEGORIES.length);
+    expect(result.overspent).toBeDefined();
+    expect(result.readyToAssign).toBeDefined();
+  }
+  const elapsed = timings.sort((a, b) => a - b)[Math.floor(timings.length / 2)];
 
-  expect(result.available).toHaveLength(CATEGORIES.length);
-  expect(result.overspent).toBeDefined();
-  expect(result.readyToAssign).toBeDefined();
   expect(elapsed).toBeLessThan(50);
 });

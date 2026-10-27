@@ -4,7 +4,25 @@ import {
   createChangeLogWriter,
   createInMemoryChangeLog,
   latestBySubject,
+  perSnapshot,
 } from "./change-log";
+
+describe("perSnapshot", () => {
+  it("folds each Change Log snapshot once, and again after an append", () => {
+    const log = createInMemoryChangeLog();
+    let folds = 0;
+    const count = perSnapshot((records) => {
+      folds += 1;
+      return records.length;
+    });
+    expect(count(log.readAll())).toBe(0);
+    expect(count(log.readAll())).toBe(0);
+    expect(folds).toBe(1);
+    createChangeLogWriter(log, "device").write("thing", "Named", {});
+    expect(count(log.readAll())).toBe(1);
+    expect(folds).toBe(2);
+  });
+});
 
 /** A clock that reads whatever time the test last set. */
 function fakeClock(start: number) {

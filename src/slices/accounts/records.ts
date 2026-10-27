@@ -17,3 +17,41 @@ export type AccountOpened = ChangeRecord<
 export function isAccountOpened(record: ChangeRecord): record is AccountOpened {
   return record.type === "AccountOpened";
 }
+
+/** An Account's new name. The latest one wins. Its subject is the Account's id. */
+export type AccountRenamed = ChangeRecord<
+  "AccountRenamed",
+  { version: 1; name: string }
+>;
+
+export function isAccountRenamed(
+  record: ChangeRecord,
+): record is AccountRenamed {
+  return record.type === "AccountRenamed";
+}
+
+/**
+ * An Account the user no longer uses. Its history stays, but it takes no new
+ * Transactions or Transfers. Its subject is the Account's id.
+ */
+export type AccountClosed = ChangeRecord<"AccountClosed", { version: 1 }>;
+
+export function isAccountClosed(record: ChangeRecord): record is AccountClosed {
+  return record.type === "AccountClosed";
+}
+
+/**
+ * The user's statement of what an Account really holds. The Adjustment is the
+ * difference from the Account's balance just before this record. Its subject
+ * is the Account's id.
+ */
+export type BalanceRedeclared = ChangeRecord<
+  "BalanceRedeclared",
+  { version: 1; balance: Money }
+>;
+
+export function isBalanceRedeclared(
+  record: ChangeRecord,
+): record is BalanceRedeclared {
+  return record.type === "BalanceRedeclared";
+}
