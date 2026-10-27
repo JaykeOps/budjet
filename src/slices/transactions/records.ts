@@ -70,10 +70,6 @@ export type CurrentTransaction = { id: string } & TransactionFields;
  * For each one the most recent record wins (docs/adr/0004): an edit replaces
  * it and a deletion removes it. Every slice that counts Transactions reads
  * them through this. Expects records oldest first, as `readAll` returns them.
- *
- * It lives here, not in queries.ts, only because Budget Totals reads it:
- * Budget Totals depending on Transactions' index would close the cycle
- * Transactions → Categories → Budget Totals → Transactions.
  */
 export const currentTransactions = perSnapshot(foldTransactions);
 

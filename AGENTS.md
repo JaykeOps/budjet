@@ -14,7 +14,7 @@ Every tool comes from `flake.nix` (ADR 0001). Run project commands as `nix devel
 Code is organised as feature slices (ADR 0005). A slice lives in `src/slices/<slice>/`, and only these files are reachable from outside it:
 
 - `index.ts`: the public entry point. Its public queries, the hooks that wrap them, and its UI. Another slice imports it as `../<slice>`.
-- `records.ts`: the change record types it publishes. Any slice may read them.
+- `records.ts`: the change record types it publishes, plus pure folds that read those records as they now stand (e.g. `currentTransactions`, applying ADR 0004's most recent edit wins). Any slice may read them. It imports only the kernel, so it never adds a dependency between slices.
 - `commands.ts` (or `commands/`): its commands. Only the app shell (code in `src/` outside `src/slices/`) may import them.
 
 Everything else in a slice is private. Query dependencies (one slice importing another's `index.ts`) must not form a cycle. `dagger call check-feature-slices` enforces all of this with `scripts/feature-slice-architecture/check.ts`, and it runs as part of `dagger call check`.
