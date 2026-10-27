@@ -35,8 +35,12 @@ The amount the user gives to one Category in one Month.
 _Avoid_: Allocation, budgeted amount, envelope fill
 
 **Available**:
-The money a Category has to spend in a Month: what it carried forward from the previous Month, plus that Month's Assignment, plus inflows to it, minus that Month's spending in it. Available always carries forward to the next Month, whether positive or negative.
+The money a Category has to spend in a Month: what it carried forward from the previous Month, plus that Month's Assignment, minus that Month's Spending in it. Available always carries forward to the next Month, whether positive or negative.
 _Avoid_: Balance (that word belongs to Accounts), remaining
+
+**Spending**:
+What a Category's Transactions took out of the Budget in one Month: money going out, less refunds coming back in. A Month whose refunds outweigh its money going out has negative Spending. Transfers and Adjustments are never Spending.
+_Avoid_: Expenses, activity, outflow
 
 **Overspent**:
 A Category whose Available is below zero. It stays Overspent, Month after Month, until the user raises its Assignment to cover it.
