@@ -1437,6 +1437,7 @@ function VariantD({ world: w, wide, change }: VariantProps) {
       {open.kind === "steps" && (
         <Steps
           world={w}
+          wide={wide}
           initial={open.ids}
           start={open.start}
           change={change}
@@ -1444,7 +1445,7 @@ function VariantD({ world: w, wide, change }: VariantProps) {
         />
       )}
       {open.kind === "walk" && (
-        <Steps world={w} change={change} onDone={close} />
+        <Steps world={w} wide={wide} change={change} onDone={close} />
       )}
       {open.kind === "copy" && (
         <CopyPreview
@@ -1590,12 +1591,15 @@ function walkQueue(w: World): string[] {
 /** One Category at a time, without closing: ‹ ›, a swipe, or ↑ ↓ move along. */
 function Steps({
   world: w,
+  wide,
   initial,
   start = 0,
   change,
   onDone,
 }: {
   world: World;
+  /** On a phone, Back sits beside the main button instead of ‹ › up top. */
+  wide: boolean;
   /** Categories to step through; none means the Assign walk. */
   initial?: string[];
   start?: number;
@@ -1726,31 +1730,35 @@ function Steps({
   const x = w.byId(id);
   return (
     <div className="asd" ref={ref}>
-      <div className="asd-nav">
-        <button
-          type="button"
-          className="asd-arrow"
-          aria-label="Previous Category"
-          disabled={i === 0}
-          onClick={() => go(i - 1)}
-        >
-          ‹
-        </button>
+      <div className="asd-nav" data-wide={wide}>
+        {wide && (
+          <button
+            type="button"
+            className="asd-arrow"
+            aria-label="Previous Category"
+            disabled={i === 0}
+            onClick={() => go(i - 1)}
+          >
+            ‹
+          </button>
+        )}
         <span className="asd-where">
           <strong className="asd-name">{x.name}</strong>
           <span className="small muted">
             {x.group} · {i + 1} of {count}
           </span>
         </span>
-        <button
-          type="button"
-          className="asd-arrow"
-          aria-label="Next Category"
-          disabled={i === count - 1 && !walk}
-          onClick={() => go(i + 1)}
-        >
-          ›
-        </button>
+        {wide && (
+          <button
+            type="button"
+            className="asd-arrow"
+            aria-label="Next Category"
+            disabled={i === count - 1 && !walk}
+            onClick={() => go(i + 1)}
+          >
+            ›
+          </button>
+        )}
       </div>
       <div className="asd-rta num" data-state={stateOf(w.readyToAssign)}>
         <span>Ready to Assign</span>
@@ -1766,6 +1774,13 @@ function Steps({
           go(i + 1);
         }}
         onNext={() => go(i + 1)}
+        onBack={wide ? undefined : () => go(i - 1)}
+        isFirst={i === 0}
+        tip={
+          wide
+            ? "Suggestions save and move on. Use ‹ › or ↑ ↓ to look at another Category."
+            : "Suggestions save and move on. Swipe to skip ahead or go back."
+        }
       />
     </div>
   );
@@ -1778,12 +1793,20 @@ function StepPanel({
   last,
   onSave,
   onNext,
+  onBack,
+  isFirst,
+  tip,
 }: {
   world: World;
   id: string;
   last: boolean;
   onSave(next: Assigned, toast: string): void;
   onNext(): void;
+  /** Back to the previous Category, beside the main button. */
+  onBack?(): void;
+  /** Back stays in place, disabled, so the main button doesn't change width. */
+  isFirst: boolean;
+  tip: string;
 }) {
   const x = w.byId(id);
   const now = w.assignment(id);
@@ -2001,13 +2024,21 @@ function StepPanel({
             </strong>
           </div>
         </div>
-        <p className="small muted asd-tip">
-          Suggestions save and move on. Swipe, or use ‹ ›, to look at another
-          Category.
-        </p>
+        <p className="small muted asd-tip">{tip}</p>
       </div>
-      <div className="rt-foot">
-        <button type="submit" className="btn btn-primary btn-wide rt-save-main">
+      <div className="rt-foot rt-save">
+        {onBack && (
+          <button
+            type="button"
+            className="asd-arrow asd-back"
+            aria-label="Previous Category"
+            disabled={isFirst}
+            onClick={onBack}
+          >
+            ‹
+          </button>
+        )}
+        <button type="submit" className="btn btn-primary rt-save-main">
           {unchanged
             ? last
               ? "Done"

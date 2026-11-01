@@ -423,3 +423,13 @@ button.as-row-open {
   top: 12px;
   bottom: auto;
 }
+/* On a phone the arrows leave the top; Back sits beside the main button. */
+.asd-nav[data-wide="false"] {
+  grid-template-columns: 1fr;
+}
+.asd-back {
+  flex: none;
+  align-self: center;
+  width: 48px;
+  height: 48px;
+}
