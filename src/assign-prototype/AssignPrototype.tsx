@@ -239,6 +239,32 @@ function negativeNote(w: World, id: string, n: number): string {
   return lowerNote(w, id, cents(now - n));
 }
 
+/**
+ * Where D suggests covering `amount` for Category `id` from: a Category that
+ * covers it out of this Month's Assignment, in the same Category Group first;
+ * then one that needs a Take-back; most Available first within each. With
+ * nothing covering it in full, whatever can give the most.
+ */
+function suggestedSource(
+  w: World,
+  id: string,
+  amount: number,
+): string | undefined {
+  const group = w.byId(id).group;
+  const others = w.categories.filter((c) => c.id !== id && w.movable(c.id) > 0);
+  const fromAssignment = (c: Category) =>
+    Math.min(w.available(c.id), Math.max(0, w.assignment(c.id)));
+  const byAvailable = (cs: Category[]) =>
+    [...cs].sort((a, b) => w.available(b.id) - w.available(a.id));
+  const covers = others.filter((c) => fromAssignment(c) >= amount);
+  return (
+    byAvailable(covers.filter((c) => c.group === group))[0] ??
+    byAvailable(covers)[0] ??
+    byAvailable(others.filter((c) => w.movable(c.id) >= amount))[0] ??
+    [...others].sort((a, b) => w.movable(b.id) - w.movable(a.id))[0]
+  )?.id;
+}
+
 /** What "Give back" offers when Ready to Assign is below zero. */
 function giveBackFor(w: World, id: string): number {
   if (w.readyToAssign >= 0) return 0;
@@ -1955,8 +1981,7 @@ function StepPanel({
   const short = Math.max(0, -w.available(id));
   const [source, setSource] = useState<End>(
     short > 0 && short > w.readyToAssign
-      ? (w.categories.find((c) => c.id !== id && w.movable(c.id) >= short)
-          ?.id ?? RTA)
+      ? (suggestedSource(w, id, short) ?? RTA)
       : RTA,
   );
   const fromRta = source === RTA;
@@ -2097,10 +2122,8 @@ function StepPanel({
             type="button"
             aria-pressed={!fromRta}
             onClick={() => {
-              const best = [...w.categories]
-                .filter((c) => c.id !== id && w.movable(c.id) > 0)
-                .sort((a, b) => w.movable(b.id) - w.movable(a.id))[0];
-              if (best) setSource(best.id);
+              const best = suggestedSource(w, id, short);
+              if (best) setSource(best);
               setTyped(typedFrom(short));
             }}
           >
