@@ -7,7 +7,10 @@
 // picks the device. `?data=typical|fresh` picks the Month: `typical` is late
 // October with three Categories Overspent and five not assigned yet; `fresh`
 // is the 1st, with nothing assigned. `?scheme=system|dark|light`. Everything
-// is in memory; Reset starts over.
+// is in memory; Reset starts over. On D, `?neg=a|b|c` picks what happens when
+// money leaves a Category whose Assignment is smaller than the amount (#80's
+// open choice): a lets the Assignment go negative, b forbids it, c takes it
+// back from what the Category carried forward, as its own figure.
 import "@fontsource-variable/geist";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useUrlParameter } from "../url-parameter";
@@ -24,8 +27,18 @@ type Category = {
   /** Last Month's Assignment, which Copy last Month copies. */
   last: number;
 };
-/** This Month's Assignment for each Category id; missing means none yet. */
+/**
+ * This Month's Assignment for each Category id; missing means none yet. Under
+ * rule c, `taken:<id>` holds what was taken back from its carried forward.
+ */
 type Assigned = Record<string, number>;
+const TAKEN = "taken:";
+/**
+ * When money leaves a Category whose Assignment is smaller than the amount:
+ * a, the Assignment goes negative; b, refused; c, the rest is taken back from
+ * what it carried forward.
+ */
+type Rule = "a" | "b" | "c";
 
 const variantKeys = ["A", "B", "C", "D"] as const;
 type VariantKey = (typeof variantKeys)[number];
@@ -104,37 +117,58 @@ const typedFrom = (n: number) =>
 /* ------------------------------------------------------------------ */
 
 type World = {
+  rule: Rule;
   categories: Category[];
   groups: string[];
   assigned: Assigned;
   byId(id: string): Category;
   assignment(id: string): number;
+  /** Rule c: carried forward money taken back this Month. */
+  takenBack(id: string): number;
   available(id: string): number;
+  /** What can leave this Category under the rule. */
+  movable(id: string): number;
   readyToAssign: number;
   overspent: Category[];
   /** Categories Copy last Month would fill: none this Month, some last. */
   copyable: Category[];
 };
 
-function worldOf(categories: Category[], assigned: Assigned): World {
+function worldOf(
+  categories: Category[],
+  assigned: Assigned,
+  rule: Rule = "a",
+): World {
   const byId = (id: string) => {
     const x = categories.find((c) => c.id === id);
     if (!x) throw new Error(id);
     return x;
   };
   const assignment = (id: string) => assigned[id] ?? 0;
+  const takenBack = (id: string) => assigned[TAKEN + id] ?? 0;
   const available = (id: string) =>
-    cents(byId(id).carried + assignment(id) - byId(id).spending);
+    cents(
+      byId(id).carried - takenBack(id) + assignment(id) - byId(id).spending,
+    );
+  const sum = (taken: boolean) =>
+    Object.entries(assigned)
+      .filter(([k]) => k.startsWith(TAKEN) === taken)
+      .reduce((s, [, n]) => s + n, 0);
   return {
+    rule,
     categories,
     groups: [...new Set(categories.map((x) => x.group))],
     assigned,
     byId,
     assignment,
+    takenBack,
     available,
-    readyToAssign: cents(
-      POOL - Object.values(assigned).reduce((s, n) => s + n, 0),
-    ),
+    movable: (id) =>
+      Math.max(
+        0,
+        rule === "b" ? Math.min(available(id), assignment(id)) : available(id),
+      ),
+    readyToAssign: cents(POOL - sum(false) + sum(true)),
     overspent: categories.filter((x) => available(x.id) < 0),
     copyable: categories.filter((x) => !(x.id in assigned) && x.last > 0),
   };
@@ -154,9 +188,55 @@ const endAmount = (w: World, end: End) =>
 /** Raises `to`'s Assignment by `amount` and lowers `from`'s, or takes it from Ready to Assign. */
 function move(w: World, from: End, to: End, amount: number): Assigned {
   const next = { ...w.assigned };
-  if (from !== RTA) next[from] = cents(w.assignment(from) - amount);
+  if (from !== RTA) lower(w, next, from, amount);
   if (to !== RTA) next[to] = cents(w.assignment(to) + amount);
   return next;
+}
+
+/** Takes `amount` out of a Category: its Assignment, then, under rule c, what it carried forward. */
+function lower(w: World, next: Assigned, id: string, amount: number) {
+  const now = w.assignment(id);
+  if (w.rule !== "c") {
+    next[id] = cents(now - amount);
+    return;
+  }
+  const fromAssignment = Math.min(amount, Math.max(0, now));
+  next[id] = cents(now - fromAssignment);
+  const rest = cents(amount - fromAssignment);
+  if (rest > 0) next[TAKEN + id] = cents(w.takenBack(id) + rest);
+}
+
+/** Sets an Assignment to `n`. Below zero, rule b stops at $0 and rule c takes the rest back from carried forward. */
+function setTo(w: World, id: string, n: number): Assigned {
+  const next = { ...w.assigned };
+  if (n >= 0 || w.rule === "a") next[id] = n;
+  else if (w.rule === "b") next[id] = 0;
+  else lower(w, next, id, cents(w.assignment(id) - n));
+  return next;
+}
+
+/** What "Give back" offers when Ready to Assign is below zero. */
+function giveBackFor(w: World, id: string): number {
+  if (w.readyToAssign >= 0) return 0;
+  return cents(Math.min(-w.readyToAssign, w.movable(id)));
+}
+
+/** Says what lowering a Category by `amount` does to it under the rule. */
+function lowerNote(w: World, id: string, amount: number): string {
+  const x = w.byId(id);
+  const now = w.assignment(id);
+  if (w.rule === "c" && amount > Math.max(0, now)) {
+    const fromAssignment = Math.max(0, now);
+    return fromAssignment > 0
+      ? `Takes ${money(fromAssignment)} from ${x.name}’s ${MONTH} Assignment and ${money(cents(amount - fromAssignment))} back from what it carried forward.`
+      : `Takes ${money(amount)} back from what ${x.name} carried forward. Its ${MONTH} Assignment stays ${money(now)}.`;
+  }
+  const after = cents(now - amount);
+  return `Lowers ${x.name}’s ${MONTH} Assignment from ${money(now)} to ${money(after)}.${
+    after < 0
+      ? " A negative Assignment takes back money carried forward from earlier Months."
+      : ""
+  }`;
 }
 
 function copied(w: World, only?: Set<string>): Assigned {
@@ -183,8 +263,12 @@ export function AssignPrototype() {
   const [frameParam, setFrame] = useUrlParameter("frame");
   const [dataParam, setData] = useUrlParameter("data");
   const [schemeParam, setScheme] = useUrlParameter("scheme");
+  const [negParam, setNeg] = useUrlParameter("neg");
   const key: VariantKey =
     variantKeys.find((k) => k === variantParam) ?? variantKeys[0];
+  // Only D offers the other rules; A to C keep a, as moveMoney does today.
+  const rule: Rule =
+    key === "D" && (negParam === "b" || negParam === "c") ? negParam : "a";
   const frame =
     frameParam === "phone" || frameParam === "desktop"
       ? frameParam
@@ -197,7 +281,7 @@ export function AssignPrototype() {
   const [assigned, setAssigned] = useState<Assigned>(datasets[data].assigned);
   const [toast, setToast] = useState<Toast | null>(null);
   const [run, setRun] = useState(0);
-  const world = worldOf(datasets[data].categories, assigned);
+  const world = worldOf(datasets[data].categories, assigned, rule);
 
   // A new data set starts over.
   const lastData = useRef(data);
@@ -241,7 +325,7 @@ export function AssignPrototype() {
   const Variant = { A: VariantA, B: VariantB, C: VariantC, D: VariantD }[key];
   const variant = (
     <Variant
-      key={`${key}-${frame}-${data}-${run}`}
+      key={`${key}-${frame}-${data}-${rule}-${run}`}
       world={world}
       wide={frame === "desktop"}
       change={change}
@@ -316,6 +400,21 @@ export function AssignPrototype() {
             <option value="typical">Late in the Month</option>
             <option value="fresh">The 1st, nothing assigned</option>
           </select>
+          {key === "D" && (
+            <select
+              value={rule}
+              onChange={(e) => {
+                setNeg(e.target.value, "replace");
+                setAssigned(datasets[data].assigned);
+                setToast(null);
+              }}
+              aria-label="Negative Assignments"
+            >
+              <option value="a">a: Assignment can go negative</option>
+              <option value="b">b: Only this Month’s Assignment moves</option>
+              <option value="c">c: Take back carried forward</option>
+            </select>
+          )}
           <select
             value={scheme}
             onChange={(e) => setScheme(e.target.value, "replace")}
@@ -522,6 +621,7 @@ function AssignField({
   quiet,
   onFocused,
   onTyped,
+  saves = (n) => n,
 }: {
   world: World;
   category: Category;
@@ -530,6 +630,8 @@ function AssignField({
   quiet?: boolean;
   /** D: the panel beside the table follows the focused field. */
   onFocused?(): void;
+  /** D: what the Assignment becomes once saved, for rules that stop at $0. */
+  saves?(n: number): number;
   onTyped?(typed: string): void;
 }) {
   const saved = w.assignment(x.id);
@@ -550,6 +652,7 @@ function AssignField({
   function commit() {
     const n = parse(typed);
     if (n !== saved) onSet(n);
+    setTyped(typedFrom(saves(n)));
   }
   return (
     <label className="asa-field" data-quiet={quiet}>
@@ -1459,6 +1562,7 @@ function VariantD({ world: w, wide, change }: VariantProps) {
       {open.kind === "move" && (
         <MoveForm
           world={w}
+          limited
           onMove={(from, to, amount) => {
             change(
               move(w, from, to, amount),
@@ -1506,10 +1610,15 @@ function VariantD({ world: w, wide, change }: VariantProps) {
               setTyped(null);
             }}
             onTyped={setTyped}
+            saves={(n) => (w.rule === "a" ? n : Math.max(0, n))}
             onSet={(n) =>
               change(
-                { ...w.assigned, [c.id]: n },
-                `Assigned ${money(n)} to ${c.name}`,
+                setTo(w, c.id, n),
+                n >= 0 || w.rule === "a"
+                  ? `Assigned ${money(n)} to ${c.name}`
+                  : w.rule === "b"
+                    ? `An Assignment can’t go below $0.00, so ${c.name} is now $0.00`
+                    : `Took ${money(cents(w.assignment(c.id) - n))} back from ${c.name}`,
               )
             }
           />
@@ -1534,7 +1643,7 @@ function VariantD({ world: w, wide, change }: VariantProps) {
                   amount={typed === null ? w.assignment(x.id) : parse(typed)}
                   onPick={(n) => {
                     change(
-                      { ...w.assigned, [x.id]: n },
+                      setTo(w, x.id, n),
                       `Assigned ${money(n)} to ${x.name}`,
                     );
                     const i = all.indexOf(x.id);
@@ -1576,12 +1685,7 @@ function walkQueue(w: World): string[] {
   if (w.readyToAssign < 0)
     queue.push(
       ...w.categories
-        .filter(
-          (x) =>
-            !queue.includes(x.id) &&
-            w.assignment(x.id) > 0 &&
-            w.available(x.id) > 0,
-        )
+        .filter((x) => !queue.includes(x.id) && w.movable(x.id) > 0)
         .sort((a, b) => w.available(b.id) - w.available(a.id))
         .map((x) => x.id),
     );
@@ -1692,7 +1796,7 @@ function Steps({
                 next,
                 `Copied ${w.copyable.length} Assignments from ${LAST_MONTH}`,
               );
-              setIds(walkQueue(worldOf(w.categories, next)));
+              setIds(walkQueue(worldOf(w.categories, next, w.rule)));
             }}
           >
             Copy {w.copyable.length} Assignments
@@ -1813,7 +1917,7 @@ function StepPanel({
   const short = Math.max(0, -w.available(id));
   const [source, setSource] = useState<End>(
     short > 0 && short > w.readyToAssign
-      ? (w.categories.find((c) => c.id !== id && w.available(c.id) >= short)
+      ? (w.categories.find((c) => c.id !== id && w.movable(c.id) >= short)
           ?.id ?? RTA)
       : RTA,
   );
@@ -1830,10 +1934,12 @@ function StepPanel({
   }, []);
 
   const unchanged = fromRta ? amount === now : amount === 0;
+  // Rule b: only this Month's Assignment can leave a Category.
+  const tooMuch = !fromRta && amount > w.movable(source);
   function saveWith(n: number) {
     if (fromRta)
       onSave(
-        { ...w.assigned, [id]: n },
+        setTo(w, id, n),
         n < now
           ? `Took ${money(cents(now - n))} back from ${x.name}`
           : `Assigned ${money(n)} to ${x.name}`,
@@ -1845,10 +1951,7 @@ function StepPanel({
       );
   }
 
-  const giveBack =
-    fromRta && w.readyToAssign < 0
-      ? cents(Math.min(-w.readyToAssign, w.available(id), now))
-      : 0;
+  const giveBack = fromRta ? giveBackFor(w, id) : 0;
   const suggestions: [string, number][] = fromRta
     ? [
         ...(short > 0 && now + short !== amount
@@ -1884,7 +1987,14 @@ function StepPanel({
       : [];
 
   const nextAvailable = cents(
-    x.carried + (fromRta ? amount : now + amount) - x.spending,
+    x.carried -
+      w.takenBack(id) +
+      (fromRta
+        ? w.rule === "b"
+          ? Math.max(0, amount)
+          : amount
+        : now + amount) -
+      x.spending,
   );
   const sourceAfter = fromRta
     ? cents(w.readyToAssign - (amount - now))
@@ -1911,6 +2021,12 @@ function StepPanel({
             <dt>Carried forward from {LAST_MONTH}</dt>
             <dd>{money(x.carried)}</dd>
           </div>
+          {w.takenBack(id) > 0 && (
+            <div>
+              <dt>Taken back from carried forward</dt>
+              <dd>− {money(w.takenBack(id))}</dd>
+            </div>
+          )}
           <div>
             <dt>Assigned in {MONTH}</dt>
             <dd>+ {money(now)}</dd>
@@ -1944,8 +2060,8 @@ function StepPanel({
             aria-pressed={!fromRta}
             onClick={() => {
               const best = [...w.categories]
-                .filter((c) => c.id !== id && w.available(c.id) > 0)
-                .sort((a, b) => w.available(b.id) - w.available(a.id))[0];
+                .filter((c) => c.id !== id && w.movable(c.id) > 0)
+                .sort((a, b) => w.movable(b.id) - w.movable(a.id))[0];
               if (best) setSource(best.id);
               setTyped(typedFrom(short));
             }}
@@ -1963,8 +2079,16 @@ function StepPanel({
                   {w.categories
                     .filter((c) => c.group === g && c.id !== id)
                     .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({money(w.available(c.id))} available)
+                      <option
+                        key={c.id}
+                        value={c.id}
+                        disabled={w.rule === "b" && w.movable(c.id) === 0}
+                      >
+                        {c.name} (
+                        {w.rule === "b"
+                          ? `${money(w.movable(c.id))} can move`
+                          : `${money(w.available(c.id))} available`}
+                        )
                       </option>
                     ))}
                 </optgroup>
@@ -2024,6 +2148,20 @@ function StepPanel({
             </strong>
           </div>
         </div>
+        {!fromRta && amount > 0 && (
+          <p className="small asd-rule" data-error={tooMuch}>
+            {tooMuch
+              ? `${endName(w, source)} has ${money(w.movable(source))} assigned in ${MONTH} that can move. What it carried forward from earlier Months stays.`
+              : lowerNote(w, source, amount)}
+          </p>
+        )}
+        {fromRta && amount < 0 && (
+          <p className="small asd-rule" data-error={w.rule === "b"}>
+            {w.rule === "b"
+              ? "An Assignment can’t go below $0.00."
+              : lowerNote(w, id, cents(now - amount))}
+          </p>
+        )}
         <p className="small muted asd-tip">{tip}</p>
       </div>
       <div className="rt-foot rt-save">
@@ -2038,7 +2176,11 @@ function StepPanel({
             ‹
           </button>
         )}
-        <button type="submit" className="btn btn-primary rt-save-main">
+        <button
+          type="submit"
+          className="btn btn-primary rt-save-main"
+          disabled={tooMuch}
+        >
           {unchanged
             ? last
               ? "Done"
@@ -2066,13 +2208,15 @@ function Breakdown({
 }) {
   const x = w.byId(id);
   const now = w.assignment(id);
-  const available = cents(x.carried + amount - x.spending);
+  const available = cents(
+    x.carried -
+      w.takenBack(id) +
+      (w.rule === "b" ? Math.max(0, amount) : amount) -
+      x.spending,
+  );
   const rta = cents(w.readyToAssign - (amount - now));
   const short = Math.max(0, -w.available(id));
-  const giveBack =
-    w.readyToAssign < 0
-      ? cents(Math.min(-w.readyToAssign, w.available(id), now))
-      : 0;
+  const giveBack = giveBackFor(w, id);
   const picks: [string, number][] = [
     ...(short > 0
       ? [
@@ -2101,6 +2245,12 @@ function Breakdown({
           <dt>Carried forward</dt>
           <dd>{money(x.carried)}</dd>
         </div>
+        {w.takenBack(id) > 0 && (
+          <div>
+            <dt>Taken back</dt>
+            <dd>− {money(w.takenBack(id))}</dd>
+          </div>
+        )}
         <div>
           <dt>Assigned in {MONTH}</dt>
           <dd data-changed={amount !== now}>+ {money(amount)}</dd>
@@ -2118,6 +2268,13 @@ function Breakdown({
           </dd>
         </div>
       </dl>
+      {amount < 0 && (
+        <p className="small asd-rule" data-error={w.rule === "b"}>
+          {w.rule === "b"
+            ? "An Assignment can’t go below $0.00."
+            : lowerNote(w, id, cents(now - amount))}
+        </p>
+      )}
       <p className="small muted num">
         Ready to Assign {amount === now ? "is" : "after"}{" "}
         <strong data-state={stateOf(rta)}>{money(rta)}</strong>
@@ -2150,9 +2307,12 @@ function Breakdown({
 function MoveForm({
   world: w,
   onMove,
+  limited,
 }: {
   world: World;
   onMove(from: End, to: End, amount: number): void;
+  /** D: only what the rule lets leave a Category can move. */
+  limited?: boolean;
 }) {
   const [from, setFrom] = useState<End>(RTA);
   const [to, setTo] = useState<End>(w.overspent[0]?.id ?? w.categories[0].id);
@@ -2160,6 +2320,7 @@ function MoveForm({
     typedFrom(w.overspent[0] ? -w.available(w.overspent[0].id) : 0),
   );
   const amount = parse(typed);
+  const tooMuch = limited === true && from !== RTA && amount > w.movable(from);
   const options = (
     <>
       <option value={RTA}>Ready to Assign ({money(w.readyToAssign)})</option>
@@ -2204,6 +2365,13 @@ function MoveForm({
             onChange={(e) => setTyped(e.target.value)}
           />
         </label>
+        {limited && from !== RTA && from !== to && amount > 0 && (
+          <p className="small asd-rule" data-error={tooMuch}>
+            {tooMuch
+              ? `${endName(w, from)} has ${money(w.movable(from))} that can move.`
+              : lowerNote(w, from, amount)}
+          </p>
+        )}
         {from !== to && amount > 0 && (
           <p className="small muted num">
             {endName(w, from)} after:{" "}
@@ -2217,7 +2385,7 @@ function MoveForm({
         <button
           type="submit"
           className="btn btn-primary btn-wide rt-save-main"
-          disabled={from === to || amount <= 0}
+          disabled={from === to || amount <= 0 || tooMuch}
         >
           Move {money(amount)}
         </button>
@@ -2592,6 +2760,8 @@ function DesktopBudget({
                               <span className="a-carried muted small">
                                 {" "}
                                 {money(x.carried)} carried forward
+                                {w.takenBack(x.id) > 0 &&
+                                  `, ${money(w.takenBack(x.id))} taken back`}
                               </span>
                             )}
                           </span>
@@ -2693,7 +2863,7 @@ function RowNote({
   onCover(id: string): void;
 }) {
   const n = w.available(x.id);
-  const had = x.carried + w.assignment(x.id);
+  const had = x.carried - w.takenBack(x.id) + w.assignment(x.id);
   if (n < 0)
     return (
       <p className="note note-over small as-note">
@@ -2713,7 +2883,7 @@ function RowNote({
 }
 
 function Bar({ world: w, category: x }: { world: World; category: Category }) {
-  const had = x.carried + w.assignment(x.id);
+  const had = x.carried - w.takenBack(x.id) + w.assignment(x.id);
   const used = had <= 0 ? (x.spending > 0 ? 1 : 0) : x.spending / had;
   return (
     <span className="bar" data-over={w.available(x.id) < 0} aria-hidden>
