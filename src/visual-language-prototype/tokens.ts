@@ -41,7 +41,7 @@ export type Shape = {
   radiusControl: string;
   radiusCard: string;
   /** How a Category shows its Spending against what it was given. */
-  meter: "envelope" | "segments" | "bar";
+  meter: "envelope" | "segments" | "bar" | "ring";
   tile: "monogram" | "none" | "disc";
 };
 
@@ -53,7 +53,7 @@ export type Variant = {
   light: Scheme;
 };
 
-export const variants: Record<"A" | "B" | "C", Variant> = {
+export const variants: Record<"A" | "B" | "C" | "D", Variant> = {
   A: {
     name: "Fig",
     idea: "Plum and saffron. Each Category row is an envelope: its background is the money still in it, and drains as you spend.",
@@ -256,6 +256,74 @@ export const variants: Record<"A" | "B" | "C", Variant> = {
       meterTrack: "#e4e1f7",
       meterFill: "#1b2470",
       meterOver: "#d61f78",
+    },
+  },
+  D: {
+    name: "Card",
+    idea: "A modern finance app: quiet monochrome surfaces, black-and-white buttons, and one pastel card that holds Ready to Assign. Each Category's icon is ringed by what it has spent.",
+    shape: {
+      font: "'Geist Variable', system-ui, sans-serif",
+      displayWidth: "normal",
+      radiusControl: "999px",
+      radiusCard: "24px",
+      meter: "ring",
+      tile: "disc",
+    },
+    dark: {
+      bg: "#18181d",
+      surface: "#222228",
+      raised: "#2d2d35",
+      line: "#34343c",
+      controlBorder: "#75757f",
+      text: "#f4f4f6",
+      muted: "#a9a9b3",
+      accent: "#f4f4f6",
+      onAccent: "#18181d",
+      accentText: "#c3b5ff",
+      accentTop: "#ffffff",
+      accentEdge: "#9a9aa4",
+      hero: "#ff9cb8",
+      onHero: "#1a1420",
+      heroTop: "#ffc09a",
+      shadow: "#050507",
+      negative: "#ff7a85",
+      negativeTint: "#3d2228",
+      onNegativeTint: "#ff9aa3",
+      positive: "#5fdc9a",
+      positiveTint: "#1d3328",
+      onPositiveTint: "#73e8aa",
+      focus: "#c3b5ff",
+      meterTrack: "#3a3a43",
+      meterFill: "#f4f4f6",
+      meterOver: "#ff7a85",
+    },
+    light: {
+      bg: "#f2f2f5",
+      surface: "#ffffff",
+      raised: "#ebebf0",
+      line: "#e1e1e7",
+      controlBorder: "#85858f",
+      text: "#18181d",
+      muted: "#5c5c66",
+      accent: "#18181d",
+      onAccent: "#ffffff",
+      accentText: "#5b45d6",
+      accentTop: "#3a3a42",
+      accentEdge: "#000000",
+      hero: "#ff9cb8",
+      onHero: "#1a1420",
+      heroTop: "#ffc09a",
+      shadow: "#2a2a40",
+      negative: "#c8283a",
+      negativeTint: "#fde5e8",
+      onNegativeTint: "#a81f30",
+      positive: "#0f7343",
+      positiveTint: "#e0f4e8",
+      onPositiveTint: "#0c6639",
+      focus: "#5b45d6",
+      meterTrack: "#e4e4ea",
+      meterFill: "#18181d",
+      meterOver: "#d63044",
     },
   },
 };

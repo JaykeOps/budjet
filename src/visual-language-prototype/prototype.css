@@ -243,6 +243,20 @@ body {
   font-weight: 700;
 }
 
+/* Ring and sparkline exist only for the variants that ask for them. */
+.vl-tile-wrap {
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.vl-tile-wrap > * {
+  grid-area: 1 / 1;
+}
+.vl-ring,
+.vl-sparkline {
+  display: none;
+}
+
 /* Meters: one element carries all three shapes; the variant picks one. */
 
 .vl-meter {
@@ -990,6 +1004,163 @@ body {
   .vl[data-depth="deep"] .vl-month {
     transition: none;
   }
+}
+
+/* ---- D. Card: a modern finance app, monochrome with one pastel card ---- */
+
+.vl[data-variant="card"] .vl-title {
+  font-weight: 600;
+  font-size: 28px;
+  letter-spacing: -0.035em;
+}
+.vl[data-variant="card"] .vl-display {
+  font-size: 52px;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+}
+.vl[data-variant="card"] .vl-amount {
+  font-weight: 600;
+  letter-spacing: -0.045em;
+}
+.vl[data-variant="card"] .vl-hero {
+  min-height: 196px;
+  justify-content: space-between;
+  padding: var(--space-5);
+  background:
+    radial-gradient(circle at 0% 0%, var(--hero-top), transparent 60%),
+    radial-gradient(circle at 100% 100%, #b7a6ff, transparent 65%), var(--hero);
+}
+.vl[data-variant="card"] .vl-hero-label {
+  font-weight: 500;
+}
+.vl[data-variant="card"] .vl-hero .vl-btn-primary {
+  --btn: var(--on-hero);
+  --btn-top: color-mix(in oklab, var(--on-hero), white 22%);
+  --btn-edge: #000000;
+  --btn-ink: #ffffff;
+}
+.vl[data-variant="card"] .vl-spent {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  gap: var(--space-3);
+}
+.vl[data-variant="card"] .vl-spent .vl-meter {
+  display: none;
+}
+.vl[data-variant="card"] .vl-sparkline {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.vl-spark-area {
+  fill: color-mix(in srgb, var(--meter-fill) 9%, transparent);
+}
+.vl-spark-line {
+  fill: none;
+  stroke: var(--meter-fill);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.vl-spark-pace {
+  stroke: var(--muted);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 5;
+}
+.vl-spark-dot {
+  fill: var(--meter-fill);
+  stroke: var(--surface);
+  stroke-width: 3;
+}
+.vl[data-variant="card"] .vl-group-head h2 {
+  font-size: 15px;
+}
+.vl[data-variant="card"] .vl-categories {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-1) 0;
+}
+.vl[data-variant="card"] .vl-category .vl-meter {
+  display: none;
+}
+.vl[data-variant="card"] .vl-category {
+  padding: var(--space-3) var(--space-4);
+}
+.vl[data-variant="card"] .vl-category-body {
+  gap: 2px;
+}
+.vl[data-variant="card"] .vl-category-name,
+.vl[data-variant="card"] .vl-available {
+  font-weight: 600;
+}
+.vl[data-variant="card"] .vl-tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--raised);
+  font-weight: 600;
+}
+.vl[data-variant="card"] .vl-ring {
+  display: block;
+  width: 48px;
+  height: 48px;
+  transform: rotate(-90deg);
+}
+.vl-ring circle {
+  fill: none;
+  stroke-width: 3;
+}
+.vl-ring-track {
+  stroke: var(--meter-track);
+}
+.vl-ring-fill {
+  stroke: var(--meter-fill);
+  stroke-linecap: round;
+}
+.vl-ring[data-over="true"] .vl-ring-fill {
+  stroke: var(--meter-over);
+}
+.vl[data-variant="card"] .vl-segmented {
+  border-radius: 999px;
+}
+.vl[data-variant="card"] .vl-tabs {
+  margin: 0 var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: blur(20px) saturate(1.4);
+}
+.vl[data-depth="deep"][data-variant="card"] .vl-spent {
+  background: linear-gradient(
+    180deg,
+    var(--surface-top),
+    var(--surface-bottom)
+  );
+  box-shadow: var(--elev-2);
+}
+.vl[data-depth="deep"][data-variant="card"] .vl-categories {
+  background: linear-gradient(
+    180deg,
+    var(--surface-top),
+    var(--surface-bottom)
+  );
+  box-shadow: var(--elev-2);
+}
+.vl[data-depth="deep"][data-variant="card"] .vl-hero {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.45),
+    0 2px 3px -1px var(--sh),
+    0 22px 40px -18px color-mix(in srgb, var(--hero) 70%, transparent);
+}
+.vl[data-depth="deep"][data-variant="card"] .vl-tabs {
+  border-color: var(--line);
+  box-shadow: var(--elev-2);
+}
+.vl[data-depth="deep"][data-variant="card"] .vl-tile {
+  box-shadow: none;
 }
 
 @media (max-width: 900px) {

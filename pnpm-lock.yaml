@@ -14,6 +14,9 @@ importers:
       '@fontsource-variable/gabarito':
         specifier: ^5.3.0
         version: 5.3.0
+      '@fontsource-variable/geist':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@fontsource-variable/schibsted-grotesk':
         specifier: ^5.3.0
         version: 5.3.0
@@ -626,6 +629,9 @@ packages:
 
   '@fontsource-variable/gabarito@5.3.0':
     resolution: {integrity: sha512-p7ROuY70ufLI5/hVvdgo4iJo17Dz2OfQXgdkaeS0U/B2wMqNIPt+/2WWWaAzrUYvcrNquL7farT2MY/vVo2ENw==}
+
+  '@fontsource-variable/geist@5.3.0':
+    resolution: {integrity: sha512-j0m+vLQuG5XAYoHtGCVu0spvlGreR3EzpECUVzkFmI1mTVnAO38l/NEPDCFgZ177JxzYJCLSmTQibIiYPilGrA==}
 
   '@fontsource-variable/schibsted-grotesk@5.3.0':
     resolution: {integrity: sha512-ndS6H/KICWANchlHF3q4UdZD+xrZ3Ji0rUobIuXlgvDUzDfqZDsVuXPXZb636nJZMHE9zZ9Fmwgqazm8hMB50Q==}
@@ -3068,6 +3074,8 @@ snapshots:
   '@fontsource-variable/bricolage-grotesque@5.3.0': {}
 
   '@fontsource-variable/gabarito@5.3.0': {}
+
+  '@fontsource-variable/geist@5.3.0': {}
 
   '@fontsource-variable/schibsted-grotesk@5.3.0': {}
 

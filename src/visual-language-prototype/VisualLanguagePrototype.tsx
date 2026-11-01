@@ -6,6 +6,7 @@
 // buttons you press down; `flat` takes them away to compare.
 import "@fontsource-variable/bricolage-grotesque/opsz.css";
 import "@fontsource-variable/gabarito";
+import "@fontsource-variable/geist";
 import "@fontsource-variable/schibsted-grotesk";
 import { type CSSProperties, useEffect, useState } from "react";
 import { useUrlParameter } from "../url-parameter";
@@ -233,6 +234,7 @@ function BudgetScreen() {
             </span>
           </div>
           <Meter spent={spent} given={given} />
+          <Sparkline given={given} />
         </div>
 
         {groups.map((g) => (
@@ -286,7 +288,10 @@ function CategoryRow({ category: c }: { category: Category }) {
       data-state={state}
       style={{ "--left": `${left * 100}%` } as CSSProperties}
     >
-      <Tile name={c.name} />
+      <span className="vl-tile-wrap">
+        <Ring spent={c.spent} given={c.given} />
+        <Tile name={c.name} />
+      </span>
       <div className="vl-category-body">
         <div className="vl-split">
           <span className="vl-category-name">{c.name}</span>
@@ -504,6 +509,61 @@ function Tile({ name }: { name: string }) {
     <span className="vl-tile" aria-hidden>
       {name[0]}
     </span>
+  );
+}
+
+// Spending, ringed round a Category's icon: where the meter is "ring".
+function Ring({ spent, given }: { spent: number; given: number }) {
+  const used = given === 0 ? 0 : Math.min(spent / given, 1);
+  const r = 21;
+  const length = 2 * Math.PI * r;
+  return (
+    <svg
+      className="vl-ring"
+      data-over={spent > given}
+      viewBox="0 0 48 48"
+      aria-hidden
+    >
+      <circle className="vl-ring-track" cx="24" cy="24" r={r} />
+      <circle
+        className="vl-ring-fill"
+        cx="24"
+        cy="24"
+        r={r}
+        strokeDasharray={`${used * length} ${length}`}
+      />
+    </svg>
+  );
+}
+
+// Spending so far this Month, day by day (today is the 20th), against an
+// even pace that would land on what the Month has to spend.
+const daily = [
+  1430, 1452, 1490, 1531, 1540, 1612, 1655, 1690, 1734, 1790, 1868, 1902, 1955,
+  2050, 2110, 2187, 2260, 2340, 2448, 2536.2,
+];
+
+function Sparkline({ given }: { given: number }) {
+  const w = 320;
+  const h = 72;
+  const x = (day: number) => (day / 29) * w;
+  const y = (amount: number) => h - 4 - (amount / given) * (h - 8);
+  const line = daily
+    .map(
+      (v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`,
+    )
+    .join(" ");
+  const last = daily.length - 1;
+  return (
+    <svg className="vl-sparkline" viewBox={`0 0 ${w} ${h}`} aria-hidden>
+      <path
+        className="vl-spark-area"
+        d={`${line} L${x(last)},${h} L0,${h} Z`}
+      />
+      <path className="vl-spark-pace" d={`M0,${y(0)} L${w},${y(given)}`} />
+      <path className="vl-spark-line" d={line} />
+      <circle className="vl-spark-dot" cx={x(last)} cy={y(daily[last])} r="4" />
+    </svg>
   );
 }
 
