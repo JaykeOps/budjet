@@ -11,6 +11,9 @@
 // money leaves a Category whose Assignment is smaller than the amount (#80's
 // open choice): a lets the Assignment go negative, b forbids it, c takes it
 // back from what the Category carried forward, as its own figure.
+// `?data=moved` starts from the typical Month just after covering Dining out's
+// $42.50 from Holiday, which has nothing assigned in October, so the three
+// rules differ from the first screen.
 import "@fontsource-variable/geist";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useUrlParameter } from "../url-parameter";
@@ -101,6 +104,15 @@ const datasets = {
   },
 };
 type DataKey = keyof typeof datasets;
+type StartKey = DataKey | "moved";
+
+/** This Month's Assignments to start from; under rule b the move is refused. */
+function startingAssignments(start: StartKey, rule: Rule): Assigned {
+  if (start !== "moved") return datasets[start].assigned;
+  if (rule === "b") return typicalAssigned;
+  const w = worldOf(typicalCategories, typicalAssigned, rule);
+  return move(w, "holiday", "dining-out", 42.5);
+}
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -215,6 +227,18 @@ function setTo(w: World, id: string, n: number): Assigned {
   return next;
 }
 
+/** An Assignment in a breakdown: "+ $300.00", or "− $42.50" when negative. */
+const plusMinus = (n: number) => (n < 0 ? `− ${money(-n)}` : `+ ${money(n)}`);
+
+/** Explains an Assignment of `n` below zero, typed or already saved. */
+function negativeNote(w: World, id: string, n: number): string {
+  if (w.rule === "b") return "An Assignment can’t go below $0.00.";
+  const now = w.assignment(id);
+  if (n === now)
+    return "A negative Assignment takes back money carried forward from earlier Months.";
+  return lowerNote(w, id, cents(now - n));
+}
+
 /** What "Give back" offers when Ready to Assign is below zero. */
 function giveBackFor(w: World, id: string): number {
   if (w.readyToAssign >= 0) return 0;
@@ -275,19 +299,23 @@ export function AssignPrototype() {
       : window.innerWidth < 900
         ? "phone"
         : "desktop";
-  const data: DataKey = dataParam === "fresh" ? "fresh" : "typical";
+  const start: StartKey =
+    dataParam === "fresh" || dataParam === "moved" ? dataParam : "typical";
+  const data: DataKey = start === "fresh" ? "fresh" : "typical";
   const scheme = schemeParam ?? "dark";
 
-  const [assigned, setAssigned] = useState<Assigned>(datasets[data].assigned);
+  const [assigned, setAssigned] = useState<Assigned>(() =>
+    startingAssignments(start, rule),
+  );
   const [toast, setToast] = useState<Toast | null>(null);
   const [run, setRun] = useState(0);
   const world = worldOf(datasets[data].categories, assigned, rule);
 
   // A new data set starts over.
-  const lastData = useRef(data);
-  if (lastData.current !== data) {
-    lastData.current = data;
-    setAssigned(datasets[data].assigned);
+  const lastStart = useRef(start);
+  if (lastStart.current !== start) {
+    lastStart.current = start;
+    setAssigned(startingAssignments(start, rule));
     setToast(null);
   }
 
@@ -325,7 +353,7 @@ export function AssignPrototype() {
   const Variant = { A: VariantA, B: VariantB, C: VariantC, D: VariantD }[key];
   const variant = (
     <Variant
-      key={`${key}-${frame}-${data}-${rule}-${run}`}
+      key={`${key}-${frame}-${start}-${rule}-${run}`}
       world={world}
       wide={frame === "desktop"}
       change={change}
@@ -393,19 +421,29 @@ export function AssignPrototype() {
             <option value="desktop">Desktop</option>
           </select>
           <select
-            value={data}
+            value={start}
             onChange={(e) => setData(e.target.value, "replace")}
             aria-label="Month shown"
           >
             <option value="typical">Late in the Month</option>
             <option value="fresh">The 1st, nothing assigned</option>
+            <option value="moved">
+              After covering Dining out from Holiday
+            </option>
           </select>
           {key === "D" && (
             <select
               value={rule}
               onChange={(e) => {
                 setNeg(e.target.value, "replace");
-                setAssigned(datasets[data].assigned);
+                setAssigned(
+                  startingAssignments(
+                    start,
+                    e.target.value === "b" || e.target.value === "c"
+                      ? e.target.value
+                      : "a",
+                  ),
+                );
                 setToast(null);
               }}
               aria-label="Negative Assignments"
@@ -427,7 +465,7 @@ export function AssignPrototype() {
           <button
             type="button"
             onClick={() => {
-              setAssigned(datasets[data].assigned);
+              setAssigned(startingAssignments(start, rule));
               setToast(null);
               setRun(run + 1);
             }}
@@ -919,7 +957,7 @@ function CategoryPanel({
           </div>
           <div>
             <dt>Assigned in {MONTH}</dt>
-            <dd>+ {money(now)}</dd>
+            <dd>{plusMinus(now)}</dd>
           </div>
           <div>
             <dt>Spending</dt>
@@ -2029,7 +2067,7 @@ function StepPanel({
           )}
           <div>
             <dt>Assigned in {MONTH}</dt>
-            <dd>+ {money(now)}</dd>
+            <dd>{plusMinus(now)}</dd>
           </div>
           <div>
             <dt>Spending</dt>
@@ -2157,9 +2195,7 @@ function StepPanel({
         )}
         {fromRta && amount < 0 && (
           <p className="small asd-rule" data-error={w.rule === "b"}>
-            {w.rule === "b"
-              ? "An Assignment can’t go below $0.00."
-              : lowerNote(w, id, cents(now - amount))}
+            {negativeNote(w, id, amount)}
           </p>
         )}
         <p className="small muted asd-tip">{tip}</p>
@@ -2253,7 +2289,7 @@ function Breakdown({
         )}
         <div>
           <dt>Assigned in {MONTH}</dt>
-          <dd data-changed={amount !== now}>+ {money(amount)}</dd>
+          <dd data-changed={amount !== now}>{plusMinus(amount)}</dd>
         </div>
         <div>
           <dt>Spending</dt>
@@ -2270,9 +2306,7 @@ function Breakdown({
       </dl>
       {amount < 0 && (
         <p className="small asd-rule" data-error={w.rule === "b"}>
-          {w.rule === "b"
-            ? "An Assignment can’t go below $0.00."
-            : lowerNote(w, id, cents(now - amount))}
+          {negativeNote(w, id, amount)}
         </p>
       )}
       <p className="small muted num">
@@ -2878,6 +2912,10 @@ function RowNote({
       {had === 0
         ? "Nothing assigned yet"
         : `${money(x.spending)} of ${money(had)} spent`}
+      {w.assignment(x.id) < 0 &&
+        ` · ${money(w.assignment(x.id))} assigned in ${MONTH}`}
+      {w.takenBack(x.id) > 0 &&
+        ` · ${money(w.takenBack(x.id))} taken back from carried forward`}
     </p>
   );
 }
