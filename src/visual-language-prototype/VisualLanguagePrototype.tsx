@@ -2,8 +2,10 @@
 // languages, switchable via `?variant=A|B|C`. Each shows the Budget screen and
 // the New Transaction screen on a phone, then the parts they are made of.
 // `?scheme=both` (default) stacks dark over light; `system`, `dark` and
-// `light` show one. `?depth=deep` (default) adds shadows, gradients and
-// buttons you press down; `flat` takes them away to compare.
+// `light` show one. `?depth=` sets how far things lift off the page:
+// `flat`; `soft` (hairline edges, diffuse shadows, buttons that shrink when
+// pressed); `glass` (frosted panels over a glow); `deep` (default: gradients
+// and buttons you push down onto a lip).
 import "@fontsource-variable/bricolage-grotesque/opsz.css";
 import "@fontsource-variable/gabarito";
 import "@fontsource-variable/geist";
@@ -23,7 +25,7 @@ import {
 type Key = keyof typeof variants;
 const keys = Object.keys(variants) as Key[];
 const schemes = ["both", "system", "dark", "light"] as const;
-const depths = ["deep", "flat"] as const;
+const depths = ["deep", "glass", "soft", "flat"] as const;
 
 export function VisualLanguagePrototype() {
   const [variant, setVariant] = useUrlParameter("variant");
@@ -99,8 +101,10 @@ export function VisualLanguagePrototype() {
             onChange={(e) => setDepth(e.target.value, "replace")}
             aria-label="Depth"
           >
-            <option value="deep">Deep</option>
             <option value="flat">Flat</option>
+            <option value="soft">Soft</option>
+            <option value="glass">Glass</option>
+            <option value="deep">Deep</option>
           </select>
         </div>
       )}
@@ -169,7 +173,7 @@ function Specimen({
 }: {
   variant: Variant;
   scheme: "dark" | "light";
-  depth: "deep" | "flat";
+  depth: (typeof depths)[number];
 }) {
   const s = v[scheme];
   return (

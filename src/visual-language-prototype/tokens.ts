@@ -260,13 +260,13 @@ export const variants: Record<"A" | "B" | "C" | "D", Variant> = {
   },
   D: {
     name: "Card",
-    idea: "A modern finance app: quiet monochrome surfaces, black-and-white buttons, and one pastel card that holds Ready to Assign. Each Category's icon is ringed by what it has spent.",
+    idea: "A modern finance app: quiet monochrome surfaces, black-and-white buttons, and one pastel card that holds Ready to Assign. Categories use Riso's round bars and Available pills.",
     shape: {
       font: "'Geist Variable', system-ui, sans-serif",
       displayWidth: "normal",
       radiusControl: "999px",
       radiusCard: "24px",
-      meter: "ring",
+      meter: "bar",
       tile: "disc",
     },
     dark: {

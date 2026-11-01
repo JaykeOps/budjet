@@ -727,23 +727,27 @@ body {
   border-radius: var(--radius-card);
   padding: var(--space-2) 0;
 }
-.vl[data-variant="riso"] .vl-tile {
+.vl:is([data-variant="riso"], [data-variant="card"]) .vl-tile {
   border-radius: 999px;
   background: var(--raised);
   width: 40px;
   height: 40px;
 }
-.vl[data-variant="riso"] .vl-available {
+.vl:is([data-variant="riso"], [data-variant="card"]) .vl-available {
   padding: 2px 10px;
   border-radius: 999px;
   background: var(--positive-tint);
   color: var(--on-positive-tint);
 }
-.vl[data-variant="riso"] .vl-category[data-state="zero"] .vl-available {
+.vl:is([data-variant="riso"], [data-variant="card"])
+  .vl-category[data-state="zero"]
+  .vl-available {
   background: var(--raised);
   color: var(--muted);
 }
-.vl[data-variant="riso"] .vl-category[data-state="overspent"] .vl-available {
+.vl:is([data-variant="riso"], [data-variant="card"])
+  .vl-category[data-state="overspent"]
+  .vl-available {
   background: var(--negative-tint);
   color: var(--on-negative-tint);
 }
@@ -768,7 +772,7 @@ body {
 
 /* ---- Depth: light from above, shadows in each palette's own hue ---- */
 
-.vl[data-depth="deep"] {
+.vl {
   /* Lit top edge of anything raised, and the shadows it casts. */
   --hl: rgb(255 255 255 / 0.07);
   --hl-strong: rgb(255 255 255 / 0.28);
@@ -788,7 +792,7 @@ body {
     0 16px 32px -16px var(--sh-soft);
   --recess: inset 0 2px 4px var(--sh-soft), inset 0 1px 1px var(--sh-soft);
 }
-.vl[data-depth="deep"][data-scheme="light"] {
+.vl[data-scheme="light"] {
   --hl: rgb(255 255 255 / 0.9);
   --hl-strong: rgb(255 255 255 / 0.35);
   --sh: color-mix(in srgb, var(--shadow) 22%, transparent);
@@ -1082,27 +1086,20 @@ body {
   border-radius: var(--radius-card);
   padding: var(--space-1) 0;
 }
-.vl[data-variant="card"] .vl-category .vl-meter {
+.vl[data-meter="ring"] .vl-category .vl-meter {
   display: none;
 }
 .vl[data-variant="card"] .vl-category {
   padding: var(--space-3) var(--space-4);
-}
-.vl[data-variant="card"] .vl-category-body {
-  gap: 2px;
 }
 .vl[data-variant="card"] .vl-category-name,
 .vl[data-variant="card"] .vl-available {
   font-weight: 600;
 }
 .vl[data-variant="card"] .vl-tile {
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  background: var(--raised);
   font-weight: 600;
 }
-.vl[data-variant="card"] .vl-ring {
+.vl[data-meter="ring"] .vl-ring {
   display: block;
   width: 48px;
   height: 48px;
@@ -1161,6 +1158,217 @@ body {
 }
 .vl[data-depth="deep"][data-variant="card"] .vl-tile {
   box-shadow: none;
+}
+
+/* ---- Soft: hairline edges and diffuse shadows; nothing has a lip ---- */
+
+.vl[data-depth="soft"] {
+  --edge: color-mix(in srgb, var(--text) 9%, transparent);
+  --soft-1: 0 0 0 1px var(--edge), 0 1px 2px var(--sh-soft);
+  --soft-2:
+    inset 0 1px 0 var(--hl), 0 0 0 1px var(--edge), 0 1px 2px var(--sh-soft),
+    0 12px 32px -16px var(--sh);
+}
+.vl[data-depth="soft"] .vl-phone {
+  outline-color: var(--edge);
+  box-shadow: 0 30px 60px -36px var(--sh);
+}
+.vl[data-depth="soft"]:is(
+    [data-variant="fig"],
+    [data-variant="riso"],
+    [data-variant="card"]
+  )
+  .vl-hero,
+.vl[data-depth="soft"]:is(
+    [data-variant="petrol"],
+    [data-variant="riso"],
+    [data-variant="card"]
+  )
+  .vl-categories,
+.vl[data-depth="soft"][data-variant="card"] .vl-spent,
+.vl[data-depth="soft"][data-variant="fig"] .vl-category {
+  box-shadow: var(--soft-2);
+}
+.vl[data-depth="soft"] .vl-btn,
+.vl[data-depth="soft"] .vl-record,
+.vl[data-depth="soft"] .vl-chip {
+  transition:
+    transform 120ms ease-out,
+    filter 120ms ease-out;
+}
+.vl[data-depth="soft"] .vl-btn-primary {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--btn-top) 55%, var(--btn)),
+    var(--btn)
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.2),
+    0 1px 2px var(--sh),
+    0 6px 14px -8px var(--sh);
+}
+.vl[data-depth="soft"] .vl-record {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.25),
+    0 8px 20px -8px var(--sh);
+}
+.vl[data-depth="soft"] :is(.vl-btn, .vl-record):active:not(:disabled),
+.vl[data-depth="soft"] .vl-btn.is-pressed {
+  transform: scale(0.97);
+  filter: brightness(0.94);
+}
+.vl[data-depth="soft"] :is(.vl-btn-secondary, .vl-btn-danger, .vl-month) {
+  box-shadow:
+    inset 0 0 0 1px var(--control-border),
+    0 1px 2px var(--sh-soft);
+}
+.vl[data-depth="soft"] .vl-month {
+  border: 0;
+}
+.vl[data-depth="soft"] .vl-segmented {
+  background: color-mix(in oklab, var(--bg), var(--text) 5%);
+}
+.vl[data-depth="soft"] .vl-segmented label:has(:checked) {
+  box-shadow:
+    var(--soft-1),
+    0 2px 6px -2px var(--sh-soft);
+}
+.vl[data-depth="soft"][data-scheme="light"] .vl-segmented label:has(:checked) {
+  background: var(--surface);
+}
+.vl[data-depth="soft"] .vl-chip:has(:checked) {
+  box-shadow: 0 4px 12px -6px var(--sh);
+}
+.vl[data-depth="soft"] .vl-input {
+  box-shadow: 0 1px 2px var(--sh-soft);
+}
+.vl[data-depth="soft"]:is([data-variant="riso"], [data-variant="card"])
+  .vl-tabs {
+  box-shadow: var(--soft-2);
+}
+
+/* ---- Glass: frosted panels over a glow taken from the palette ---- */
+
+.vl[data-depth="glass"] {
+  --glass: color-mix(in srgb, var(--surface) 58%, transparent);
+  --glass-edge: rgb(255 255 255 / 0.09);
+  --glass-light: rgb(255 255 255 / 0.14);
+  /* Peach goes muddy on dark surfaces; the card's pink stays clean. */
+  --glow-1: color-mix(in srgb, var(--hero) 20%, transparent);
+  --glow-2: color-mix(in srgb, var(--accent-text) 22%, transparent);
+  --pane:
+    inset 0 1px 0 var(--glass-light), inset 0 0 0 1px var(--glass-edge),
+    0 12px 32px -16px var(--sh);
+}
+.vl[data-depth="glass"][data-scheme="light"] {
+  --glass: color-mix(in srgb, var(--surface) 62%, transparent);
+  --glass-edge: rgb(255 255 255 / 0.7);
+  --glass-light: rgb(255 255 255 / 0.9);
+  --glow-1: color-mix(in srgb, var(--hero-top) 38%, transparent);
+  --glow-2: color-mix(in srgb, var(--accent-text) 16%, transparent);
+  --pane:
+    inset 0 1px 0 var(--glass-light), inset 0 0 0 1px var(--glass-edge),
+    0 0 0 1px color-mix(in srgb, var(--text) 6%, transparent),
+    0 12px 32px -16px var(--sh);
+}
+.vl[data-depth="glass"] .vl-phone {
+  outline-color: var(--glass-edge);
+  background:
+    radial-gradient(70% 35% at 10% 8%, var(--glow-1), transparent),
+    radial-gradient(60% 40% at 100% 55%, var(--glow-2), transparent), var(--bg);
+  box-shadow: 0 30px 60px -36px var(--sh);
+}
+.vl[data-depth="glass"]:is(
+    [data-variant="petrol"],
+    [data-variant="riso"],
+    [data-variant="card"]
+  )
+  .vl-categories,
+.vl[data-depth="glass"][data-variant="card"] .vl-spent,
+.vl[data-depth="glass"] .vl-tabs,
+.vl[data-depth="glass"] .vl-segmented,
+.vl[data-depth="glass"] .vl-input,
+.vl[data-depth="glass"] .vl-chip:not(:has(:checked)),
+.vl[data-depth="glass"] :is(.vl-btn-secondary, .vl-btn-danger, .vl-month) {
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(1.5);
+}
+.vl[data-depth="glass"]:is(
+    [data-variant="petrol"],
+    [data-variant="riso"],
+    [data-variant="card"]
+  )
+  .vl-categories,
+.vl[data-depth="glass"][data-variant="card"] .vl-spent,
+.vl[data-depth="glass"][data-variant="fig"] .vl-category {
+  box-shadow: var(--pane);
+}
+.vl[data-depth="glass"] .vl-tabs {
+  border-top: 0;
+  box-shadow: inset 0 1px 0 var(--glass-light);
+}
+.vl[data-depth="glass"]:is([data-variant="riso"], [data-variant="card"])
+  .vl-tabs {
+  border: 0;
+  box-shadow: var(--pane);
+}
+.vl[data-depth="glass"]:is(
+    [data-variant="fig"],
+    [data-variant="riso"],
+    [data-variant="card"]
+  )
+  .vl-hero {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    0 20px 40px -20px color-mix(in srgb, var(--hero) 60%, transparent);
+}
+.vl[data-depth="glass"] .vl-segmented label:has(:checked) {
+  background: color-mix(in srgb, var(--raised) 80%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-light);
+}
+.vl[data-depth="glass"][data-scheme="light"] .vl-segmented label:has(:checked) {
+  background: var(--surface);
+  box-shadow:
+    inset 0 1px 0 var(--glass-light),
+    0 2px 6px -2px var(--sh);
+}
+.vl[data-depth="glass"] .vl-btn,
+.vl[data-depth="glass"] .vl-record {
+  transition:
+    transform 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+.vl[data-depth="glass"] .vl-btn-primary,
+.vl[data-depth="glass"] .vl-record,
+.vl[data-depth="glass"] .vl-chip:has(:checked) {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 8px 20px -8px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.vl[data-depth="glass"] :is(.vl-btn, .vl-record):active:not(:disabled),
+.vl[data-depth="glass"] .vl-btn.is-pressed {
+  transform: scale(0.97);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+.vl[data-depth="glass"]
+  :is(.vl-btn-secondary, .vl-btn-danger, .vl-month, .vl-chip, .vl-input) {
+  box-shadow:
+    inset 0 1px 0 var(--glass-light),
+    inset 0 0 0 1px var(--control-border);
+}
+.vl[data-depth="glass"] .vl-btn-danger {
+  box-shadow:
+    inset 0 1px 0 var(--glass-light),
+    inset 0 0 0 1px var(--negative);
+}
+.vl[data-depth="glass"] :is(.vl-month, .vl-input) {
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vl :is(.vl-btn, .vl-record, .vl-chip, .vl-month) {
+    transition: none;
+  }
 }
 
 @media (max-width: 900px) {
