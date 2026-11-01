@@ -1,0 +1,346 @@
+/* PROTOTYPE (prototype/assign): throwaway. Builds on the Budget screen and
+   recording prototypes' tokens and parts, and adds the assigning flows. */
+
+.as [data-state="overspent"] > strong,
+.as strong[data-state="overspent"] {
+  color: var(--negative);
+}
+
+/* ---------- frames ---------- */
+
+.as-toast {
+  z-index: 30;
+}
+.bs-desktop .as-toast {
+  position: fixed;
+  left: 50%;
+  right: auto;
+  bottom: 72px;
+  transform: translateX(-50%);
+  min-width: 360px;
+}
+.as-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgb(0 0 0 / 0.45);
+  display: grid;
+  place-items: center;
+}
+.as-scrim[data-side="true"] {
+  background: rgb(0 0 0 / 0.2);
+  place-items: stretch end;
+}
+.as-dialog {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  background: var(--page);
+  border-radius: 28px;
+  box-shadow: var(--soft-2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.as-dialog[data-side="true"] {
+  width: 420px;
+  max-height: none;
+  height: 100vh;
+  border-radius: 28px 0 0 28px;
+}
+.as .rt-head {
+  grid-template-columns: 72px 1fr 72px;
+}
+.as-menu {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 260px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+.as-row {
+  flex-direction: column;
+  gap: 6px;
+}
+.as-row-open {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: none;
+  text-align: left;
+}
+button.as-row-open {
+  cursor: pointer;
+}
+.as-note {
+  padding-left: 52px;
+}
+.a-trow[data-selected="true"] {
+  background: color-mix(in srgb, var(--link) 12%, transparent);
+}
+
+/* ---------- A. Assign in place ---------- */
+
+.asa-bar {
+  position: sticky;
+  top: -20px;
+  z-index: 3;
+  margin: -20px -16px 0;
+  padding: 20px 16px 14px;
+  background: var(--hero-gradient);
+  color: var(--hero-ink);
+  border-radius: 0 0 24px 24px;
+  box-shadow: var(--soft-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.asa-bar .split {
+  align-items: center;
+}
+.asa-bar-label {
+  display: block;
+  color: var(--hero-muted);
+}
+.asa-bar-amount {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.asa-bar[data-state="overspent"] .asa-bar-amount {
+  color: #ff9aa3;
+}
+.asa-bar-note {
+  color: var(--hero-muted);
+}
+.asa-copy {
+  align-self: flex-start;
+  white-space: normal;
+  text-align: left;
+  background: rgb(255 255 255 / 0.14);
+  color: var(--hero-ink);
+  box-shadow: none;
+}
+.asa-group {
+  padding-top: 4px;
+}
+.asa-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+}
+.asa-row + .asa-row {
+  border-top: 1px solid var(--edge);
+}
+.asa-row[data-state="overspent"] {
+  background: color-mix(in srgb, var(--negative-tint) 60%, transparent);
+}
+.asa-row .split {
+  align-items: center;
+}
+.asa-avail[data-state="available"] {
+  color: var(--positive);
+}
+.asa-cover {
+  background: var(--negative-tint);
+  color: var(--on-negative-tint);
+}
+.asa-field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  width: 128px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--raised);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+.asa-field:focus-within {
+  outline: 2px solid var(--link);
+  outline-offset: 1px;
+  background: var(--card);
+}
+.asa-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  text-align: right;
+  font-weight: inherit;
+  outline: none;
+}
+.asa-field[data-quiet="true"] {
+  width: 100%;
+  padding: 4px 12px;
+  font-weight: 400;
+}
+.asa-field[data-quiet="true"] input {
+  font-size: 15px;
+}
+
+/* ---------- B. One Category at a time ---------- */
+
+.asb-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.asb-name {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.asb-available {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--positive);
+}
+.asb-available[data-state="overspent"] {
+  color: var(--negative);
+}
+.asb-available[data-state="zero"] {
+  color: var(--muted);
+}
+.asb-available .small {
+  font-weight: 500;
+}
+.asb-sum {
+  padding: 6px 16px;
+  border-radius: 18px;
+}
+.asb-sum > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  color: var(--muted);
+}
+.asb-sum .asb-total {
+  border-top: 1px solid var(--edge);
+  color: var(--text);
+  font-weight: 650;
+}
+.asb-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 28px;
+  font-weight: 750;
+}
+.asb-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  font-size: 28px;
+  font-weight: inherit;
+}
+.asb-done {
+  justify-content: center;
+  text-align: center;
+  padding-top: 32px;
+  padding-bottom: 32px;
+}
+
+/* ---------- C. Everything is a move ---------- */
+
+.asc {
+  gap: 10px;
+}
+.asc .b-amount-field {
+  padding: 12px 0 8px;
+}
+.asc-end {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+.asc-change {
+  color: var(--muted);
+}
+.asc-after {
+  color: var(--text);
+}
+.asc-pick-title {
+  font-size: 17px;
+  font-weight: 650;
+  padding: 4px 4px 0;
+}
+.asc-end-row {
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.asc-end-row:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.asc-end-row .tile {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+}
+.asc-pop-host {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+.header .asc-pop-host {
+  width: auto;
+  margin-left: auto;
+}
+.asc-pop {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 280px;
+  padding: 12px;
+  text-align: left;
+}
+.asc-pop form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.asc-copy-row {
+  padding: 10px 16px;
+}
+.asc-check {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+.asc-copy-row[data-kept="true"] {
+  color: var(--muted);
+}
+.asc-copy [data-muted="true"] {
+  color: var(--muted);
+}
+
+/* ---------- the Budget screen, narrower for a 1400px window ---------- */
+
+.as .a-columns {
+  grid-template-columns: 300px 1fr;
+  gap: 24px;
+}
+.as .a-table-head,
+.as .a-trow {
+  grid-template-columns: minmax(170px, 1.4fr) 116px minmax(130px, 1fr) 150px;
+}
+/* The Assigned popover may hang below its group's card. */
+.as .a-group.card {
+  overflow: visible;
+}

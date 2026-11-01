@@ -8,6 +8,7 @@
     "prototype:visual-language": "vite --open '/?variant=A'",
     "prototype:budget-screen": "vite --open '/?budget=A'",
     "prototype:record": "vite --open '/?record=A'",
+    "prototype:assign": "vite --open '/?assign=A'",
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",

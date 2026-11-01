@@ -16,7 +16,16 @@ if (!root) throw new Error("#root element missing from index.html");
 // prototype.
 // PROTOTYPE (prototype/record-transaction): `?record=` opens the recording
 // prototype.
+// PROTOTYPE (prototype/assign): `?assign=` opens the assigning prototype.
 if (
+  import.meta.env.DEV &&
+  new URLSearchParams(window.location.search).has("assign")
+) {
+  const { AssignPrototype } = await import(
+    "./assign-prototype/AssignPrototype"
+  );
+  createRoot(root).render(<AssignPrototype />);
+} else if (
   import.meta.env.DEV &&
   new URLSearchParams(window.location.search).has("record")
 ) {
