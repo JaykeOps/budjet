@@ -400,3 +400,91 @@ export function contrast(a: string, b: string): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 }
+
+/**
+ * Colours for Card's Ready to Assign card, the same in dark and light. The
+ * gradient runs from `top` (top left) through `mid` to `end` (bottom right);
+ * `ink` is the text on it, and the Assign button is `ink` with `buttonInk`.
+ */
+export type CardColour = {
+  name: string;
+  top: string;
+  mid: string;
+  end: string;
+  ink: string;
+  buttonInk: string;
+};
+
+export const cardColours: Record<string, CardColour> = {
+  blush: {
+    name: "Blush",
+    top: "#ffc09a",
+    mid: "#ff9cb8",
+    end: "#b7a6ff",
+    ink: "#1a1420",
+    buttonInk: "#ffffff",
+  },
+  holo: {
+    name: "Holo",
+    top: "#f4d4ff",
+    mid: "#c9eeff",
+    end: "#fff1c2",
+    ink: "#16161d",
+    buttonInk: "#ffffff",
+  },
+  mint: {
+    name: "Mint",
+    top: "#d4f7e6",
+    mid: "#93e3cf",
+    end: "#a9c9f5",
+    ink: "#0c201c",
+    buttonInk: "#ffffff",
+  },
+  sage: {
+    name: "Sage",
+    top: "#e6eccf",
+    mid: "#bcd3ae",
+    end: "#93bfb3",
+    ink: "#18221a",
+    buttonInk: "#ffffff",
+  },
+  lemon: {
+    name: "Lemon",
+    top: "#fff7b8",
+    mid: "#ffde6e",
+    end: "#ffb38f",
+    ink: "#221a0a",
+    buttonInk: "#ffffff",
+  },
+  aurora: {
+    name: "Aurora",
+    top: "#3b2f8f",
+    mid: "#22205a",
+    end: "#0e6a6a",
+    ink: "#f4f4f6",
+    buttonInk: "#1b1a3f",
+  },
+  ember: {
+    name: "Ember",
+    top: "#c2410c",
+    mid: "#9f1c43",
+    end: "#4c1d95",
+    ink: "#ffffff",
+    buttonInk: "#5a1530",
+  },
+  graphite: {
+    name: "Graphite",
+    top: "#5a5a66",
+    mid: "#2e2e36",
+    end: "#4a4a55",
+    ink: "#f4f4f6",
+    buttonInk: "#18181d",
+  },
+};
+
+/** The lowest contrast between a card's ink and any stop of its gradient. */
+export function cardContrast(c: CardColour): number {
+  return Math.min(
+    ...[c.top, c.mid, c.end].map((stop) => contrast(c.ink, stop)),
+  );
+}

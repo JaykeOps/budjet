@@ -5,7 +5,8 @@
 // `light` show one. `?depth=` sets how far things lift off the page:
 // `flat`; `soft` (hairline edges, diffuse shadows, buttons that shrink when
 // pressed); `glass` (frosted panels over a glow); `deep` (default: gradients
-// and buttons you push down onto a lip).
+// and buttons you push down onto a lip). On Card, `?card=` picks the colour
+// of the Ready to Assign card.
 import "@fontsource-variable/bricolage-grotesque/opsz.css";
 import "@fontsource-variable/gabarito";
 import "@fontsource-variable/geist";
@@ -14,6 +15,9 @@ import { type CSSProperties, useEffect, useState } from "react";
 import { useUrlParameter } from "../url-parameter";
 import "./prototype.css";
 import {
+  type CardColour,
+  cardColours,
+  cardContrast,
   contrast,
   pairings,
   type Scheme,
@@ -34,6 +38,8 @@ export function VisualLanguagePrototype() {
   const scheme = schemes.find((s) => s === schemeParam) ?? "both";
   const [depthParam, setDepth] = useUrlParameter("depth");
   const depth = depths.find((d) => d === depthParam) ?? "deep";
+  const [cardParam, setCard] = useUrlParameter("card");
+  const cardKey = cardParam && cardParam in cardColours ? cardParam : "blush";
   const systemDark = useSystemDark();
   const v = variants[key];
 
@@ -65,7 +71,14 @@ export function VisualLanguagePrototype() {
   return (
     <>
       {shown.map((s) => (
-        <Specimen key={`${key}-${s}`} variant={v} scheme={s} depth={depth} />
+        <Specimen
+          key={`${key}-${s}`}
+          variant={v}
+          scheme={s}
+          depth={depth}
+          card={key === "D" ? cardKey : undefined}
+          onCard={(to) => setCard(to, "replace")}
+        />
       ))}
       {import.meta.env.DEV && (
         <div className="p-switcher">
@@ -106,6 +119,19 @@ export function VisualLanguagePrototype() {
             <option value="glass">Glass</option>
             <option value="deep">Deep</option>
           </select>
+          {key === "D" && (
+            <select
+              value={cardKey}
+              onChange={(e) => setCard(e.target.value, "replace")}
+              aria-label="Card colour"
+            >
+              {Object.entries(cardColours).map(([k, c]) => (
+                <option key={k} value={k}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
     </>
@@ -170,12 +196,33 @@ function Specimen({
   variant: v,
   scheme,
   depth,
+  card,
+  onCard,
 }: {
   variant: Variant;
   scheme: "dark" | "light";
   depth: (typeof depths)[number];
+  card?: string;
+  onCard: (key: string) => void;
 }) {
-  const s = v[scheme];
+  const colour = card ? cardColours[card] : undefined;
+  // A chosen card colour stands in for the scheme's own hero colours, so the
+  // contrast audit checks what is on screen.
+  const s: Scheme = colour
+    ? {
+        ...v[scheme],
+        hero: colour.mid,
+        heroTop: colour.top,
+        onHero: colour.ink,
+      }
+    : v[scheme];
+  const style = {
+    ...cssVariables(s, v.shape),
+    ...(colour && {
+      "--hero-end": colour.end,
+      "--hero-button-ink": colour.buttonInk,
+    }),
+  } as CSSProperties;
   return (
     <section
       className="vl"
@@ -184,7 +231,7 @@ function Specimen({
       data-variant={v.name.toLowerCase()}
       data-meter={v.shape.meter}
       data-tile={v.shape.tile}
-      style={cssVariables(s, v.shape)}
+      style={style}
       aria-label={`${v.name}, ${scheme}`}
     >
       <header className="vl-intro">
@@ -200,7 +247,7 @@ function Specimen({
         <TransactionScreen scheme={scheme} />
       </div>
 
-      <Parts scheme={s} />
+      <Parts scheme={s} card={card} onCard={onCard} />
     </section>
   );
 }
@@ -385,7 +432,15 @@ function TransactionScreen({ scheme }: { scheme: string }) {
   );
 }
 
-function Parts({ scheme: s }: { scheme: Scheme }) {
+function Parts({
+  scheme: s,
+  card,
+  onCard,
+}: {
+  scheme: Scheme;
+  card?: string;
+  onCard: (key: string) => void;
+}) {
   const results = pairings.map((p) => ({
     ...p,
     ratio: contrast(s[p.fg], s[p.bg]),
@@ -404,6 +459,21 @@ function Parts({ scheme: s }: { scheme: Scheme }) {
   ];
   return (
     <div className="vl-parts">
+      {card && (
+        <div className="vl-part">
+          <h2>Card colour</h2>
+          <div className="vl-card-picker">
+            {Object.entries(cardColours).map(([k, c]) => (
+              <CardSwatch
+                key={k}
+                colour={c}
+                chosen={k === card}
+                onPick={() => onCard(k)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
       <div className="vl-part">
         <h2>Colour</h2>
         <ul className="vl-swatches">
@@ -505,6 +575,38 @@ function Parts({ scheme: s }: { scheme: Scheme }) {
         </details>
       </div>
     </div>
+  );
+}
+
+function CardSwatch({
+  colour: c,
+  chosen,
+  onPick,
+}: {
+  colour: CardColour;
+  chosen: boolean;
+  onPick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="vl-card-swatch"
+      aria-pressed={chosen}
+      onClick={onPick}
+      style={
+        {
+          "--hero": c.mid,
+          "--hero-top": c.top,
+          "--hero-end": c.end,
+          "--on-hero": c.ink,
+        } as CSSProperties
+      }
+    >
+      <span className="vl-money">$240.00</span>
+      <span>
+        {c.name}, {cardContrast(c).toFixed(1)}:1
+      </span>
+    </button>
   );
 }
 

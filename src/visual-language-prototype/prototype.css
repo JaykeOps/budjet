@@ -1032,7 +1032,42 @@ body {
   padding: var(--space-5);
   background:
     radial-gradient(circle at 0% 0%, var(--hero-top), transparent 60%),
-    radial-gradient(circle at 100% 100%, #b7a6ff, transparent 65%), var(--hero);
+    radial-gradient(circle at 100% 100%, var(--hero-end), transparent 65%),
+    var(--hero);
+}
+.vl-card-picker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.vl-card-swatch {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-3);
+  aspect-ratio: 1.586;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: 12px;
+  text-align: left;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--on-hero);
+  background:
+    radial-gradient(circle at 0% 0%, var(--hero-top), transparent 60%),
+    radial-gradient(circle at 100% 100%, var(--hero-end), transparent 65%),
+    var(--hero);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.vl-card-swatch .vl-money {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.vl-card-swatch[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--text);
 }
 .vl[data-variant="card"] .vl-hero-label {
   font-weight: 500;
@@ -1040,8 +1075,8 @@ body {
 .vl[data-variant="card"] .vl-hero .vl-btn-primary {
   --btn: var(--on-hero);
   --btn-top: color-mix(in oklab, var(--on-hero), white 22%);
-  --btn-edge: #000000;
-  --btn-ink: #ffffff;
+  --btn-edge: color-mix(in oklab, var(--on-hero), black 50%);
+  --btn-ink: var(--hero-button-ink);
 }
 .vl[data-variant="card"] .vl-spent {
   background: var(--surface);
