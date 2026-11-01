@@ -1617,6 +1617,7 @@ function VariantD({ world: w, wide, change }: VariantProps) {
       {open.kind === "copy" && (
         <CopyPreview
           world={w}
+          selectable
           onCopy={(next, count) => {
             change(next, `Copied ${count} Assignments from ${LAST_MONTH}`);
             close();
@@ -1779,6 +1780,10 @@ function Steps({
     initial ?? (w.copyable.length > 0 ? null : walkQueue(w)),
   );
   const [i, setI] = useState(start);
+  // The copy offer: untick Categories to keep Ready to Assign above zero.
+  const [picked, setPicked] = useState(
+    () => new Set(w.copyable.map((x) => x.id)),
+  );
   const ref = useRef<HTMLDivElement>(null);
   const count = ids?.length ?? 0;
   const go = (to: number) => {
@@ -1831,17 +1836,18 @@ function Steps({
             Start them from what you assigned in {LAST_MONTH}, then check what’s
             left.
           </p>
-          <CopyList world={w} onlyCopyable />
-          <p className="small muted num">
-            Ready to Assign after:{" "}
-            <strong>
-              {money(
-                cents(
-                  w.readyToAssign - w.copyable.reduce((s, x) => s + x.last, 0),
-                ),
-              )}
-            </strong>
-          </p>
+          <CopyList
+            world={w}
+            onlyCopyable
+            picked={picked}
+            onPick={(id) => {
+              const next = new Set(picked);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              setPicked(next);
+            }}
+          />
+          <CopyAfter world={w} picked={picked} />
         </div>
         <div className="rt-foot rt-save">
           <button
@@ -1854,16 +1860,17 @@ function Steps({
           <button
             type="button"
             className="btn btn-primary rt-save-main"
+            disabled={picked.size === 0}
             onClick={() => {
-              const next = copied(w);
+              const next = copied(w, picked);
               change(
                 next,
-                `Copied ${w.copyable.length} Assignments from ${LAST_MONTH}`,
+                `Copied ${picked.size} Assignments from ${LAST_MONTH}`,
               );
               setIds(walkQueue(worldOf(w.categories, next, w.rule)));
             }}
           >
-            Copy {w.copyable.length} Assignments
+            Copy {picked.size} Assignments
           </button>
         </div>
       </>
@@ -2521,10 +2528,6 @@ function CopyPreview({
   const [picked, setPicked] = useState(
     () => new Set(w.copyable.map((x) => x.id)),
   );
-  const total = w.copyable
-    .filter((x) => picked.has(x.id))
-    .reduce((s, x) => s + x.last, 0);
-  const after = cents(w.readyToAssign - total);
   return (
     <>
       <div className="rt-body">
@@ -2554,18 +2557,7 @@ function CopyPreview({
               : undefined
           }
         />
-        <div className="rt-meter num">
-          <div className="split">
-            <span>Ready to Assign after</span>
-            <strong data-state={stateOf(after)}>{money(after)}</strong>
-          </div>
-          {after < 0 && (
-            <span className="small">
-              That’s {money(-after)} more than you have. You can take it back
-              from a Category afterwards.
-            </span>
-          )}
-        </div>
+        <CopyAfter world={w} picked={picked} />
       </div>
       <div className="rt-foot">
         <button
@@ -2578,6 +2570,34 @@ function CopyPreview({
         </button>
       </div>
     </>
+  );
+}
+
+/** Ready to Assign after copying the ticked Categories, warning below zero. */
+function CopyAfter({
+  world: w,
+  picked,
+}: {
+  world: World;
+  picked: Set<string>;
+}) {
+  const total = w.copyable
+    .filter((x) => picked.has(x.id))
+    .reduce((s, x) => s + x.last, 0);
+  const after = cents(w.readyToAssign - total);
+  return (
+    <div className="rt-meter num">
+      <div className="split">
+        <span>Ready to Assign after</span>
+        <strong data-state={stateOf(after)}>{money(after)}</strong>
+      </div>
+      {after < 0 && (
+        <span className="small">
+          That’s {money(-after)} more than you have. Untick a Category, or take
+          it back from one afterwards.
+        </span>
+      )}
+    </div>
   );
 }
 
