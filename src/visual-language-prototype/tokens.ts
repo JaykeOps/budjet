@@ -13,9 +13,15 @@ export type Scheme = {
   accent: string;
   onAccent: string;
   accentText: string;
+  /** Top of a primary button's gradient, and the lip it stands on. */
+  accentTop: string;
+  accentEdge: string;
   /** The block behind Ready to Assign, and the text on it. */
   hero: string;
   onHero: string;
+  heroTop: string;
+  /** The hue shadows are cast in, so they never read as plain grey. */
+  shadow: string;
   negative: string;
   negativeTint: string;
   onNegativeTint: string;
@@ -70,8 +76,12 @@ export const variants: Record<"A" | "B" | "C", Variant> = {
       accent: "#ffc94d",
       onAccent: "#2a1530",
       accentText: "#ffd66e",
+      accentTop: "#ffdb7a",
+      accentEdge: "#b8800a",
       hero: "#271b31",
       onHero: "#f5eef8",
+      heroTop: "#3a2a4a",
+      shadow: "#07030b",
       negative: "#ff8fa3",
       negativeTint: "#4a1f33",
       onNegativeTint: "#ffb0bf",
@@ -94,8 +104,12 @@ export const variants: Record<"A" | "B" | "C", Variant> = {
       accent: "#5a2d7a",
       onAccent: "#ffffff",
       accentText: "#5a2d7a",
+      accentTop: "#7b46a3",
+      accentEdge: "#3a1854",
       hero: "#ffffff",
       onHero: "#22142b",
+      heroTop: "#ffffff",
+      shadow: "#4a2a5e",
       negative: "#b8234b",
       negativeTint: "#fce6ec",
       onNegativeTint: "#a51d42",
@@ -130,8 +144,12 @@ export const variants: Record<"A" | "B" | "C", Variant> = {
       accent: "#c9b8ff",
       onAccent: "#1a1340",
       accentText: "#cdbdff",
+      accentTop: "#ddd2ff",
+      accentEdge: "#8f77e0",
       hero: "#0d2629",
       onHero: "#e8f3f1",
+      heroTop: "#1a3f44",
+      shadow: "#020e10",
       negative: "#ff9a7a",
       negativeTint: "#46261f",
       onNegativeTint: "#ffae93",
@@ -154,8 +172,12 @@ export const variants: Record<"A" | "B" | "C", Variant> = {
       accent: "#4b33c4",
       onAccent: "#ffffff",
       accentText: "#4b33c4",
+      accentTop: "#6650dc",
+      accentEdge: "#2f1d8f",
       hero: "#edf3f2",
       onHero: "#0d2629",
+      heroTop: "#ffffff",
+      shadow: "#0d3a3e",
       negative: "#b83a1b",
       negativeTint: "#fbe6df",
       onNegativeTint: "#9e3014",
@@ -190,8 +212,12 @@ export const variants: Record<"A" | "B" | "C", Variant> = {
       accent: "#ffe14d",
       onAccent: "#1b2470",
       accentText: "#ffe14d",
+      accentTop: "#fff08a",
+      accentEdge: "#c9a400",
       hero: "#ffe14d",
       onHero: "#1b2470",
+      heroTop: "#fff08a",
+      shadow: "#080c38",
       negative: "#ff9ccb",
       negativeTint: "#5a2a7e",
       onNegativeTint: "#ffb3d7",
@@ -214,8 +240,12 @@ export const variants: Record<"A" | "B" | "C", Variant> = {
       accent: "#1b2470",
       onAccent: "#ffe14d",
       accentText: "#2f3fb0",
+      accentTop: "#33429f",
+      accentEdge: "#0d1348",
       hero: "#1b2470",
       onHero: "#ffe14d",
+      heroTop: "#33429f",
+      shadow: "#1b2470",
       negative: "#c2186b",
       negativeTint: "#fde3ef",
       onNegativeTint: "#a3155a",
@@ -248,7 +278,19 @@ export const pairings: Pairing[] = [
   { label: "Link on page", fg: "accentText", bg: "bg", min: 4.5 },
   { label: "Link on card", fg: "accentText", bg: "surface", min: 4.5 },
   { label: "Button label", fg: "onAccent", bg: "accent", min: 4.5 },
+  {
+    label: "Button label on its highlight",
+    fg: "onAccent",
+    bg: "accentTop",
+    min: 4.5,
+  },
   { label: "Ready to Assign", fg: "onHero", bg: "hero", min: 4.5 },
+  {
+    label: "Ready to Assign on its highlight",
+    fg: "onHero",
+    bg: "heroTop",
+    min: 4.5,
+  },
   { label: "Negative on card", fg: "negative", bg: "surface", min: 4.5 },
   { label: "Negative on raised", fg: "negative", bg: "raised", min: 4.5 },
   {

@@ -2,7 +2,8 @@
 // languages, switchable via `?variant=A|B|C`. Each shows the Budget screen and
 // the New Transaction screen on a phone, then the parts they are made of.
 // `?scheme=both` (default) stacks dark over light; `system`, `dark` and
-// `light` show one.
+// `light` show one. `?depth=deep` (default) adds shadows, gradients and
+// buttons you press down; `flat` takes them away to compare.
 import "@fontsource-variable/bricolage-grotesque/opsz.css";
 import "@fontsource-variable/gabarito";
 import "@fontsource-variable/schibsted-grotesk";
@@ -21,12 +22,15 @@ import {
 type Key = keyof typeof variants;
 const keys = Object.keys(variants) as Key[];
 const schemes = ["both", "system", "dark", "light"] as const;
+const depths = ["deep", "flat"] as const;
 
 export function VisualLanguagePrototype() {
   const [variant, setVariant] = useUrlParameter("variant");
   const [schemeParam, setScheme] = useUrlParameter("scheme");
   const key: Key = keys.includes(variant as Key) ? (variant as Key) : "A";
   const scheme = schemes.find((s) => s === schemeParam) ?? "both";
+  const [depthParam, setDepth] = useUrlParameter("depth");
+  const depth = depths.find((d) => d === depthParam) ?? "deep";
   const systemDark = useSystemDark();
   const v = variants[key];
 
@@ -58,7 +62,7 @@ export function VisualLanguagePrototype() {
   return (
     <>
       {shown.map((s) => (
-        <Specimen key={`${key}-${s}`} variant={v} scheme={s} />
+        <Specimen key={`${key}-${s}`} variant={v} scheme={s} depth={depth} />
       ))}
       {import.meta.env.DEV && (
         <div className="p-switcher">
@@ -88,6 +92,14 @@ export function VisualLanguagePrototype() {
             <option value="system">Follow system</option>
             <option value="dark">Dark</option>
             <option value="light">Light</option>
+          </select>
+          <select
+            value={depth}
+            onChange={(e) => setDepth(e.target.value, "replace")}
+            aria-label="Depth"
+          >
+            <option value="deep">Deep</option>
+            <option value="flat">Flat</option>
           </select>
         </div>
       )}
@@ -152,15 +164,18 @@ const groups: { name: string; categories: Category[] }[] = [
 function Specimen({
   variant: v,
   scheme,
+  depth,
 }: {
   variant: Variant;
   scheme: "dark" | "light";
+  depth: "deep" | "flat";
 }) {
   const s = v[scheme];
   return (
     <section
       className="vl"
       data-scheme={scheme}
+      data-depth={depth}
       data-variant={v.name.toLowerCase()}
       data-meter={v.shape.meter}
       data-tile={v.shape.tile}
@@ -426,6 +441,9 @@ function Parts({ scheme: s }: { scheme: Scheme }) {
           </button>
           <button type="button" className="vl-btn vl-btn-primary" disabled>
             Assign
+          </button>
+          <button type="button" className="vl-btn vl-btn-primary is-pressed">
+            Pressed
           </button>
           <button type="button" className="vl-btn vl-btn-primary is-focused">
             Focused

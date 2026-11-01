@@ -335,8 +335,12 @@ body {
   white-space: nowrap;
 }
 .vl-btn-primary {
-  background: var(--accent);
-  color: var(--on-accent);
+  --btn: var(--accent);
+  --btn-top: var(--accent-top);
+  --btn-edge: var(--accent-edge);
+  --btn-ink: var(--on-accent);
+  background: var(--btn);
+  color: var(--btn-ink);
 }
 .vl-btn-secondary {
   background: transparent;
@@ -691,8 +695,10 @@ body {
   padding: var(--space-5);
 }
 .vl[data-variant="riso"] .vl-hero .vl-btn-primary {
-  background: var(--on-hero);
-  color: var(--hero);
+  --btn: var(--on-hero);
+  --btn-top: color-mix(in oklab, var(--on-hero), white 14%);
+  --btn-edge: color-mix(in oklab, var(--on-hero), black 45%);
+  --btn-ink: var(--hero);
 }
 .vl[data-variant="riso"] .vl-display,
 .vl[data-variant="riso"] .vl-amount,
@@ -744,6 +750,246 @@ body {
 }
 .vl[data-variant="petrol"] .vl-available {
   font-variant-numeric: tabular-nums;
+}
+
+/* ---- Depth: light from above, shadows in each palette's own hue ---- */
+
+.vl[data-depth="deep"] {
+  /* Lit top edge of anything raised, and the shadows it casts. */
+  --hl: rgb(255 255 255 / 0.07);
+  --hl-strong: rgb(255 255 255 / 0.28);
+  --sh: color-mix(in srgb, var(--shadow) 80%, transparent);
+  --sh-soft: color-mix(in srgb, var(--shadow) 50%, transparent);
+  --surface-top: color-mix(in oklab, var(--surface), white 4%);
+  --surface-bottom: var(--surface);
+  --well: color-mix(in oklab, var(--surface), black 22%);
+
+  --elev-1:
+    inset 0 1px 0 var(--hl), 0 1px 1px var(--sh), 0 3px 8px -3px var(--sh-soft);
+  --elev-2:
+    inset 0 1px 0 var(--hl), 0 2px 3px -1px var(--sh),
+    0 14px 28px -12px var(--sh);
+  --elev-3:
+    inset 0 1px 0 var(--hl), 0 40px 80px -30px var(--sh),
+    0 16px 32px -16px var(--sh-soft);
+  --recess: inset 0 2px 4px var(--sh-soft), inset 0 1px 1px var(--sh-soft);
+}
+.vl[data-depth="deep"][data-scheme="light"] {
+  --hl: rgb(255 255 255 / 0.9);
+  --hl-strong: rgb(255 255 255 / 0.35);
+  --sh: color-mix(in srgb, var(--shadow) 22%, transparent);
+  --sh-soft: color-mix(in srgb, var(--shadow) 11%, transparent);
+  --surface-top: var(--surface);
+  --surface-bottom: color-mix(in oklab, var(--surface), var(--shadow) 3%);
+  --well: color-mix(in oklab, var(--bg), var(--shadow) 4%);
+}
+
+.vl[data-depth="deep"] .vl-phone {
+  outline: 0;
+  box-shadow:
+    var(--elev-3),
+    0 0 0 1px var(--line);
+}
+
+/* Cards: a faint top light and a soft cast shadow. */
+.vl[data-depth="deep"] .vl-hero,
+.vl[data-depth="deep"][data-variant="petrol"] .vl-categories,
+.vl[data-depth="deep"][data-variant="riso"] .vl-categories {
+  box-shadow: var(--elev-2);
+}
+.vl[data-depth="deep"][data-variant="petrol"] .vl-categories,
+.vl[data-depth="deep"][data-variant="riso"] .vl-categories {
+  background: linear-gradient(
+    180deg,
+    var(--surface-top),
+    var(--surface-bottom)
+  );
+}
+.vl[data-depth="deep"] .vl-hero {
+  background: linear-gradient(170deg, var(--hero-top), var(--hero) 70%);
+}
+.vl[data-depth="deep"][data-variant="petrol"] .vl-hero {
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  border-bottom: 0;
+  border-radius: var(--radius-card);
+}
+
+/* Fig's envelopes are each a small raised object. */
+.vl[data-depth="deep"][data-variant="fig"] .vl-category {
+  background:
+    linear-gradient(rgb(255 255 255 / 0.04), transparent 60%),
+    linear-gradient(
+      90deg,
+      var(--raised) var(--left),
+      var(--surface) var(--left)
+    );
+  box-shadow: var(--elev-1);
+}
+.vl[data-depth="deep"][data-variant="fig"]
+  .vl-category[data-state="overspent"] {
+  background:
+    linear-gradient(rgb(255 255 255 / 0.04), transparent 60%),
+    var(--negative-tint);
+}
+.vl[data-depth="deep"] .vl-tile {
+  box-shadow: var(--recess);
+}
+
+/* Buttons stand on a lip; pressing one pushes it down onto it. */
+.vl[data-depth="deep"] .vl-btn,
+.vl[data-depth="deep"] .vl-record,
+.vl[data-depth="deep"] .vl-month {
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out;
+}
+.vl[data-depth="deep"] .vl-btn-primary {
+  background: linear-gradient(180deg, var(--btn-top), var(--btn));
+  box-shadow:
+    inset 0 1px 0 var(--hl-strong),
+    0 4px 0 var(--btn-edge),
+    0 8px 14px -4px var(--sh);
+}
+.vl[data-depth="deep"] .vl-btn-primary:active:not(:disabled),
+.vl[data-depth="deep"] .vl-btn-primary.is-pressed {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 2px 3px color-mix(in srgb, var(--btn-edge) 60%, transparent),
+    0 0 0 var(--btn-edge),
+    0 1px 2px var(--sh-soft);
+}
+.vl[data-depth="deep"] .vl-btn-secondary,
+.vl[data-depth="deep"] .vl-btn-danger,
+.vl[data-depth="deep"] .vl-month {
+  background: linear-gradient(
+    180deg,
+    var(--surface-top),
+    var(--surface-bottom)
+  );
+  box-shadow:
+    inset 0 0 0 1px var(--control-border),
+    inset 0 2px 0 var(--hl),
+    0 2px 0 var(--sh-soft),
+    0 4px 8px -4px var(--sh);
+}
+.vl[data-depth="deep"] .vl-btn-danger {
+  box-shadow:
+    inset 0 0 0 1px var(--negative),
+    inset 0 2px 0 var(--hl),
+    0 2px 0 var(--sh-soft),
+    0 4px 8px -4px var(--sh);
+}
+.vl[data-depth="deep"] .vl-month {
+  border: 0;
+}
+.vl[data-depth="deep"] .vl-btn-secondary:active,
+.vl[data-depth="deep"] .vl-btn-danger:active,
+.vl[data-depth="deep"] .vl-month:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 0 0 1px var(--control-border),
+    var(--recess);
+}
+.vl[data-depth="deep"] .vl-btn:disabled {
+  opacity: 0.45;
+  box-shadow: none;
+  background: var(--raised);
+  color: var(--muted);
+}
+.vl[data-depth="deep"] .vl-record {
+  background:
+    radial-gradient(circle at 50% 22%, var(--hl-strong), transparent 55%),
+    linear-gradient(180deg, var(--accent-top), var(--accent));
+  box-shadow:
+    inset 0 1px 0 var(--hl-strong),
+    0 4px 0 var(--accent-edge),
+    0 10px 18px -6px var(--sh);
+  transform: translateY(-6px);
+}
+.vl[data-depth="deep"] .vl-record:active {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 2px 4px color-mix(in srgb, var(--accent-edge) 60%, transparent),
+    0 0 0 var(--accent-edge),
+    0 2px 4px var(--sh-soft);
+}
+.vl[data-depth="deep"] .vl-tabs {
+  border-top: 0;
+  background: linear-gradient(
+    180deg,
+    var(--surface-top),
+    var(--surface-bottom)
+  );
+  box-shadow: 0 -10px 24px -16px var(--sh);
+}
+.vl[data-depth="deep"][data-variant="riso"] .vl-tabs {
+  box-shadow: var(--elev-2);
+}
+
+/* Fields and tracks are wells pressed into the surface. */
+.vl[data-depth="deep"] .vl-input {
+  background: var(--well);
+  box-shadow: var(--recess);
+}
+.vl[data-depth="deep"] .vl-segmented {
+  background: var(--well);
+  box-shadow: var(--recess);
+}
+.vl[data-depth="deep"] .vl-segmented label:has(:checked) {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--raised), white 6%),
+    var(--raised)
+  );
+  box-shadow: var(--elev-1);
+}
+.vl[data-depth="deep"][data-scheme="light"] .vl-segmented label:has(:checked) {
+  background: var(--surface);
+}
+.vl[data-depth="deep"] .vl-chip {
+  background: linear-gradient(
+    180deg,
+    var(--surface-top),
+    var(--surface-bottom)
+  );
+  box-shadow:
+    inset 0 0 0 1px var(--control-border),
+    0 2px 0 var(--sh-soft);
+}
+/* The chosen Category stays pushed in. */
+.vl[data-depth="deep"] .vl-chip:has(:checked) {
+  transform: translateY(2px);
+  background: linear-gradient(180deg, var(--accent), var(--accent-top));
+  box-shadow: inset 0 2px 4px
+    color-mix(in srgb, var(--accent-edge) 70%, transparent);
+}
+
+.vl[data-depth="deep"] .vl-meter > span,
+.vl[data-depth="deep"][data-meter="bar"] .vl-meter,
+.vl[data-depth="deep"][data-meter="envelope"] .vl-meter {
+  box-shadow: var(--recess);
+}
+.vl[data-depth="deep"] .vl-meter > span[data-on="true"],
+.vl[data-depth="deep"] .vl-meter[data-over="true"] > span,
+.vl[data-depth="deep"] .vl-meter > i {
+  box-shadow: inset 0 1px 0 var(--hl-strong);
+}
+.vl[data-depth="deep"] .vl-meter > i {
+  background-image: linear-gradient(rgb(255 255 255 / 0.25), transparent);
+}
+
+.vl[data-depth="deep"] .vl-swatch {
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--elev-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vl[data-depth="deep"] .vl-btn,
+  .vl[data-depth="deep"] .vl-record,
+  .vl[data-depth="deep"] .vl-month {
+    transition: none;
+  }
 }
 
 @media (max-width: 900px) {
