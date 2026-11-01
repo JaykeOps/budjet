@@ -12,7 +12,17 @@ if (!root) throw new Error("#root element missing from index.html");
 
 // PROTOTYPE (prototype/visual-language): `?variant=` opens the visual
 // language prototype instead of the saved Budget.
+// PROTOTYPE (prototype/budget-screen): `?budget=` opens the Budget screen
+// prototype.
 if (
+  import.meta.env.DEV &&
+  new URLSearchParams(window.location.search).has("budget")
+) {
+  const { BudgetScreenPrototype } = await import(
+    "./budget-screen-prototype/BudgetScreenPrototype"
+  );
+  createRoot(root).render(<BudgetScreenPrototype />);
+} else if (
   import.meta.env.DEV &&
   new URLSearchParams(window.location.search).has("variant")
 ) {

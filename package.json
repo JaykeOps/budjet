@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "prototype:visual-language": "vite --open '/?variant=A'",
+    "prototype:budget-screen": "vite --open '/?budget=A'",
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
