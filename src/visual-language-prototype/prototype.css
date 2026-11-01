@@ -1,454 +1,765 @@
-/* PROTOTYPE (prototype/visual-language): throwaway. Every colour and radius
-   comes from the custom properties VisualLanguagePrototype.tsx sets on each
-   .vl column, so one stylesheet renders all three variants in both schemes. */
+/* PROTOTYPE (prototype/visual-language): throwaway. Shared structure for the
+   three variants; each variant's character comes from its tokens and from the
+   [data-variant] blocks further down. */
 
 body {
   margin: 0;
-  background: #000;
-}
-
-.vl-stage {
-  display: grid;
-  grid-template-columns: repeat(var(--columns, 1), minmax(0, 1fr));
-  min-height: 100vh;
-}
-.vl-stage[data-columns="2"] {
-  --columns: 2;
-}
-@media (max-width: 860px) {
-  .vl-stage[data-columns="2"] {
-    --columns: 1;
-  }
 }
 
 .vl {
-  --space: 16px;
-  --gap: 12px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  color-scheme: dark;
   background: var(--bg);
   color: var(--text);
-  padding: 24px 24px 96px;
-  font:
-    15px / 1.45 system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
-  min-width: 0;
-}
-.vl[data-scheme="dark"] {
-  color-scheme: dark;
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  padding: var(--space-7) var(--space-6) 96px;
+  display: grid;
+  grid-template-columns: auto minmax(280px, 400px);
+  grid-template-areas:
+    "intro intro"
+    "phones parts";
+  gap: var(--space-6) var(--space-7);
+  justify-content: center;
+  align-items: start;
 }
 .vl[data-scheme="light"] {
   color-scheme: light;
 }
-.vl[data-density="compact"] {
-  --space: 12px;
-  --gap: 8px;
-  font-size: 14px;
-}
-
 .vl * {
   box-sizing: border-box;
 }
-.vl p,
-.vl h1,
-.vl h2 {
+:where(.vl) :where(p, h1, h2, ul, fieldset) {
   margin: 0;
+  padding: 0;
+}
+:where(.vl) ul {
+  list-style: none;
+}
+:where(.vl) :where(button, input, select) {
+  font: inherit;
+  color: inherit;
 }
 
-/* Type */
-.vl-display {
-  font-size: 2.25em;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-}
-.vl-title {
-  font-size: 1.75em;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.vl-heading {
-  font-size: 1.1em;
-  font-weight: 600;
+.vl-money {
+  font-variant-numeric: tabular-nums;
 }
 .vl-muted {
   color: var(--muted);
 }
-.vl-caption {
-  color: var(--muted);
-  font-size: 0.85em;
-}
-.vl-money {
-  font-variant-numeric: tabular-nums;
-}
-.vl .vl-h {
-  font-size: 0.8em;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin: 32px 0 12px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--line);
-}
 
-/* Layout helpers */
-.vl-head {
-  display: grid;
-  gap: 4px;
+.vl-intro {
+  grid-area: intro;
   max-width: 60ch;
 }
-.vl-row {
-  display: flex;
-  align-items: center;
-  gap: var(--gap);
+.vl-idea {
+  font-size: 20px;
+  line-height: 1.35;
+  margin-top: var(--space-1);
+  text-wrap: balance;
 }
-.vl-row-between {
+
+/* Phones */
+
+.vl-phones {
+  grid-area: phones;
+  display: flex;
+  gap: var(--space-5);
+  align-items: start;
+  flex-wrap: wrap;
+}
+.vl-phone {
+  width: 375px;
+  min-height: 780px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-radius: 36px;
+  outline: 1px solid var(--line);
+  overflow: hidden;
+}
+.vl-screen {
+  flex: 1;
+  padding: var(--space-5) var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.vl-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--gap);
+  gap: var(--space-3);
+  min-height: 40px;
 }
-.vl-wrap {
-  flex-wrap: wrap;
-  margin-bottom: var(--gap);
-}
-.vl-stack {
-  display: grid;
-  gap: var(--gap);
-  max-width: 420px;
-}
-.vl-grow {
-  flex: 1;
-  display: grid;
-  gap: 4px;
+.vl-split {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
 }
 
-/* Surfaces */
-.vl-card {
-  background: var(--surface);
-  border-radius: var(--radius-card);
-  padding: var(--space);
-  display: grid;
-  gap: 8px;
+.vl-title {
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
-.vl[data-border="hairline"] .vl-card {
-  border: 1px solid var(--line);
+.vl-sheet-title {
+  font-size: 17px;
+  font-weight: 600;
 }
-.vl-surfaces {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--gap);
-  max-width: 420px;
+.vl-bar-spacer {
+  width: 56px;
 }
-.vl-surfaces > div {
-  border-radius: var(--radius-card);
-  padding: var(--space);
-  outline: 1px dashed var(--line);
+.vl-display {
+  font-size: 48px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
-/* The phone composition */
-.vl-phone {
-  max-width: 390px;
-  display: grid;
-  gap: var(--gap);
-  padding: var(--space);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 28px;
+.vl-month {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px var(--space-3);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--control-border);
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
 }
+.vl-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  width: 56px;
+  text-align: left;
+  color: var(--accent-text);
+  cursor: pointer;
+}
+
+/* Ready to Assign */
+
+.vl-hero {
+  background: var(--hero);
+  color: var(--on-hero);
+  border-radius: var(--radius-card);
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.vl-hero-label {
+  font-weight: 600;
+}
+.vl-hero-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* Spent this Month */
+
+.vl-spent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-1);
+}
+
+/* Category Groups and Categories */
+
 .vl-group {
-  margin-top: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
-.vl-list {
-  gap: 0;
-  padding-block: 4px;
+.vl-group-head {
+  padding: 0 var(--space-1);
+  font-size: 13px;
+  color: var(--muted);
+}
+.vl-group-head h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.vl-categories {
+  display: flex;
+  flex-direction: column;
 }
 .vl-category {
   display: flex;
-  gap: var(--gap);
-  align-items: flex-start;
-  padding-block: 10px;
-}
-.vl-category + .vl-category {
-  border-top: 1px solid var(--line);
-}
-.vl-tabbar {
-  display: flex;
-  justify-content: space-around;
+  gap: var(--space-3);
   align-items: center;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
+  padding: var(--space-3) var(--space-4);
 }
-.vl-tab {
-  color: var(--muted);
-  font-size: 0.85em;
+.vl-category-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
-.vl-tab[aria-current="page"] {
-  color: var(--accent-text);
+.vl-category-name {
   font-weight: 600;
 }
-.vl-plus {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 26px;
+.vl-category-note {
+  font-size: 13px;
+  color: var(--muted);
+}
+.vl-available {
+  font-weight: 700;
+}
+.vl-category[data-state="available"] .vl-available {
+  color: var(--positive);
+}
+.vl-category[data-state="zero"] .vl-available {
+  color: var(--muted);
+}
+.vl-category[data-state="overspent"] .vl-available,
+.vl-category[data-state="overspent"] .vl-category-note {
+  color: var(--negative);
 }
 
-/* Tiles: three styles of placeholder Category tile */
 .vl-tile {
   flex: none;
   display: grid;
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-control);
   font-weight: 700;
-  color: var(--hue);
-}
-.vl[data-tile="tinted"] .vl-tile {
-  background: color-mix(in srgb, var(--hue) 18%, var(--surface));
-}
-.vl[data-tile="outlined"] .vl-tile {
-  border: 1px solid var(--hue);
-  border-radius: var(--radius-pill);
-}
-.vl[data-tile="filled"] .vl-tile {
-  background: var(--hue);
-  color: var(--surface);
-  border-radius: 12px;
-}
-.vl-tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: var(--gap);
-  margin-top: var(--space);
-  max-width: 480px;
 }
 
-/* Swatches and scales */
-.vl-swatches {
+/* Meters: one element carries all three shapes; the variant picks one. */
+
+.vl-meter {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
 }
-.vl-swatch {
+.vl-meter > span {
+  height: 8px;
+  border-radius: 2px;
+  background: var(--meter-track);
+}
+.vl-meter > span[data-on="true"] {
+  background: var(--meter-fill);
+}
+.vl-meter[data-over="true"] > span {
+  background: var(--meter-over);
+}
+.vl-meter > i {
+  display: none;
+}
+
+.vl[data-meter="bar"] .vl-meter,
+.vl[data-meter="envelope"] .vl-meter {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--meter-track);
+  overflow: hidden;
+}
+.vl[data-meter="bar"] .vl-meter > span,
+.vl[data-meter="envelope"] .vl-meter > span {
+  display: none;
+}
+.vl[data-meter="bar"] .vl-meter > i,
+.vl[data-meter="envelope"] .vl-meter > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--meter-fill);
+}
+.vl[data-meter="bar"] .vl-meter[data-over="true"] > i,
+.vl[data-meter="envelope"] .vl-meter[data-over="true"] > i {
+  background: var(--meter-over);
+}
+
+/* Tab bar */
+
+.vl-tabs {
   display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  justify-items: center;
+  padding: var(--space-2) var(--space-3) var(--space-5);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.vl-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 2px;
   font-size: 12px;
+  color: var(--muted);
 }
-.vl-swatch > span {
-  height: 36px;
-  border-radius: 6px;
-  outline: 1px solid var(--line);
+.vl-tab[aria-current="page"] {
+  color: var(--text);
+  font-weight: 600;
 }
-.vl-space {
+.vl-record {
   display: grid;
-  justify-items: center;
-  gap: 4px;
-  font-size: 12px;
-}
-.vl-space > span {
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
   background: var(--accent);
-}
-.vl-radius {
-  padding: 16px 20px;
-  background: var(--raised);
-  font-size: 13px;
+  color: var(--on-accent);
+  border: 0;
 }
 
 /* Controls */
+
 .vl-btn {
-  font: inherit;
-  font-weight: 600;
-  min-height: 44px;
-  padding: 0 18px;
+  border: 0;
   border-radius: var(--radius-control);
-  border: 1px solid transparent;
+  padding: 10px 18px;
+  font-weight: 600;
   cursor: pointer;
-}
-.vl[data-density="compact"] .vl-btn {
-  min-height: 36px;
-  padding: 0 12px;
+  white-space: nowrap;
 }
 .vl-btn-primary {
   background: var(--accent);
   color: var(--on-accent);
 }
 .vl-btn-secondary {
-  background: var(--raised);
+  background: transparent;
   color: var(--text);
-  border-color: var(--control-border);
+  box-shadow: inset 0 0 0 1px var(--control-border);
 }
 .vl-btn-quiet {
   background: transparent;
   color: var(--accent-text);
+  padding-inline: var(--space-2);
 }
 .vl-btn-danger {
   background: transparent;
   color: var(--negative);
-  border-color: var(--negative);
+  box-shadow: inset 0 0 0 1px var(--negative);
 }
 .vl-btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
-.vl-btn:hover:not(:disabled) {
-  filter: brightness(1.12);
+.vl-btn-wide {
+  width: 100%;
+  padding-block: 15px;
+  font-size: 16px;
+  margin-top: auto;
 }
-
 .vl :focus-visible,
 .vl .is-focused {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
-.vl-field {
-  display: grid;
-  gap: 4px;
-}
-.vl-input,
-.vl-select {
-  font: inherit;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-control);
-  min-height: 44px;
-  padding: 0 14px;
-}
-.vl[data-density="compact"] :is(.vl-input, .vl-select) {
-  min-height: 36px;
-}
-.vl-phone .vl-select {
-  min-height: 36px;
-}
-.vl-amount {
-  font-size: 1.5em;
-  font-weight: 700;
-  color: var(--negative);
-}
-
 .vl-segmented {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   padding: 3px;
-  gap: 3px;
-  background: var(--raised);
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-control);
-  justify-self: start;
+  border-radius: calc(var(--radius-control) + 3px);
+  background: var(--surface);
 }
 .vl-segmented label {
-  padding: 8px 14px;
+  text-align: center;
+  padding: 8px;
   border-radius: var(--radius-control);
-  cursor: pointer;
   color: var(--muted);
-}
-.vl-segmented label:has(:checked) {
-  background: var(--accent);
-  color: var(--on-accent);
   font-weight: 600;
+  cursor: pointer;
 }
-.vl-segmented label:has(:focus-visible) {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.vl-segmented input {
+.vl-segmented input,
+.vl-chip input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
+.vl-segmented label:has(:checked) {
+  background: var(--raised);
+  color: var(--text);
+}
+.vl-segmented label:has(:focus-visible),
+.vl-chip:has(:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.vl-amount {
+  font-size: 56px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-align: center;
+  padding: var(--space-5) 0 var(--space-3);
+}
+
+.vl-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.vl-field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+.vl-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 13px;
+  color: var(--muted);
+}
+.vl-input {
+  width: 100%;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  padding: 10px var(--space-3);
+}
+
+.vl-chips {
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.vl-chips legend {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+.vl-chip {
+  position: relative;
+  padding: 7px 14px;
+  border-radius: var(--radius-control);
+  box-shadow: inset 0 0 0 1px var(--control-border);
+  font-size: 14px;
+  cursor: pointer;
+}
+.vl-chip:has(:checked) {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.vl-after {
+  font-size: 14px;
+  color: var(--muted);
+}
+.vl-after strong {
+  color: var(--positive);
+}
+
+.vl-check-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
 .vl-check {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   accent-color: var(--accent);
 }
 
-/* Money */
+/* Parts */
+
+.vl-parts {
+  grid-area: parts;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.vl-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.vl-part > h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.vl-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.vl-figures {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.vl-swatches {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3) var(--space-2);
+  font-size: 13px;
+}
+.vl-swatches li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vl-swatches code {
+  font-family: inherit;
+  color: var(--muted);
+}
+.vl-swatch {
+  height: 40px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  margin-bottom: var(--space-1);
+}
+
 .vl-pill {
   display: inline-block;
-  padding: 2px 10px;
-  border-radius: var(--radius-pill);
-  font-weight: 600;
-  font-size: 0.9em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
-.vl-pill-pos {
+.vl-pill[data-state="available"] {
   background: var(--positive-tint);
   color: var(--on-positive-tint);
 }
-.vl-pill-neg {
-  background: var(--negative-tint);
-  color: var(--on-negative-tint);
-}
-.vl-pill-zero {
+.vl-pill[data-state="zero"] {
   background: var(--raised);
   color: var(--muted);
 }
-
-.vl-meter {
-  height: var(--meter-height);
-  background: var(--meter-track);
-  border-radius: 999px;
-  overflow: hidden;
+.vl-pill[data-state="overspent"] {
+  background: var(--negative-tint);
+  color: var(--on-negative-tint);
 }
-.vl-meter > span {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--meter-fill);
-}
-.vl-meter > span[data-tone="near"] {
-  background: var(--meter-near);
-}
-.vl-meter > span[data-tone="over"] {
-  background: var(--meter-over);
-}
-
-/* Contrast audit */
-.vl-audit {
-  border-collapse: collapse;
-  font-size: 13px;
-  max-width: 480px;
-  width: 100%;
-}
-.vl-audit td {
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--line);
-}
-.vl-chip {
-  display: inline-block;
-  padding: 0 8px;
-  border: 2px solid;
-  border-radius: 4px;
+.vl-out {
   font-weight: 700;
+}
+.vl-in {
+  font-weight: 700;
+  color: var(--positive);
 }
 .vl-pass {
   color: var(--positive);
+  font-size: 14px;
 }
 .vl-fail {
   color: var(--negative);
-  font-weight: 700;
+  font-size: 14px;
 }
-.vl-tokens {
-  margin-top: 24px;
+.vl-audit {
+  font-size: 13px;
+  color: var(--muted);
 }
-.vl-tokens pre {
-  font-size: 12px;
-  overflow-x: auto;
-  background: var(--surface);
-  padding: 12px;
-  border-radius: 8px;
+.vl-audit summary {
+  cursor: pointer;
+}
+.vl-audit table {
+  border-collapse: collapse;
+  margin-top: var(--space-2);
+}
+.vl-audit td {
+  padding: 2px var(--space-3) 2px 0;
 }
 
-/* The switcher: not part of any design. */
+/* ---- A. Fig: every Category is an envelope that drains as you spend ---- */
+
+.vl[data-variant="fig"] .vl-hero {
+  padding: var(--space-5);
+}
+.vl[data-variant="fig"] .vl-display,
+.vl[data-variant="fig"] .vl-amount,
+.vl[data-variant="fig"] .vl-title {
+  font-variation-settings: "opsz" 96;
+  font-weight: 800;
+}
+.vl[data-variant="fig"] .vl-display {
+  font-size: 56px;
+}
+.vl[data-variant="fig"] .vl-categories {
+  gap: 6px;
+}
+.vl[data-variant="fig"] .vl-category {
+  border-radius: 16px;
+  /* The coloured part is the money still in the envelope. */
+  background: linear-gradient(
+    90deg,
+    var(--raised) var(--left),
+    var(--surface) var(--left)
+  );
+}
+.vl[data-variant="fig"] .vl-category-note {
+  color: var(--text);
+  opacity: 0.8;
+}
+.vl[data-variant="fig"] .vl-category[data-state="overspent"] {
+  background: var(--negative-tint);
+}
+.vl[data-variant="fig"] .vl-category[data-state="overspent"] .vl-available,
+.vl[data-variant="fig"] .vl-category[data-state="overspent"] .vl-category-note {
+  color: var(--on-negative-tint);
+}
+.vl[data-variant="fig"] .vl-category .vl-meter {
+  display: none;
+}
+.vl[data-variant="fig"] .vl-tile {
+  border-radius: 11px;
+  background: var(--bg);
+  color: var(--accent-text);
+}
+.vl[data-variant="fig"][data-scheme="light"] .vl-tile {
+  color: var(--accent);
+}
+.vl[data-variant="fig"] .vl-meter {
+  height: 6px;
+}
+.vl[data-variant="fig"] .vl-phone {
+  background: var(--bg);
+}
+
+/* ---- B. Petrol: figures first, no tiles, ten-segment meters ---- */
+
+.vl[data-variant="petrol"] .vl-hero {
+  padding: var(--space-3) var(--space-1) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+.vl[data-variant="petrol"] .vl-display {
+  font-size: 72px;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+}
+.vl[data-variant="petrol"] .vl-amount {
+  font-weight: 500;
+  font-size: 64px;
+  letter-spacing: -0.045em;
+}
+.vl[data-variant="petrol"] .vl-title {
+  font-weight: 800;
+  font-size: 26px;
+}
+.vl[data-variant="petrol"] .vl-tile {
+  display: none;
+}
+.vl[data-variant="petrol"] .vl-categories {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+}
+.vl[data-variant="petrol"] .vl-category + .vl-category {
+  border-top: 1px solid var(--line);
+}
+.vl[data-variant="petrol"] .vl-category-body {
+  gap: var(--space-2);
+}
+.vl[data-variant="petrol"] .vl-available {
+  font-weight: 600;
+}
+.vl[data-variant="petrol"] .vl-category[data-state="overspent"] .vl-available {
+  background: var(--negative-tint);
+  color: var(--on-negative-tint);
+  padding: 1px 8px;
+  margin: -1px -8px;
+  border-radius: 4px;
+}
+.vl[data-variant="petrol"] .vl-record {
+  border-radius: 14px;
+}
+
+/* ---- C. Riso: a solid block of ink, round everything ---- */
+
+.vl[data-variant="riso"] .vl-hero {
+  padding: var(--space-5);
+}
+.vl[data-variant="riso"] .vl-hero .vl-btn-primary {
+  background: var(--on-hero);
+  color: var(--hero);
+}
+.vl[data-variant="riso"] .vl-display,
+.vl[data-variant="riso"] .vl-amount,
+.vl[data-variant="riso"] .vl-title {
+  font-weight: 800;
+}
+.vl[data-variant="riso"] .vl-display {
+  font-size: 60px;
+}
+.vl[data-variant="riso"] .vl-categories {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-2) 0;
+}
+.vl[data-variant="riso"] .vl-tile {
+  border-radius: 999px;
+  background: var(--raised);
+  width: 40px;
+  height: 40px;
+}
+.vl[data-variant="riso"] .vl-available {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--positive-tint);
+  color: var(--on-positive-tint);
+}
+.vl[data-variant="riso"] .vl-category[data-state="zero"] .vl-available {
+  background: var(--raised);
+  color: var(--muted);
+}
+.vl[data-variant="riso"] .vl-category[data-state="overspent"] .vl-available {
+  background: var(--negative-tint);
+  color: var(--on-negative-tint);
+}
+.vl[data-variant="riso"] .vl-segmented {
+  border-radius: 999px;
+}
+.vl[data-variant="riso"] .vl-tabs {
+  margin: 0 var(--space-3) var(--space-4);
+  border-radius: 999px;
+  border: 0;
+  padding: var(--space-2) var(--space-3);
+}
+
+/* Schibsted's tabular figures space out the point and comma; keep them only
+   where figures stack in a column. */
+.vl[data-variant="petrol"] .vl-money {
+  font-variant-numeric: normal;
+}
+.vl[data-variant="petrol"] .vl-available {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .vl {
+    grid-template-columns: 1fr;
+    grid-template-areas: "intro" "phones" "parts";
+    padding-inline: var(--space-4);
+  }
+  .vl-phone {
+    width: 100%;
+    max-width: 375px;
+  }
+}
+
+/* Prototype chrome: not part of any variant. */
+
 .p-switcher {
   position: fixed;
   bottom: 16px;

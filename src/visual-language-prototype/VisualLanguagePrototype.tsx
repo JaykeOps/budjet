@@ -1,7 +1,11 @@
 // PROTOTYPE (prototype/visual-language): throwaway. Three candidate visual
-// languages, switchable via `?variant=A|B|C`, each shown as one specimen of
-// tokens and base components. `?scheme=both` (default) puts dark and light side
-// by side; `system`, `dark` and `light` show one column.
+// languages, switchable via `?variant=A|B|C`. Each shows the Budget screen and
+// the New Transaction screen on a phone, then the parts they are made of.
+// `?scheme=both` (default) stacks dark over light; `system`, `dark` and
+// `light` show one.
+import "@fontsource-variable/bricolage-grotesque/opsz.css";
+import "@fontsource-variable/gabarito";
+import "@fontsource-variable/schibsted-grotesk";
 import { type CSSProperties, useEffect, useState } from "react";
 import { useUrlParameter } from "../url-parameter";
 import "./prototype.css";
@@ -53,11 +57,9 @@ export function VisualLanguagePrototype() {
 
   return (
     <>
-      <div className="vl-stage" data-columns={shown.length}>
-        {shown.map((s) => (
-          <Specimen key={s} variant={v} scheme={s} />
-        ))}
-      </div>
+      {shown.map((s) => (
+        <Specimen key={`${key}-${s}`} variant={v} scheme={s} />
+      ))}
       {import.meta.env.DEV && (
         <div className="p-switcher">
           <button
@@ -109,26 +111,43 @@ function cssVariables(s: Scheme, shape: Shape): CSSProperties {
   const vars: Record<string, string> = {};
   for (const [name, value] of Object.entries(s))
     vars[`--${kebab(name)}`] = value;
+  vars["--font"] = shape.font;
   vars["--radius-control"] = shape.radiusControl;
   vars["--radius-card"] = shape.radiusCard;
-  vars["--radius-pill"] = shape.radiusPill;
-  vars["--meter-height"] = shape.meterHeight;
   return vars as CSSProperties;
 }
 
 const kebab = (name: string) =>
   name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
-// Placeholder Category tiles (user-chosen icons are out of scope): one hue per
-// Category, with a bright and a deep shade for dark and light schemes.
-const tiles = [
-  { name: "Rent", hue: ["#f3b84f", "#8f5200"] },
-  { name: "Groceries", hue: ["#4fd68a", "#14773a"] },
-  { name: "Dining out", hue: ["#6ea2ff", "#1d5ae0"] },
-  { name: "Transport", hue: ["#b39cff", "#6a3fd1"] },
-  { name: "Shopping", hue: ["#ff8fb0", "#b8295a"] },
-  { name: "Fun", hue: ["#4fd8d0", "#0d7670"] },
-] as const;
+const usd = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+const money = (n: number) => usd.format(n).replace("-", "−");
+
+type Category = { name: string; spent: number; given: number };
+
+// `given` is what the Category had to spend this Month: carried forward plus
+// the Assignment. Available = given − Spending.
+const groups: { name: string; categories: Category[] }[] = [
+  {
+    name: "Everyday",
+    categories: [
+      { name: "Groceries", spent: 412.4, given: 600 },
+      { name: "Dining out", spent: 276, given: 300 },
+      { name: "Shopping", spent: 268, given: 250 },
+      { name: "Fun", spent: 64, given: 200 },
+    ],
+  },
+  {
+    name: "Bills",
+    categories: [
+      { name: "Rent", spent: 1400, given: 1400 },
+      { name: "Internet", spent: 0, given: 55 },
+    ],
+  },
+];
 
 function Specimen({
   variant: v,
@@ -138,227 +157,150 @@ function Specimen({
   scheme: "dark" | "light";
 }) {
   const s = v[scheme];
-  const shade = (hue: readonly [string, string]) =>
-    scheme === "dark" ? hue[0] : hue[1];
-
   return (
     <section
       className="vl"
       data-scheme={scheme}
-      data-border={v.shape.cardBorder}
-      data-density={v.shape.density}
+      data-variant={v.name.toLowerCase()}
+      data-meter={v.shape.meter}
       data-tile={v.shape.tile}
       style={cssVariables(s, v.shape)}
+      aria-label={`${v.name}, ${scheme}`}
     >
-      <header className="vl-head">
-        <p className="vl-caption">
-          {scheme === "dark" ? "Dark (first)" : "Light (follows system)"}
+      <header className="vl-intro">
+        <p className="vl-muted">
+          {v.name},{" "}
+          {scheme === "dark" ? "dark (first)" : "light (follows the system)"}
         </p>
-        <h1 className="vl-title">{v.name}</h1>
-        <p className="vl-muted">{v.idea}</p>
+        <p className="vl-idea">{v.idea}</p>
       </header>
 
-      <h2 className="vl-h">In use</h2>
-      <div className="vl-phone">
-        <div className="vl-row-between">
+      <div className="vl-phones">
+        <BudgetScreen />
+        <TransactionScreen scheme={scheme} />
+      </div>
+
+      <Parts scheme={s} />
+    </section>
+  );
+}
+
+function BudgetScreen() {
+  const spent = 2536.2;
+  const given = 3230;
+  return (
+    <div className="vl-phone">
+      <div className="vl-screen">
+        <div className="vl-bar">
           <h1 className="vl-title">Budget</h1>
-          <select className="vl-select" aria-label="Month">
-            <option>November 2026</option>
-            <option>October 2026</option>
-          </select>
+          <button type="button" className="vl-month">
+            November 2026
+            <Chevron />
+          </button>
         </div>
 
-        <div className="vl-card">
-          <p className="vl-caption">Ready to Assign</p>
-          <p className="vl-display vl-money">$240.00</p>
-          <p className="vl-muted">Give these dollars a job.</p>
-          <div className="vl-row">
+        <div className="vl-hero">
+          <p className="vl-hero-label">Ready to Assign</p>
+          <p className="vl-display vl-money">{money(240)}</p>
+          <div className="vl-hero-foot">
+            <p className="vl-hero-hint">Give these dollars a job.</p>
             <button type="button" className="vl-btn vl-btn-primary">
               Assign
             </button>
-            <button type="button" className="vl-btn vl-btn-secondary">
-              Move Money
-            </button>
           </div>
         </div>
 
-        <div className="vl-card">
-          <div className="vl-row-between">
-            <p className="vl-heading">Spent this Month</p>
-            <span className="vl-pill vl-pill-pos">$694 left</span>
+        <div className="vl-spent">
+          <div className="vl-split">
+            <span>Spent this Month</span>
+            <span className="vl-money">
+              {money(spent)} <span className="vl-muted">of {money(given)}</span>
+            </span>
           </div>
-          <p className="vl-money vl-heading">
-            $2,536 <span className="vl-muted">/ $3,230</span>
-          </p>
-          <Meter used={0.79} tone="fill" />
+          <Meter spent={spent} given={given} />
         </div>
 
-        <p className="vl-caption vl-group">Everyday</p>
-        <div className="vl-card vl-list">
-          <CategoryRow
-            tile={tiles[1]}
-            shade={shade}
-            spent={412}
-            of={600}
-            available="$188.00"
-            tone="pos"
-          />
-          <CategoryRow
-            tile={tiles[2]}
-            shade={shade}
-            spent={276}
-            of={300}
-            available="$24.00"
-            tone="near"
-          />
-          <CategoryRow
-            tile={tiles[4]}
-            shade={shade}
-            spent={268}
-            of={250}
-            available="−$18.00"
-            tone="neg"
-          />
-          <CategoryRow
-            tile={tiles[5]}
-            shade={shade}
-            spent={0}
-            of={0}
-            available="$0.00"
-            tone="zero"
-          />
-        </div>
-
-        <nav className="vl-tabbar" aria-label="Sample tab bar">
-          <span className="vl-tab" aria-current="page">
-            Budget
-          </span>
-          <span className="vl-tab">Activity</span>
-          <span className="vl-plus" aria-hidden>
-            +
-          </span>
-          <span className="vl-tab">Accounts</span>
-        </nav>
-      </div>
-
-      <h2 className="vl-h">Colour</h2>
-      <div className="vl-swatches">
-        {(Object.keys(s) as (keyof Scheme)[]).map((name) => (
-          <div key={name} className="vl-swatch">
-            <span style={{ background: s[name] }} />
-            <code>{kebab(name)}</code>
-            <code className="vl-muted">{s[name]}</code>
-          </div>
-        ))}
-      </div>
-      <div className="vl-tiles">
-        {tiles.map((t) => (
-          <div key={t.name} className="vl-row">
-            <Tile hue={shade(t.hue)} name={t.name} />
-            <span>{t.name}</span>
+        {groups.map((g) => (
+          <div key={g.name} className="vl-group">
+            <div className="vl-split vl-group-head">
+              <h2>{g.name}</h2>
+              <span>Available</span>
+            </div>
+            <ul className="vl-categories">
+              {g.categories.map((c) => (
+                <CategoryRow key={c.name} category={c} />
+              ))}
+            </ul>
           </div>
         ))}
       </div>
 
-      <h2 className="vl-h">Type</h2>
-      <div className="vl-stack">
-        <p className="vl-display vl-money">$4,560.00</p>
-        <p className="vl-title">Title · Budget</p>
-        <p className="vl-heading">Heading · Spent this Month</p>
-        <p>Body · Groceries had $600 assigned this Month.</p>
-        <p className="vl-muted">Muted · carried forward from October</p>
-        <p className="vl-caption">Caption · Ready to Assign</p>
-        <p className="vl-money">Tabular figures · $1,111.11 / $8,888.88</p>
-      </div>
-
-      <h2 className="vl-h">Spacing and radii</h2>
-      <div className="vl-row vl-wrap">
-        {[4, 8, 12, 16, 24, 32].map((n) => (
-          <div key={n} className="vl-space">
-            <span style={{ width: n, height: n }} />
-            <code>{n}</code>
-          </div>
-        ))}
-      </div>
-      <div className="vl-row vl-wrap">
-        <div
-          className="vl-radius"
-          style={{ borderRadius: "var(--radius-pill)" }}
+      <nav className="vl-tabs" aria-label="Sample tab bar">
+        <span className="vl-tab" aria-current="page">
+          <TabIcon kind="budget" />
+          Budget
+        </span>
+        <span className="vl-tab">
+          <TabIcon kind="activity" />
+          Activity
+        </span>
+        <button
+          type="button"
+          className="vl-record"
+          aria-label="Record a Transaction"
         >
-          pill {v.shape.radiusPill}
-        </div>
-        <div
-          className="vl-radius"
-          style={{ borderRadius: "var(--radius-control)" }}
-        >
-          control {v.shape.radiusControl}
-        </div>
-        <div
-          className="vl-radius"
-          style={{ borderRadius: "var(--radius-card)" }}
-        >
-          card {v.shape.radiusCard}
-        </div>
-      </div>
+          <Plus />
+        </button>
+        <span className="vl-tab">
+          <TabIcon kind="accounts" />
+          Accounts
+        </span>
+      </nav>
+    </div>
+  );
+}
 
-      <h2 className="vl-h">Surfaces</h2>
-      <div className="vl-surfaces">
-        <div style={{ background: "var(--bg)" }}>page</div>
-        <div className="vl-card">card</div>
-        <div className="vl-card" style={{ background: "var(--raised)" }}>
-          raised
+function CategoryRow({ category: c }: { category: Category }) {
+  const available = c.given - c.spent;
+  const left = c.given === 0 ? 0 : Math.max(0, available / c.given);
+  const state =
+    available < 0 ? "overspent" : available === 0 ? "zero" : "available";
+  return (
+    <li
+      className="vl-category"
+      data-state={state}
+      style={{ "--left": `${left * 100}%` } as CSSProperties}
+    >
+      <Tile name={c.name} />
+      <div className="vl-category-body">
+        <div className="vl-split">
+          <span className="vl-category-name">{c.name}</span>
+          <span className="vl-available vl-money">{money(available)}</span>
         </div>
+        <Meter spent={c.spent} given={c.given} />
+        <p className="vl-category-note vl-money">
+          {state === "overspent"
+            ? `Overspent by ${money(-available)}`
+            : `${money(c.spent)} of ${money(c.given)} spent`}
+        </p>
       </div>
+    </li>
+  );
+}
 
-      <h2 className="vl-h">Controls</h2>
-      <div className="vl-stack">
-        <div className="vl-row vl-wrap">
-          <button type="button" className="vl-btn vl-btn-primary">
-            Save Transaction
-          </button>
-          <button type="button" className="vl-btn vl-btn-secondary">
+function TransactionScreen({ scheme }: { scheme: string }) {
+  const chips = ["Groceries", "Dining out", "Shopping", "Fun", "Rent"];
+  return (
+    <div className="vl-phone">
+      <div className="vl-screen">
+        <div className="vl-bar">
+          <button type="button" className="vl-link">
             Cancel
           </button>
-          <button type="button" className="vl-btn vl-btn-quiet">
-            Copy last Month
-          </button>
-          <button type="button" className="vl-btn vl-btn-danger">
-            Close Account
-          </button>
-          <button type="button" className="vl-btn vl-btn-primary" disabled>
-            Disabled
-          </button>
+          <h1 className="vl-sheet-title">New Transaction</h1>
+          <span className="vl-bar-spacer" />
         </div>
-        <div className="vl-row vl-wrap">
-          <button type="button" className="vl-btn vl-btn-primary is-focused">
-            Focused
-          </button>
-          <button type="button" className="vl-btn vl-btn-secondary is-focused">
-            Focused
-          </button>
-          <span className="vl-muted">
-            Tab through this column for live rings.
-          </span>
-        </div>
-        <label className="vl-field">
-          <span className="vl-caption">Payee</span>
-          <input className="vl-input" defaultValue="Corner Bistro" />
-        </label>
-        <label className="vl-field">
-          <span className="vl-caption">Amount</span>
-          <input
-            className="vl-input vl-money vl-amount"
-            defaultValue="−18.50"
-            inputMode="decimal"
-          />
-        </label>
-        <label className="vl-field">
-          <span className="vl-caption">Category</span>
-          <select className="vl-select">
-            <option>Dining out</option>
-            <option>Groceries</option>
-          </select>
-        </label>
+
         <div className="vl-segmented" role="radiogroup" aria-label="Direction">
           <label>
             <input type="radio" name={`dir-${scheme}`} defaultChecked />
@@ -369,146 +311,246 @@ function Specimen({
             Money in
           </label>
         </div>
-        <label className="vl-row">
+
+        <p className="vl-amount vl-money">{money(-18.5)}</p>
+
+        <div className="vl-fields">
+          <label className="vl-field">
+            <span>Payee</span>
+            <input className="vl-input" defaultValue="Corner Bistro" />
+          </label>
+          <div className="vl-field-pair">
+            <label className="vl-field">
+              <span>Account</span>
+              <select className="vl-input">
+                <option>Checking</option>
+                <option>Cash</option>
+              </select>
+            </label>
+            <label className="vl-field">
+              <span>Date</span>
+              <input className="vl-input" defaultValue="Today" />
+            </label>
+          </div>
+        </div>
+
+        <fieldset className="vl-chips">
+          <legend>Category</legend>
+          {chips.map((name) => (
+            <label key={name} className="vl-chip">
+              <input
+                type="radio"
+                name={`cat-${scheme}`}
+                defaultChecked={name === "Dining out"}
+              />
+              {name}
+            </label>
+          ))}
+        </fieldset>
+
+        <p className="vl-after">
+          Dining out will have{" "}
+          <strong className="vl-money">{money(5.5)}</strong> left this Month.
+        </p>
+
+        <button type="button" className="vl-btn vl-btn-primary vl-btn-wide">
+          Save Transaction
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Parts({ scheme: s }: { scheme: Scheme }) {
+  const results = pairings.map((p) => ({
+    ...p,
+    ratio: contrast(s[p.fg], s[p.bg]),
+  }));
+  const failing = results.filter((r) => r.ratio < r.min);
+  const swatches: [keyof Scheme, string][] = [
+    ["bg", "Page"],
+    ["surface", "Card"],
+    ["raised", "Raised"],
+    ["text", "Text"],
+    ["muted", "Muted"],
+    ["accent", "Action"],
+    ["hero", "Ready to Assign"],
+    ["positive", "Available"],
+    ["negative", "Overspent"],
+  ];
+  return (
+    <div className="vl-parts">
+      <div className="vl-part">
+        <h2>Colour</h2>
+        <ul className="vl-swatches">
+          {swatches.map(([token, label]) => (
+            <li key={token}>
+              <span className="vl-swatch" style={{ background: s[token] }} />
+              <span>{label}</span>
+              <code>{s[token]}</code>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="vl-part">
+        <h2>Type</h2>
+        <p className="vl-display vl-money">$4,560.00</p>
+        <p className="vl-title">Budget</p>
+        <p className="vl-sheet-title">Spent this Month</p>
+        <p>Groceries had $600.00 to spend this Month.</p>
+        <p className="vl-muted">$412.40 of $600.00 spent</p>
+        <p className="vl-money vl-figures">
+          $1,111.11
+          <br />
+          $8,888.88
+        </p>
+      </div>
+
+      <div className="vl-part">
+        <h2>Controls</h2>
+        <div className="vl-wrap">
+          <button type="button" className="vl-btn vl-btn-primary">
+            Assign
+          </button>
+          <button type="button" className="vl-btn vl-btn-secondary">
+            Move money
+          </button>
+          <button type="button" className="vl-btn vl-btn-quiet">
+            Copy last Month
+          </button>
+        </div>
+        <div className="vl-wrap">
+          <button type="button" className="vl-btn vl-btn-danger">
+            Delete Account
+          </button>
+          <button type="button" className="vl-btn vl-btn-primary" disabled>
+            Assign
+          </button>
+          <button type="button" className="vl-btn vl-btn-primary is-focused">
+            Focused
+          </button>
+        </div>
+        <label className="vl-check-row">
           <input type="checkbox" className="vl-check" defaultChecked />
           Show hidden Categories
         </label>
       </div>
 
-      <h2 className="vl-h">Money states</h2>
-      <div className="vl-row vl-wrap">
-        <span className="vl-pill vl-pill-pos">$188.00</span>
-        <span className="vl-pill vl-pill-zero">$0.00</span>
-        <span className="vl-pill vl-pill-neg">−$18.00</span>
-        <span className="vl-money" style={{ color: "var(--negative)" }}>
-          −$64.18
-        </span>
-        <span className="vl-money" style={{ color: "var(--positive)" }}>
-          +$2,400.00
-        </span>
-        <span style={{ color: "var(--warning)" }}>Nearly there · $24 left</span>
-      </div>
-      <div className="vl-stack">
-        <Meter used={0.53} tone="fill" />
-        <Meter used={0.92} tone="near" />
-        <Meter used={1} tone="over" />
-      </div>
-
-      <h2 className="vl-h">Contrast (WCAG 2.2 AA)</h2>
-      <table className="vl-audit">
-        <tbody>
-          {pairings.map((p) => {
-            const ratio = contrast(s[p.fg], s[p.bg]);
-            return (
-              <tr key={p.label}>
-                <td>
-                  <span
-                    className="vl-chip"
-                    style={{
-                      color: s[p.fg],
-                      background: s[p.bg],
-                      borderColor: s[p.fg],
-                    }}
-                  >
-                    Aa
-                  </span>
-                </td>
-                <td>{p.label}</td>
-                <td className="vl-money">{ratio.toFixed(2)}</td>
-                <td className={ratio >= p.min ? "vl-pass" : "vl-fail"}>
-                  {ratio >= p.min ? "pass" : "FAIL"} ≥{p.min}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      {scheme === "dark" && (
-        <details className="vl-tokens">
-          <summary>As tokens with light-dark()</summary>
-          <pre>{tokensCss(v)}</pre>
-        </details>
-      )}
-    </section>
-  );
-}
-
-function CategoryRow({
-  tile,
-  shade,
-  spent,
-  of,
-  available,
-  tone,
-}: {
-  tile: (typeof tiles)[number];
-  shade: (hue: readonly [string, string]) => string;
-  spent: number;
-  of: number;
-  available: string;
-  tone: "pos" | "near" | "neg" | "zero";
-}) {
-  const used = of === 0 ? 0 : spent / of;
-  return (
-    <div className="vl-category">
-      <Tile hue={shade(tile.hue)} name={tile.name} />
-      <div className="vl-grow">
-        <div className="vl-row-between">
-          <span>{tile.name}</span>
-          <span className={`vl-pill vl-pill-${tone === "near" ? "pos" : tone}`}>
-            {available}
+      <div className="vl-part">
+        <h2>Money</h2>
+        <div className="vl-wrap">
+          <span className="vl-pill" data-state="available">
+            {money(188)}
+          </span>
+          <span className="vl-pill" data-state="zero">
+            {money(0)}
+          </span>
+          <span className="vl-pill" data-state="overspent">
+            {money(-18)}
           </span>
         </div>
-        <Meter
-          used={used}
-          tone={tone === "neg" ? "over" : tone === "near" ? "near" : "fill"}
-        />
-        <p className="vl-caption vl-money">
-          ${spent} of ${of}
-          {tone === "near" && (
-            <span style={{ color: "var(--warning)" }}> · Nearly there</span>
-          )}
-          {tone === "neg" && (
-            <span style={{ color: "var(--negative)" }}> · Overspent</span>
-          )}
+        <p className="vl-money">
+          <span className="vl-out">{money(-64.18)}</span> Trader Joe’s
+          <br />
+          <span className="vl-in">+{money(2400)}</span> Paycheck
         </p>
+        <p className={failing.length === 0 ? "vl-pass" : "vl-fail"}>
+          {failing.length === 0
+            ? `All ${results.length} colour pairs meet WCAG 2.2 AA.`
+            : `${failing.length} of ${results.length} pairs fail AA: ${failing
+                .map((f) => `${f.label} ${f.ratio.toFixed(2)}`)
+                .join(", ")}`}
+        </p>
+        <details className="vl-audit">
+          <summary>Contrast ratios</summary>
+          <table>
+            <tbody>
+              {results.map((r) => (
+                <tr key={r.label}>
+                  <td>{r.label}</td>
+                  <td className="vl-money">{r.ratio.toFixed(2)}</td>
+                  <td>≥ {r.min}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
       </div>
     </div>
   );
 }
 
-function Tile({ hue, name }: { hue: string; name: string }) {
+function Tile({ name }: { name: string }) {
   return (
-    <span
-      className="vl-tile"
-      style={{ "--hue": hue } as CSSProperties}
-      aria-hidden
-    >
+    <span className="vl-tile" aria-hidden>
       {name[0]}
     </span>
   );
 }
 
-function Meter({
-  used,
-  tone,
-}: {
-  used: number;
-  tone: "fill" | "near" | "over";
-}) {
+function Meter({ spent, given }: { spent: number; given: number }) {
+  const used = given === 0 ? 0 : spent / given;
+  const over = used > 1;
   return (
     // The figures beside every meter carry the same information.
-    <div className="vl-meter" aria-hidden>
-      <span data-tone={tone} style={{ width: `${Math.min(used, 1) * 100}%` }} />
+    <div className="vl-meter" data-over={over} aria-hidden>
+      {Array.from({ length: 10 }, (_, i) => (
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: fixed segments
+          key={i}
+          data-on={i < Math.round(Math.min(used, 1) * 10)}
+        />
+      ))}
+      <i style={{ width: `${Math.min(used, 1) * 100}%` }} />
     </div>
   );
 }
 
-function tokensCss(v: Variant): string {
-  const lines = (Object.keys(v.dark) as (keyof Scheme)[]).map(
-    (name) =>
-      `  --${kebab(name)}: light-dark(${v.light[name]}, ${v.dark[name]});`,
+function Chevron() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+      <path
+        d="M3 4.5 6 7.5 9 4.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
-  return `:root {\n  color-scheme: light dark;\n${lines.join("\n")}\n  --radius-control: ${v.shape.radiusControl};\n  --radius-card: ${v.shape.radiusCard};\n  --radius-pill: ${v.shape.radiusPill};\n}`;
+}
+
+function Plus() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+      <path
+        d="M11 4v14M4 11h14"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function TabIcon({ kind }: { kind: "budget" | "activity" | "accounts" }) {
+  const d = {
+    budget: "M4 5h14M4 11h9M4 17h11",
+    activity: "M3 12h4l3-7 4 14 3-7h3",
+    accounts: "M3 8h16v10H3zM3 8l3-4h10l3 4M14 13h2",
+  }[kind];
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+      <path
+        d={d}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
