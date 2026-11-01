@@ -14,7 +14,17 @@ if (!root) throw new Error("#root element missing from index.html");
 // language prototype instead of the saved Budget.
 // PROTOTYPE (prototype/budget-screen): `?budget=` opens the Budget screen
 // prototype.
+// PROTOTYPE (prototype/record-transaction): `?record=` opens the recording
+// prototype.
 if (
+  import.meta.env.DEV &&
+  new URLSearchParams(window.location.search).has("record")
+) {
+  const { RecordPrototype } = await import(
+    "./record-prototype/RecordPrototype"
+  );
+  createRoot(root).render(<RecordPrototype />);
+} else if (
   import.meta.env.DEV &&
   new URLSearchParams(window.location.search).has("budget")
 ) {
