@@ -344,3 +344,82 @@ button.as-row-open {
 .as .a-group.card {
   overflow: visible;
 }
+
+/* ---------- D. B, faster ---------- */
+
+.as-group-assign {
+  margin-left: auto;
+}
+.asd,
+.asd-form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  touch-action: pan-y;
+}
+.asd-nav {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 8px;
+}
+.asd-where {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.asd-name {
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+.asd-arrow {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--soft-1);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.asd-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.asd-rta {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 16px 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--hero-gradient);
+  color: var(--hero-ink);
+}
+.asd-rta[data-state="overspent"] strong {
+  color: #ff9aa3;
+}
+.asd-tip {
+  text-align: center;
+}
+.asd-explain {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.asd-sum {
+  padding: 0;
+}
+.asd-sum dd[data-changed="true"] {
+  color: var(--link);
+  font-weight: 650;
+}
+/* Over an open sheet, the toast moves to the top so it hides nothing. */
+.bs-phone:has(.rt-scrim) .as-toast {
+  top: 12px;
+  bottom: auto;
+}

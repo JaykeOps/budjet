@@ -1,6 +1,6 @@
-// PROTOTYPE (prototype/assign): throwaway. Three ways to set Assignments, Move
+// PROTOTYPE (prototype/assign): throwaway. Four ways to set Assignments, Move
 // Money and Copy last Month for "How does the user set Assignments, Move Money
-// and Copy last Month?" (#80), switchable via `?assign=A|B|C`. Each variant
+// and Copy last Month?" (#80), switchable via `?assign=A|B|C|D`. Each variant
 // owns what the Budget screen's entry points do: the Assign button on Ready
 // to Assign, Cover it on an Overspent Category, the Assigned pill in the
 // desktop table, and Copy last Month / Move money. `?frame=phone|desktop`
@@ -27,12 +27,13 @@ type Category = {
 /** This Month's Assignment for each Category id; missing means none yet. */
 type Assigned = Record<string, number>;
 
-const variantKeys = ["A", "B", "C"] as const;
+const variantKeys = ["A", "B", "C", "D"] as const;
 type VariantKey = (typeof variantKeys)[number];
 const variantNames: Record<VariantKey, string> = {
   A: "Assign in place",
   B: "One Category at a time",
   C: "Everything is a move",
+  D: "B, faster",
 };
 
 const MONTH = "October";
@@ -237,7 +238,7 @@ export function AssignPrototype() {
     setAssigned(next);
   }
 
-  const Variant = { A: VariantA, B: VariantB, C: VariantC }[key];
+  const Variant = { A: VariantA, B: VariantB, C: VariantC, D: VariantD }[key];
   const variant = (
     <Variant
       key={`${key}-${frame}-${data}-${run}`}
@@ -519,12 +520,17 @@ function AssignField({
   onSet,
   autoFocus,
   quiet,
+  onFocused,
+  onTyped,
 }: {
   world: World;
   category: Category;
   onSet(n: number): void;
   autoFocus?: boolean;
   quiet?: boolean;
+  /** D: the panel beside the table follows the focused field. */
+  onFocused?(): void;
+  onTyped?(typed: string): void;
 }) {
   const saved = w.assignment(x.id);
   const [typed, setTyped] = useState(typedFrom(saved));
@@ -557,17 +563,33 @@ function AssignField({
         inputMode="decimal"
         placeholder="0"
         value={typed}
-        onChange={(e) => setTyped(e.target.value)}
-        onFocus={(e) => e.target.select()}
+        onChange={(e) => {
+          setTyped(e.target.value);
+          onTyped?.(e.target.value);
+        }}
+        onFocus={(e) => {
+          e.target.select();
+          onFocused?.();
+        }}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === "Escape") setTyped(typedFrom(saved));
-          if (e.key !== "Enter") return;
+          if (e.key === "Escape") {
+            setTyped(typedFrom(saved));
+            onTyped?.(typedFrom(saved));
+          }
+          const by =
+            e.key === "Enter" || e.key === "ArrowDown"
+              ? 1
+              : e.key === "ArrowUp"
+                ? -1
+                : 0;
+          if (by === 0) return;
+          e.preventDefault();
           commit();
           const all = [
             ...document.querySelectorAll<HTMLInputElement>("[id^='assign-']"),
           ];
-          all[all.indexOf(e.currentTarget) + 1]?.focus();
+          all[all.indexOf(e.currentTarget) + by]?.focus();
         }}
       />
     </label>
@@ -1356,6 +1378,740 @@ function SetPopover({
 }
 
 /* ------------------------------------------------------------------ */
+/* D. B, faster: B's guardrails with fewer taps. The Category sheet   */
+/* stays open and steps through Categories (‹ ›, a swipe, or ↑ ↓);    */
+/* Enter, the keyboard's Next key, or a suggestion saves and moves    */
+/* on. The Assign walk offers Copy last Month first and then only     */
+/* asks about what's left, including what to take back when Ready to  */
+/* Assign went below zero. Each Category Group can be walked on its   */
+/* own. On desktop the Assigned column is typed into directly, and a  */
+/* panel under Ready to Assign explains whichever row has focus.      */
+/* ------------------------------------------------------------------ */
+
+function VariantD({ world: w, wide, change }: VariantProps) {
+  type Open =
+    | { kind: "steps"; title: string; ids: string[]; start: number }
+    | { kind: "walk" }
+    | { kind: "copy" }
+    | { kind: "move" };
+  const [open, setOpen] = useState<Open | null>(null);
+  const [focused, setFocused] = useState<string | null>(null);
+  const [typed, setTyped] = useState<string | null>(null);
+  const [explain, setExplain] = useState(true);
+  const close = () => setOpen(null);
+
+  const all = w.categories.map((x) => x.id);
+  const browse = (id: string) =>
+    setOpen({
+      kind: "steps",
+      title: "Categories",
+      ids: all,
+      start: all.indexOf(id),
+    });
+  const group = (g: string) =>
+    setOpen({
+      kind: "steps",
+      title: `Assign ${g}`,
+      ids: w.categories.filter((x) => x.group === g).map((x) => x.id),
+      start: 0,
+    });
+  const focusRow = (id: string) =>
+    document.querySelector<HTMLInputElement>(`#assign-${id}`)?.focus();
+
+  const panel = open && (
+    <Overlay
+      wide={wide}
+      side
+      full
+      label={
+        open.kind === "steps"
+          ? open.title
+          : open.kind === "walk"
+            ? `Assign ${MONTH}`
+            : open.kind === "copy"
+              ? `Copy ${LAST_MONTH}`
+              : "Move money"
+      }
+      onClose={close}
+    >
+      {open.kind === "steps" && (
+        <Steps
+          world={w}
+          initial={open.ids}
+          start={open.start}
+          change={change}
+          onDone={close}
+        />
+      )}
+      {open.kind === "walk" && (
+        <Steps world={w} change={change} onDone={close} />
+      )}
+      {open.kind === "copy" && (
+        <CopyPreview
+          world={w}
+          onCopy={(next, count) => {
+            change(next, `Copied ${count} Assignments from ${LAST_MONTH}`);
+            close();
+          }}
+        />
+      )}
+      {open.kind === "move" && (
+        <MoveForm
+          world={w}
+          onMove={(from, to, amount) => {
+            change(
+              move(w, from, to, amount),
+              `Moved ${money(amount)} from ${endName(w, from)} to ${endName(w, to)}`,
+            );
+            close();
+          }}
+        />
+      )}
+    </Overlay>
+  );
+
+  if (!wide)
+    return (
+      <>
+        <PhoneBudget
+          world={w}
+          onAssign={() => setOpen({ kind: "walk" })}
+          onCover={browse}
+          onOpen={browse}
+          onGroup={group}
+        />
+        {panel}
+      </>
+    );
+
+  const x = focused ? w.byId(focused) : null;
+  return (
+    <>
+      <DesktopBudget
+        world={w}
+        onAssign={() => setOpen({ kind: "walk" })}
+        onCover={focusRow}
+        onCopy={() => setOpen({ kind: "copy" })}
+        onMove={() => setOpen({ kind: "move" })}
+        onGroup={group}
+        selected={focused ?? undefined}
+        assignedCell={(c) => (
+          <AssignField
+            world={w}
+            category={c}
+            quiet
+            onFocused={() => {
+              setFocused(c.id);
+              setTyped(null);
+            }}
+            onTyped={setTyped}
+            onSet={(n) =>
+              change(
+                { ...w.assigned, [c.id]: n },
+                `Assigned ${money(n)} to ${c.name}`,
+              )
+            }
+          />
+        )}
+        aside={
+          explain ? (
+            <div className="card asd-explain">
+              <div className="split">
+                <strong>{x ? x.name : "How Available adds up"}</strong>
+                <button
+                  type="button"
+                  className="link small"
+                  onClick={() => setExplain(false)}
+                >
+                  Hide
+                </button>
+              </div>
+              {x ? (
+                <Breakdown
+                  world={w}
+                  id={x.id}
+                  amount={typed === null ? w.assignment(x.id) : parse(typed)}
+                  onPick={(n) => {
+                    change(
+                      { ...w.assigned, [x.id]: n },
+                      `Assigned ${money(n)} to ${x.name}`,
+                    );
+                    const i = all.indexOf(x.id);
+                    if (all[i + 1]) focusRow(all[i + 1]);
+                  }}
+                />
+              ) : (
+                <p className="muted small">
+                  Click an amount in the Assigned column. This shows how that
+                  Category’s Available is made up and what to assign. Enter, ↑
+                  and ↓ move between Categories.
+                </p>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="link small"
+              onClick={() => setExplain(true)}
+            >
+              Show how Available adds up
+            </button>
+          )
+        }
+      />
+      {panel}
+    </>
+  );
+}
+
+/** The walk's queue: what's Overspent, what has nothing assigned, then, if Ready to Assign is below zero, where to take money back from. */
+function walkQueue(w: World): string[] {
+  const queue = [
+    ...w.overspent.map((x) => x.id),
+    ...w.categories
+      .filter((x) => !(x.id in w.assigned) && w.available(x.id) >= 0)
+      .map((x) => x.id),
+  ];
+  if (w.readyToAssign < 0)
+    queue.push(
+      ...w.categories
+        .filter(
+          (x) =>
+            !queue.includes(x.id) &&
+            w.assignment(x.id) > 0 &&
+            w.available(x.id) > 0,
+        )
+        .sort((a, b) => w.available(b.id) - w.available(a.id))
+        .map((x) => x.id),
+    );
+  return queue;
+}
+
+/** One Category at a time, without closing: ‹ ›, a swipe, or ↑ ↓ move along. */
+function Steps({
+  world: w,
+  initial,
+  start = 0,
+  change,
+  onDone,
+}: {
+  world: World;
+  /** Categories to step through; none means the Assign walk. */
+  initial?: string[];
+  start?: number;
+  change: VariantProps["change"];
+  onDone(): void;
+}) {
+  const walk = !initial;
+  const [ids, setIds] = useState<string[] | null>(
+    initial ?? (w.copyable.length > 0 ? null : walkQueue(w)),
+  );
+  const [i, setI] = useState(start);
+  const ref = useRef<HTMLDivElement>(null);
+  const count = ids?.length ?? 0;
+  const go = (to: number) => {
+    if (to < 0) return;
+    if (to >= count) {
+      if (walk) setI(count);
+      else onDone();
+      return;
+    }
+    setI(to);
+  };
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !ids) return;
+    let x0 = 0;
+    let y0 = 0;
+    const down = (e: PointerEvent) => {
+      x0 = e.clientX;
+      y0 = e.clientY;
+    };
+    const up = (e: PointerEvent) => {
+      const dx = e.clientX - x0;
+      if (Math.abs(dx) > 60 && Math.abs(e.clientY - y0) < 40)
+        go(dx < 0 ? i + 1 : i - 1);
+    };
+    const key = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).closest("select")) return;
+      if (e.key === "ArrowDown") go(i + 1);
+      else if (e.key === "ArrowUp") go(i - 1);
+      else return;
+      e.preventDefault();
+    };
+    el.addEventListener("pointerdown", down);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("keydown", key);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("keydown", key);
+    };
+  });
+
+  if (!ids)
+    return (
+      <>
+        <div className="rt-body">
+          <p>
+            {w.copyable.length} Categories have nothing assigned in {MONTH} yet.
+            Start them from what you assigned in {LAST_MONTH}, then check what’s
+            left.
+          </p>
+          <CopyList world={w} onlyCopyable />
+          <p className="small muted num">
+            Ready to Assign after:{" "}
+            <strong>
+              {money(
+                cents(
+                  w.readyToAssign - w.copyable.reduce((s, x) => s + x.last, 0),
+                ),
+              )}
+            </strong>
+          </p>
+        </div>
+        <div className="rt-foot rt-save">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setIds(walkQueue(w))}
+          >
+            Not now
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary rt-save-main"
+            onClick={() => {
+              const next = copied(w);
+              change(
+                next,
+                `Copied ${w.copyable.length} Assignments from ${LAST_MONTH}`,
+              );
+              setIds(walkQueue(worldOf(w.categories, next)));
+            }}
+          >
+            Copy {w.copyable.length} Assignments
+          </button>
+        </div>
+      </>
+    );
+
+  if (i >= count)
+    return (
+      <>
+        <div className="rt-body asb-done">
+          <p className="asb-name">
+            {count === 0 ? "Nothing needs a job." : "That’s every Category."}
+          </p>
+          <p className="muted">
+            Ready to Assign is{" "}
+            <strong className="num">{money(w.readyToAssign)}</strong>.
+          </p>
+          <RtaLine amount={w.readyToAssign} plain />
+        </div>
+        <div className="rt-foot">
+          <button
+            type="button"
+            className="btn btn-primary btn-wide rt-save-main"
+            onClick={onDone}
+          >
+            Done
+          </button>
+        </div>
+      </>
+    );
+
+  const id = ids[i];
+  const x = w.byId(id);
+  return (
+    <div className="asd" ref={ref}>
+      <div className="asd-nav">
+        <button
+          type="button"
+          className="asd-arrow"
+          aria-label="Previous Category"
+          disabled={i === 0}
+          onClick={() => go(i - 1)}
+        >
+          ‹
+        </button>
+        <span className="asd-where">
+          <strong className="asd-name">{x.name}</strong>
+          <span className="small muted">
+            {x.group} · {i + 1} of {count}
+          </span>
+        </span>
+        <button
+          type="button"
+          className="asd-arrow"
+          aria-label="Next Category"
+          disabled={i === count - 1 && !walk}
+          onClick={() => go(i + 1)}
+        >
+          ›
+        </button>
+      </div>
+      <div className="asd-rta num" data-state={stateOf(w.readyToAssign)}>
+        <span>Ready to Assign</span>
+        <strong>{money(w.readyToAssign)}</strong>
+      </div>
+      <StepPanel
+        key={id}
+        world={w}
+        id={id}
+        last={i === count - 1 && !walk}
+        onSave={(next, toast) => {
+          change(next, toast);
+          go(i + 1);
+        }}
+        onNext={() => go(i + 1)}
+      />
+    </div>
+  );
+}
+
+/** One Category in Steps: type and press Enter, or tap a suggestion. */
+function StepPanel({
+  world: w,
+  id,
+  last,
+  onSave,
+  onNext,
+}: {
+  world: World;
+  id: string;
+  last: boolean;
+  onSave(next: Assigned, toast: string): void;
+  onNext(): void;
+}) {
+  const x = w.byId(id);
+  const now = w.assignment(id);
+  const short = Math.max(0, -w.available(id));
+  const [source, setSource] = useState<End>(
+    short > 0 && short > w.readyToAssign
+      ? (w.categories.find((c) => c.id !== id && w.available(c.id) >= short)
+          ?.id ?? RTA)
+      : RTA,
+  );
+  const fromRta = source === RTA;
+  const [typed, setTyped] = useState(
+    typedFrom(fromRta ? cents(now + short) : short),
+  );
+  const amount = parse(typed);
+  const fieldId = useId();
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    input.current?.focus({ preventScroll: true });
+    input.current?.select();
+  }, []);
+
+  const unchanged = fromRta ? amount === now : amount === 0;
+  function saveWith(n: number) {
+    if (fromRta)
+      onSave(
+        { ...w.assigned, [id]: n },
+        n < now
+          ? `Took ${money(cents(now - n))} back from ${x.name}`
+          : `Assigned ${money(n)} to ${x.name}`,
+      );
+    else
+      onSave(
+        move(w, source, id, n),
+        `Moved ${money(n)} from ${endName(w, source)} to ${x.name}`,
+      );
+  }
+
+  const giveBack =
+    fromRta && w.readyToAssign < 0
+      ? cents(Math.min(-w.readyToAssign, w.available(id), now))
+      : 0;
+  const suggestions: [string, number][] = fromRta
+    ? [
+        ...(short > 0 && now + short !== amount
+          ? [
+              [
+                `Cover it: ${money(cents(now + short))}`,
+                cents(now + short),
+              ] as [string, number],
+            ]
+          : []),
+        ...(giveBack > 0
+          ? [
+              [`Give back ${money(giveBack)}`, cents(now - giveBack)] as [
+                string,
+                number,
+              ],
+            ]
+          : []),
+        ...(x.last > 0 && x.last !== now
+          ? [[`${LAST_MONTH}: ${money(x.last)}`, x.last] as [string, number]]
+          : []),
+        ...(w.readyToAssign > 0
+          ? [
+              [
+                `All of Ready to Assign: ${money(cents(now + w.readyToAssign))}`,
+                cents(now + w.readyToAssign),
+              ] as [string, number],
+            ]
+          : []),
+      ]
+    : short > 0 && amount !== short
+      ? [[`Cover it: ${money(short)}`, short]]
+      : [];
+
+  const nextAvailable = cents(
+    x.carried + (fromRta ? amount : now + amount) - x.spending,
+  );
+  const sourceAfter = fromRta
+    ? cents(w.readyToAssign - (amount - now))
+    : cents(w.available(source) - amount);
+
+  return (
+    <form
+      className="asd-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (unchanged) onNext();
+        else saveWith(amount);
+      }}
+    >
+      <div className="rt-body">
+        <p className="asb-available num" data-state={stateOf(w.available(id))}>
+          {money(w.available(id))}{" "}
+          <span className="small">
+            {short > 0 ? `Overspent by ${money(short)}` : "Available"}
+          </span>
+        </p>
+        <dl className="asb-sum card num">
+          <div>
+            <dt>Carried forward from {LAST_MONTH}</dt>
+            <dd>{money(x.carried)}</dd>
+          </div>
+          <div>
+            <dt>Assigned in {MONTH}</dt>
+            <dd>+ {money(now)}</dd>
+          </div>
+          <div>
+            <dt>Spending</dt>
+            <dd>− {money(x.spending)}</dd>
+          </div>
+          <div className="asb-total">
+            <dt>Available</dt>
+            <dd>{money(w.available(id))}</dd>
+          </div>
+        </dl>
+
+        <fieldset className="seg">
+          <legend className="visually-hidden">
+            Where the money comes from
+          </legend>
+          <button
+            type="button"
+            aria-pressed={fromRta}
+            onClick={() => {
+              setSource(RTA);
+              setTyped(typedFrom(cents(now + short)));
+            }}
+          >
+            Ready to Assign
+          </button>
+          <button
+            type="button"
+            aria-pressed={!fromRta}
+            onClick={() => {
+              const best = [...w.categories]
+                .filter((c) => c.id !== id && w.available(c.id) > 0)
+                .sort((a, b) => w.available(b.id) - w.available(a.id))[0];
+              if (best) setSource(best.id);
+              setTyped(typedFrom(short));
+            }}
+          >
+            Another Category
+          </button>
+        </fieldset>
+
+        {!fromRta && (
+          <label className="rt-field rt-account">
+            <span className="small muted">Take it from</span>
+            <select value={source} onChange={(e) => setSource(e.target.value)}>
+              {w.groups.map((g) => (
+                <optgroup key={g} label={g}>
+                  {w.categories
+                    .filter((c) => c.group === g && c.id !== id)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({money(w.available(c.id))} available)
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <div className="rt-field">
+          <label className="small muted" htmlFor={fieldId}>
+            {fromRta ? `Assigned in ${MONTH}` : `Move to ${x.name}`}
+          </label>
+          <span className="asb-amount num">
+            $
+            <input
+              ref={input}
+              id={fieldId}
+              className="asb-input"
+              inputMode="decimal"
+              enterKeyHint={last ? "done" : "next"}
+              placeholder="0"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              onFocus={(e) => e.target.select()}
+            />
+          </span>
+          {suggestions.length > 0 && (
+            <div className="rt-suggest">
+              {suggestions.map(([label, value]) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="chip chip-small"
+                  onClick={() => saveWith(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rt-meter num">
+          <div className="split">
+            <span>{x.name} Available after</span>
+            <strong data-state={stateOf(nextAvailable)}>
+              {money(nextAvailable)}
+            </strong>
+          </div>
+          <div className="split">
+            <span>
+              {fromRta ? "Ready to Assign" : `${endName(w, source)} Available`}{" "}
+              after
+            </span>
+            <strong data-state={stateOf(sourceAfter)}>
+              {money(sourceAfter)}
+            </strong>
+          </div>
+        </div>
+        <p className="small muted asd-tip">
+          Suggestions save and move on. Swipe, or use ‹ ›, to look at another
+          Category.
+        </p>
+      </div>
+      <div className="rt-foot">
+        <button type="submit" className="btn btn-primary btn-wide rt-save-main">
+          {unchanged
+            ? last
+              ? "Done"
+              : "Next Category"
+            : `${fromRta ? (amount < now ? "Take back" : "Assign") : "Move"} ${money(
+                fromRta ? Math.abs(amount - now) || amount : amount,
+              )}${last ? "" : " and next"}`}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** D's desktop panel: the focused row's Available as it would be with what's typed. */
+function Breakdown({
+  world: w,
+  id,
+  amount,
+  onPick,
+}: {
+  world: World;
+  id: string;
+  amount: number;
+  onPick(n: number): void;
+}) {
+  const x = w.byId(id);
+  const now = w.assignment(id);
+  const available = cents(x.carried + amount - x.spending);
+  const rta = cents(w.readyToAssign - (amount - now));
+  const short = Math.max(0, -w.available(id));
+  const giveBack =
+    w.readyToAssign < 0
+      ? cents(Math.min(-w.readyToAssign, w.available(id), now))
+      : 0;
+  const picks: [string, number][] = [
+    ...(short > 0
+      ? [
+          [`Cover it: ${money(cents(now + short))}`, cents(now + short)] as [
+            string,
+            number,
+          ],
+        ]
+      : []),
+    ...(giveBack > 0
+      ? [
+          [`Give back ${money(giveBack)}`, cents(now - giveBack)] as [
+            string,
+            number,
+          ],
+        ]
+      : []),
+    ...(x.last > 0 && x.last !== now
+      ? [[`${LAST_MONTH}: ${money(x.last)}`, x.last] as [string, number]]
+      : []),
+  ];
+  return (
+    <>
+      <dl className="asb-sum num asd-sum">
+        <div>
+          <dt>Carried forward</dt>
+          <dd>{money(x.carried)}</dd>
+        </div>
+        <div>
+          <dt>Assigned in {MONTH}</dt>
+          <dd data-changed={amount !== now}>+ {money(amount)}</dd>
+        </div>
+        <div>
+          <dt>Spending</dt>
+          <dd>− {money(x.spending)}</dd>
+        </div>
+        <div className="asb-total">
+          <dt>Available</dt>
+          <dd>
+            <span className="pill" data-state={stateOf(available)}>
+              {money(available)}
+            </span>
+          </dd>
+        </div>
+      </dl>
+      <p className="small muted num">
+        Ready to Assign {amount === now ? "is" : "after"}{" "}
+        <strong data-state={stateOf(rta)}>{money(rta)}</strong>
+      </p>
+      {picks.length > 0 && (
+        <div className="rt-suggest">
+          {picks.map(([label, value]) => (
+            <button
+              key={label}
+              type="button"
+              className="chip chip-small"
+              // Keep focus in the field, so it doesn't save what's typed first.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onPick(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Shared by the variants                                             */
 /* ------------------------------------------------------------------ */
 
@@ -1636,12 +2392,14 @@ function PhoneBudget({
   onCover,
   onOpen,
   monthMenu,
+  onGroup,
 }: {
   world: World;
   onAssign(): void;
   onCover(id: string): void;
   onOpen?(id: string): void;
   monthMenu?: [string, () => void][];
+  onGroup?(group: string): void;
 }) {
   const [menu, setMenu] = useState(false);
   return (
@@ -1681,7 +2439,7 @@ function PhoneBudget({
       <ReadyToAssign amount={w.readyToAssign} onAssign={onAssign} />
       {w.groups.map((g) => (
         <section key={g} className="a-group">
-          <GroupHead world={w} group={g} />
+          <GroupHead world={w} group={g} onAssign={onGroup} />
           <ul className="card">
             {w.categories
               .filter((x) => x.group === g)
@@ -1737,6 +2495,8 @@ function DesktopBudget({
   onMove,
   assignedCell,
   selected,
+  aside,
+  onGroup,
 }: {
   world: World;
   onAssign(): void;
@@ -1745,6 +2505,9 @@ function DesktopBudget({
   onMove(): void;
   assignedCell(x: Category): ReactNode;
   selected?: string;
+  /** Shown under Ready to Assign in the summary column. */
+  aside?: ReactNode;
+  onGroup?(group: string): void;
 }) {
   return (
     <div className="a" data-wide>
@@ -1766,6 +2529,7 @@ function DesktopBudget({
       <div className="a-columns">
         <aside className="a-summary">
           <ReadyToAssign amount={w.readyToAssign} onAssign={onAssign} />
+          {aside}
         </aside>
         <div className="a-table">
           <div className="a-table-head" aria-hidden>
@@ -1776,7 +2540,7 @@ function DesktopBudget({
           </div>
           {w.groups.map((g) => (
             <section key={g} className="a-group card">
-              <GroupHead world={w} group={g} />
+              <GroupHead world={w} group={g} onAssign={onGroup} />
               <ul>
                 {w.categories
                   .filter((x) => x.group === g)
@@ -1859,13 +2623,30 @@ function ReadyToAssign({
   );
 }
 
-function GroupHead({ world: w, group }: { world: World; group: string }) {
+function GroupHead({
+  world: w,
+  group,
+  onAssign,
+}: {
+  world: World;
+  group: string;
+  onAssign?(group: string): void;
+}) {
   const sum = w.categories
     .filter((x) => x.group === group)
     .reduce((s, x) => s + w.available(x.id), 0);
   return (
     <div className="split group-head">
       <h2>{group}</h2>
+      {onAssign && (
+        <button
+          type="button"
+          className="link small as-group-assign"
+          onClick={() => onAssign(group)}
+        >
+          Assign {group}
+        </button>
+      )}
       <span className="muted small num">{money(sum)}</span>
     </div>
   );
