@@ -1,6 +1,6 @@
-// PROTOTYPE (prototype/pwa-icon): throwaway. Rounds of crown icons for Crownkeep, now richer, more detailed coins and crowns, shown where
+// PROTOTYPE (prototype/pwa-icon): throwaway. Rounds of crown icons for Crownkeep, now the gold sovereign in silver, shown where
 // an icon actually lives, plus what the status bar, title bar and splash do in
-// each scheme. Switch with `?icon=H3|I1|I2|I3|I4|I5`, `?theme=page|fixed|graphite`,
+// each scheme. Switch with `?icon=I2|J1|J2|J3`, `?theme=page|fixed|graphite`,
 // `?splash=dark|light`, `?scheme=dark|light`. The real tab's favicon and the
 // real theme-color metas follow the choice; the home screens are mock-ups.
 import { useEffect } from "react";
@@ -8,7 +8,7 @@ import "@fontsource-variable/geist";
 import { useUrlParameter } from "../url-parameter";
 import "./pwa-icon.css";
 
-const iconKeys = ["H3", "I1", "I2", "I3", "I4", "I5"] as const;
+const iconKeys = ["I2", "J1", "J2", "J3"] as const;
 type IconKey = (typeof iconKeys)[number];
 type Form = "any" | "maskable" | "apple" | "favicon";
 
@@ -18,15 +18,13 @@ const crownPoints = "M136 330 112 176 188 236 256 136 324 236 400 176 376 330Z";
 
 const fade = (id: string, stops: string[]) =>
   `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">${stops.map((c, i) => `<stop offset="${i / (stops.length - 1)}" stop-color="${c}"/>`).join("")}</linearGradient>`;
-const paints = `<defs>${fade("tile", ["#3d3d47", "#1c1c22"])}${fade("silver", ["#ffffff", "#b9b9c4"])}${fade("gold", ["#ffedb0", "#e8bb4e", "#a97b1f"])}${fade("deepgold", ["#a97b1f", "#6e4d10"])}${fade("enamel", ["#7fe8b4", "#22a067"])}${fade("steel", ["#4a4a55", "#18181d"])}<clipPath id="l"><rect width="256" height="512"/></clipPath><clipPath id="r"><rect x="256" width="256" height="512"/></clipPath></defs>`;
+const paints = `<defs>${fade("tile", ["#3d3d47", "#1c1c22"])}${fade("gold", ["#ffedb0", "#e8bb4e", "#a97b1f"])}${fade("deepgold", ["#a97b1f", "#6e4d10"])}${fade("deepsilver", ["#55555f", "#18181d"])}<linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#d4d4dc"/><stop offset=".72" stop-color="#9c9ca8"/><stop offset="1" stop-color="#e8e8ee"/></linearGradient></defs>`;
 
 const around = (count: number, r: number, draw: (x: number, y: number) => string) =>
   Array.from({ length: count }, (_, i) => {
     const a = (2 * Math.PI * i) / count;
     return draw(256 + r * Math.cos(a), 256 + r * Math.sin(a));
   }).join("");
-const beads = (colour: string, r: number, count = 48, size = 5) =>
-  around(count, r, (x, y) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${size}" fill="${colour}"/>`);
 
 const place = (inner: string, x: number, y: number, scale: number) =>
   `<g transform="translate(${x} ${y}) scale(${scale}) translate(-256 -258)">${inner}</g>`;
@@ -36,8 +34,6 @@ const fullCrown = (body: string, line: string, jewel: string) =>
   `<path d="${crownPoints}" fill="${body}" stroke="${body}" stroke-width="14" stroke-linejoin="round"/><path d="M256 232 280 272 256 312 232 272Z" fill="${jewel}" stroke="${line}" stroke-width="6" stroke-linejoin="round"/><circle cx="176" cy="290" r="13" fill="${jewel}" stroke="${line}" stroke-width="5"/><circle cx="336" cy="290" r="13" fill="${jewel}" stroke="${line}" stroke-width="5"/><circle cx="112" cy="166" r="20" fill="${jewel}" stroke="${line}" stroke-width="6"/><circle cx="256" cy="124" r="20" fill="${jewel}" stroke="${line}" stroke-width="6"/><circle cx="400" cy="166" r="20" fill="${jewel}" stroke="${line}" stroke-width="6"/><rect x="132" y="346" width="248" height="38" rx="10" fill="${body}" stroke="${line}" stroke-width="5"/>${[172, 214, 256, 298, 340].map((x) => `<circle cx="${x}" cy="365" r="8" fill="${line}"/>`).join("")}`;
 const plainCrown = (colour: string) =>
   `<path d="${crownPoints}" fill="${colour}" stroke="${colour}" stroke-width="20" stroke-linejoin="round"/><rect x="132" y="346" width="248" height="36" rx="10" fill="${colour}"/>`;
-
-const counterSmall = `<circle cx="256" cy="256" r="176" fill="${ink}"/><circle cx="256" cy="256" r="176" fill="${light}" clip-path="url(#l)"/><g clip-path="url(#l)">${place(plainCrown(ink), 256, 262, 0.72)}</g><g clip-path="url(#r)">${place(plainCrown(light), 256, 262, 0.72)}</g>`;
 
 const icons: Record<
   IconKey,
@@ -52,53 +48,37 @@ const icons: Record<
     small: string;
   }
 > = {
-  H3: {
-    name: "Counterchange (last round)",
-    idea: "The split coin from last round, kept here to compare against.",
-    ground: "#34343d",
-    defs: paints,
-    mark: counterSmall,
-    small: counterSmall,
-  },
-  I1: {
-    name: "Silver crown coin",
-    idea: "A struck silver coin: a raised rim, a ring of beads and a jewelled crown on a dark field, with green stones as the app's one colour.",
-    ground: "url(#tile)",
-    defs: paints,
-    mark: `<circle cx="256" cy="256" r="190" fill="url(#silver)"/><circle cx="256" cy="256" r="166" fill="url(#steel)"/>${beads(light, 150)}${place(fullCrown("url(#silver)", ink, "#5fdc9a"), 256, 262, 0.62)}`,
-    small: `<circle cx="256" cy="256" r="180" fill="url(#silver)"/><circle cx="256" cy="256" r="146" fill="${ink}"/>${place(plainCrown(light), 256, 262, 0.66)}`,
-  },
   I2: {
-    name: "Gold sovereign",
+    name: "Gold sovereign (last round)",
     idea: "A real gold coin with a ridged edge and a crown struck into it. Warm and instantly money, and it brings in a colour the app doesn't otherwise use.",
     ground: "url(#tile)",
     defs: paints,
     mark: `<circle cx="256" cy="256" r="190" fill="url(#gold)"/>${around(72, 178, (x, y) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#8a6214"/>`)}<circle cx="256" cy="256" r="160" fill="none" stroke="#8a6214" stroke-width="5"/>${place(fullCrown("url(#deepgold)", "#3f2c08", "#ffedb0"), 256, 262, 0.62)}`,
     small: `<circle cx="256" cy="256" r="180" fill="url(#gold)"/>${place(plainCrown("#5c4009"), 256, 262, 0.72)}`,
   },
-  I3: {
-    name: "Rich counterchange",
-    idea: "The split coin with everything added back: beads round the rim and a jewelled crown, each swapping colour across the line. Keeps last round's idea and gives it the look of a real seal.",
-    ground: "#34343d",
-    defs: paints,
-    mark: `<circle cx="256" cy="256" r="190" fill="${ink}"/><g clip-path="url(#l)"><circle cx="256" cy="256" r="190" fill="${light}"/>${beads(ink, 170)}${place(fullCrown(ink, light, light), 256, 262, 0.6)}</g><g clip-path="url(#r)">${beads(light, 170)}${place(fullCrown(light, ink, ink), 256, 262, 0.6)}</g>`,
-    small: counterSmall,
-  },
-  I4: {
-    name: "Enamel badge",
-    idea: "A green enamel pin with a dark metal rim, a white crown and a glossy highlight. Something you'd be pleased to own, and the friendliest of the set.",
+  J1: {
+    name: "Silver sovereign",
+    idea: "The gold sovereign with the metal swapped for silver: the same ridged edge, ring and jewelled crown, on a diagonal sheen.",
     ground: "url(#tile)",
     defs: paints,
-    mark: `<circle cx="256" cy="256" r="190" fill="url(#steel)"/><circle cx="256" cy="256" r="164" fill="url(#enamel)"/><path d="M116 216A146 146 0 0 1 396 216C340 170 172 170 116 216Z" fill="#fff" opacity=".22"/>${place(fullCrown("#ffffff", ink, ink), 256, 262, 0.6)}`,
-    small: `<circle cx="256" cy="256" r="180" fill="${ink}"/><circle cx="256" cy="256" r="146" fill="#35c583"/>${place(plainCrown("#ffffff"), 256, 262, 0.66)}`,
+    mark: `<circle cx="256" cy="256" r="190" fill="url(#sheen)"/>${around(72, 178, (x, y) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#6a6a76"/>`)}<circle cx="256" cy="256" r="160" fill="none" stroke="#6a6a76" stroke-width="5"/>${place(fullCrown("url(#deepsilver)", ink, light), 256, 262, 0.62)}`,
+    small: `<circle cx="256" cy="256" r="180" fill="url(#sheen)"/>${place(plainCrown(ink), 256, 262, 0.72)}`,
   },
-  I5: {
-    name: "Crown over a gold coin",
-    idea: "A silver crown resting on a large gold coin, showing both objects in full rather than merging them. The most literal, and the most like an illustration.",
+  J2: {
+    name: "Modern silver",
+    idea: "The same coin with the old-world detail taken off: no jewels or ridges, just the sheen, one fine ring and a plain dark crown.",
     ground: "url(#tile)",
     defs: paints,
-    mark: `<circle cx="256" cy="312" r="130" fill="url(#gold)"/><circle cx="256" cy="312" r="102" fill="none" stroke="#8a6214" stroke-width="6"/>${place(fullCrown("url(#silver)", ink, "#5fdc9a"), 256, 180, 0.6)}`,
-    small: `<circle cx="256" cy="316" r="126" fill="url(#gold)"/>${place(plainCrown(light), 256, 176, 0.62)}`,
+    mark: `<circle cx="256" cy="256" r="190" fill="url(#sheen)"/><circle cx="256" cy="256" r="162" fill="none" stroke="#6a6a76" stroke-opacity=".6" stroke-width="4"/>${place(plainCrown("url(#deepsilver)"), 256, 262, 0.68)}`,
+    small: `<circle cx="256" cy="256" r="180" fill="url(#sheen)"/>${place(plainCrown(ink), 256, 262, 0.72)}`,
+  },
+  J3: {
+    name: "Reeded silver",
+    idea: "Modern silver with a coin's ridged edge kept as fine ticks, so it stays clearly a coin while the crown stays plain.",
+    ground: "url(#tile)",
+    defs: paints,
+    mark: `<circle cx="256" cy="256" r="190" fill="url(#sheen)"/>${Array.from({ length: 90 }, (_, i) => `<rect x="254" y="72" width="4" height="20" fill="#6a6a76" transform="rotate(${i * 4} 256 256)"/>`).join("")}${place(plainCrown("url(#deepsilver)"), 256, 262, 0.68)}`,
+    small: `<circle cx="256" cy="256" r="180" fill="url(#sheen)"/>${place(plainCrown(ink), 256, 262, 0.72)}`,
   },
 };
 
@@ -367,7 +347,7 @@ export function PwaIconPrototype() {
   const [themeParam, setTheme] = useUrlParameter("theme");
   const [splashParam, setSplash] = useUrlParameter("splash");
   const [schemeParam, setScheme] = useUrlParameter("scheme");
-  const k: IconKey = iconKeys.find((i) => i === iconParam) ?? "I1";
+  const k: IconKey = iconKeys.find((i) => i === iconParam) ?? "J2";
   const themeKey: ThemeKey =
     themeParam === "fixed" || themeParam === "graphite" ? themeParam : "page";
   const splashKey = splashParam === "light" ? "light" : "dark";
