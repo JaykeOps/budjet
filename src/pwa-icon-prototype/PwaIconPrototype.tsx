@@ -1,4 +1,4 @@
-// PROTOTYPE (prototype/pwa-icon): throwaway. Four icons for budjet, shown where
+// PROTOTYPE (prototype/pwa-icon): throwaway. Four crown icons for Crownkeep, shown where
 // an icon actually lives, plus what the status bar, title bar and splash do in
 // each scheme. Switch with `?icon=A|B|C|D`, `?theme=page|fixed|graphite`,
 // `?splash=dark|light`, `?scheme=dark|light`. The real tab's favicon and the
@@ -16,11 +16,23 @@ const light = "#f4f4f6";
 const green = "#5fdc9a";
 const graphite = `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5a5a66"/><stop offset=".55" stop-color="#2e2e36"/><stop offset="1" stop-color="#4a4a55"/></linearGradient></defs>`;
 
-const stem = `<rect x="158" y="116" width="56" height="280" rx="28" fill="${light}"/>`;
-const bowlCentre = `cx="256" cy="298" r="70"`;
+const ink = "#2e2e36";
 
-const bar = (y: number, h: number, fill: number, colour: string) =>
-  `<rect x="136" y="${y}" width="240" height="${h}" rx="${h / 2}" fill="${light}" opacity=".2"/><rect x="136" y="${y}" width="${fill}" height="${h}" rx="${h / 2}" fill="${colour}"/>`;
+/** The classic silhouette, in any colour. */
+const crown = (colour: string) =>
+  `<path d="M136 330 112 176 188 236 256 136 324 236 400 176 376 330Z" fill="${colour}" stroke="${colour}" stroke-width="20" stroke-linejoin="round"/>`;
+const band = (colour: string) =>
+  `<rect x="140" y="346" width="232" height="34" rx="17" fill="${colour}"/>`;
+
+/** A crown made of a keep's battlements, as in a heraldic mural crown. */
+const battlements = (colour: string) =>
+  `<path d="M120 170H184V226H224V170H288V226H328V170H392L368 300H144Z" fill="${colour}" stroke="${colour}" stroke-width="20" stroke-linejoin="round"/>`;
+
+const pills = (middle: string) =>
+  `<rect x="138" y="196" width="56" height="150" rx="28" fill="${light}" transform="rotate(-16 166 346)"/><rect x="318" y="196" width="56" height="150" rx="28" fill="${light}" transform="rotate(16 346 346)"/><rect x="228" y="130" width="56" height="216" rx="28" fill="${middle}"/><rect x="138" y="346" width="236" height="44" rx="22" fill="${light}"/>`;
+
+const coin = (inner: string) =>
+  `<circle cx="256" cy="256" r="180" fill="${light}"/><g transform="translate(256 262) scale(.62) translate(-256 -258)">${inner}</g>`;
 
 const icons: Record<
   IconKey,
@@ -35,36 +47,36 @@ const icons: Record<
   }
 > = {
   A: {
-    name: "Monogram",
-    idea: "A plain lowercase b on the Graphite card. The nearest thing to today's icon, and it says nothing about money.",
+    name: "Crown",
+    idea: "A plain crown on the Graphite card. Instantly read and says it's yours, with a green band as the only link to the product.",
     ground: "url(#g)",
     defs: graphite,
-    mark: `${stem}<circle ${bowlCentre} fill="none" stroke="${light}" stroke-width="56"/>`,
-    small: `${stem}<circle ${bowlCentre} fill="none" stroke="${light}" stroke-width="56"/>`,
+    mark: `${crown(light)}${band(green)}`,
+    small: `${crown(light)}${band(light)}`,
   },
   B: {
-    name: "Meters",
-    idea: "Three Category bars on the Card colour, the one green. It is the Budget screen, shrunk.",
-    ground: "#222228",
-    defs: "",
-    mark: `${bar(150, 52, 172, green)}${bar(230, 52, 96, light)}${bar(310, 52, 208, light)}`,
-    small: `${bar(146, 92, 160, green)}${bar(274, 92, 208, light)}`,
+    name: "Battlements",
+    idea: "A crown made of a keep's battlements, like a heraldic mural crown. The whole name in one shape, though it may read as a castle first.",
+    ground: "url(#g)",
+    defs: graphite,
+    mark: `${battlements(light)}<rect x="144" y="322" width="224" height="36" rx="18" fill="${green}"/>`,
+    small: `${battlements(light)}<rect x="144" y="322" width="224" height="36" rx="18" fill="${light}"/>`,
   },
   C: {
-    name: "Envelope",
-    idea: "The envelope in envelope budgeting, with a meter across it. Teaches the idea, but may read as a mail app.",
-    ground: "url(#g)",
-    defs: graphite,
-    mark: `<rect x="116" y="166" width="280" height="190" rx="32" fill="${light}"/><path d="M130 186 256 272 382 186" fill="none" stroke="#2e2e36" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/><rect x="150" y="312" width="212" height="20" rx="10" fill="#2e2e36" opacity=".25"/><rect x="150" y="312" width="124" height="20" rx="10" fill="#0f7343"/>`,
-    small: `<rect x="116" y="166" width="280" height="190" rx="32" fill="${light}"/><path d="M130 190 256 280 382 190" fill="none" stroke="#2e2e36" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>`,
+    name: "Meter crown",
+    idea: "Three of the Budget's round bars standing up as a crown, the middle one green. The closest to the product, and the least like a logo you've seen.",
+    ground: "#222228",
+    defs: "",
+    mark: pills(green),
+    small: pills(green),
   },
   D: {
-    name: "Gauge b",
-    idea: "The b's bowl is a meter, three-quarters green. A letter you can name and the product's one signature shape.",
+    name: "Crown coin",
+    idea: "A crown stamped on a coin, the way money has always carried one. Clearly about money, though it can read as crypto.",
     ground: "url(#g)",
     defs: graphite,
-    mark: `<circle ${bowlCentre} fill="none" stroke="${light}" stroke-opacity=".22" stroke-width="56"/><circle ${bowlCentre} fill="none" stroke="${green}" stroke-width="56" stroke-linecap="round" stroke-dasharray="290 440" transform="rotate(-90 256 298)"/>${stem}`,
-    small: `<circle ${bowlCentre} fill="none" stroke="${green}" stroke-width="56"/>${stem}`,
+    mark: coin(`${crown(ink)}${band("#0f7343")}`),
+    small: coin(`${crown(ink)}${band(ink)}`),
   },
 };
 
@@ -160,7 +172,7 @@ function HomeScreen({
           <div className="pi-mask">
             <Img k={k} form={form} size={56} />
           </div>
-          <span>budjet</span>
+          <span>Crownkeep</span>
         </div>
         {neighbours.slice(3).map(([colour, letter]) => (
           <Neighbour key={letter} colour={colour} letter={letter} />
@@ -194,7 +206,7 @@ function Tabs({ k, dark }: { k: IconKey; dark: boolean }) {
       <div className="pi-tabs" data-dark={dark}>
         <div className="pi-tab pi-tab-on">
           <Img k={k} form="favicon" size={16} />
-          budjet
+          Crownkeep
         </div>
         <div className="pi-tab">
           <span className="pi-otherfav" />
@@ -274,7 +286,7 @@ function Launch({
             style={{ background: splash, color: onColour(splash) }}
           >
             <Img k={k} form="any" size={72} />
-            <span>budjet</span>
+            <span>Crownkeep</span>
           </div>
         </div>
         <span className="pi-arrow" aria-hidden>
@@ -316,7 +328,7 @@ function DesktopWindow({
           style={{ background: colour, color: onColour(colour) }}
         >
           <Img k={k} form="favicon" size={16} />
-          budjet
+          Crownkeep
           <span className="pi-winbuttons">— ▢ ✕</span>
         </div>
         <BudgetTop dark={dark} />
@@ -347,6 +359,7 @@ export function PwaIconPrototype() {
 
   // The real tab and the real browser UI follow the choice.
   useEffect(() => {
+    document.title = "Crownkeep";
     const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (favicon) favicon.href = iconUrl(k, "favicon");
     for (const old of document.querySelectorAll('meta[name="theme-color"]')) {
