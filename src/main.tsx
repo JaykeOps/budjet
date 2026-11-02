@@ -20,7 +20,16 @@ if (!root) throw new Error("#root element missing from index.html");
 // PROTOTYPE (prototype/accounts): `?accounts=` opens the Account screens
 // prototype.
 // PROTOTYPE (prototype/first-run): `?first=` opens the first run prototype.
+// PROTOTYPE (prototype/categories): `?cats=` opens the Categories prototype.
 if (
+  import.meta.env.DEV &&
+  new URLSearchParams(window.location.search).has("cats")
+) {
+  const { CategoriesPrototype } = await import(
+    "./categories-prototype/CategoriesPrototype"
+  );
+  createRoot(root).render(<CategoriesPrototype />);
+} else if (
   import.meta.env.DEV &&
   new URLSearchParams(window.location.search).has("first")
 ) {

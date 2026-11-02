@@ -1,0 +1,373 @@
+/* PROTOTYPE (prototype/categories): throwaway. Builds on the Budget screen,
+   recording and first run prototypes' tokens and parts. */
+
+.ct-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.ct-toast {
+  z-index: 60;
+}
+.bs[data-frame="desktop"] .ct-toast {
+  position: fixed;
+  left: 50%;
+  right: auto;
+  bottom: 72px;
+  transform: translateX(-50%);
+  min-width: 300px;
+}
+.ct-tab {
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.ct-command {
+  font:
+    500 12px / 1 ui-monospace,
+    monospace;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.ct-danger {
+  color: var(--negative);
+}
+
+/* ---------- sheets ---------- */
+
+.ct-sheet {
+  max-height: calc(100% - 40px);
+}
+.ct-sheet:focus,
+.ct-panel:focus {
+  outline: none;
+}
+.ct-sheet-head {
+  padding: 18px 20px 10px;
+  align-items: center;
+}
+.ct-sheet-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+.ct-sheet-body {
+  overflow-y: auto;
+  padding: 4px 20px 28px;
+}
+.ct-panel-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgb(0 0 0 / 0.25);
+}
+.ct-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 420px;
+  background: var(--page);
+  box-shadow: var(--soft-2);
+  overflow-y: auto;
+}
+.ct-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ct-steps > span {
+  margin-right: auto;
+}
+.ct-fate {
+  gap: 10px;
+}
+.ct-facts {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 18px;
+}
+.ct-manage-head {
+  margin: 8px 0 -4px;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+/* ---------- adding ---------- */
+
+.ct-add {
+  padding: 10px 4px;
+  text-align: left;
+}
+.ct-inline-add {
+  display: flex;
+  gap: 8px;
+  padding: 6px 0;
+}
+.ct-inline-add input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--card);
+}
+.ct-empty {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ct-notice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.ct-assigned {
+  display: block;
+}
+
+/* ---------- A. Edit mode ---------- */
+
+.ct-edit-bar {
+  position: sticky;
+  top: -20px;
+  z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  background: var(--page);
+}
+.bs[data-frame="desktop"] .ct-edit-bar {
+  top: 0;
+  margin-bottom: 12px;
+}
+.ct-edit-list {
+  min-width: 0;
+}
+.ct-edit-title {
+  font-size: 24px;
+}
+.ct-edit-group {
+  overflow: hidden;
+}
+.ct-edit-group[data-dragging="true"] {
+  box-shadow:
+    0 0 0 2px var(--primary),
+    var(--soft-2);
+}
+.ct-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 4px 8px 4px 2px;
+  border-top: 1px solid var(--edge);
+}
+.ct-edit-head {
+  border-top: 0;
+  background: var(--raised);
+}
+.ct-edit-row[data-hidden="true"] .ct-name-input {
+  color: var(--muted);
+}
+.ct-edit-row[data-dragging="true"] {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+.ct-handle {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: grab;
+  /* Without this the phone scrolls instead of dragging. */
+  touch-action: none;
+}
+.ct-handle:active {
+  cursor: grabbing;
+}
+.ct-more {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+.ct-name-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+}
+.ct-name-input:hover,
+.ct-name-input:focus {
+  border-color: var(--edge);
+  background: var(--page);
+}
+.ct-name-input[data-bold="true"] {
+  font-weight: 650;
+}
+.ct-tag {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--muted);
+}
+.ct-edit-foot {
+  padding: 2px 16px;
+  border-top: 1px solid var(--edge);
+}
+
+/* ---------- B. Categories screen ---------- */
+
+.ct-screen-head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ct-screen-head > .link {
+  align-self: flex-start;
+}
+.ct-two-pane {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+  gap: 32px;
+  align-items: start;
+  margin-top: 16px;
+}
+.ct-detail {
+  position: sticky;
+  top: 28px;
+  padding: 20px;
+}
+.ct-pick {
+  padding: 32px 0;
+  text-align: center;
+}
+.ct-list {
+  padding: 4px 0;
+}
+.ct-list-group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  font-weight: 650;
+  font-size: 17px;
+  cursor: pointer;
+}
+.ct-list-group[aria-current="true"],
+.ct-list-row[aria-current="true"] {
+  background: var(--raised);
+}
+.ct-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 16px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+li + li > .ct-list-row {
+  border-top: 1px solid var(--edge);
+}
+.ct-list-name {
+  flex: 1;
+  font-weight: 600;
+}
+.ct-list-name .muted {
+  font-weight: 400;
+}
+.ct-list-empty {
+  padding: 12px 16px;
+}
+.ct-tile-small {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+}
+.ct-place-head {
+  align-items: center;
+}
+.ct-place-group {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 650;
+}
+.ct-place {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ct-place-row {
+  padding: 6px 14px;
+  color: var(--muted);
+}
+.ct-slot {
+  width: 100%;
+  min-height: 36px;
+  border: 1px dashed var(--link);
+  border-radius: 12px;
+  background: none;
+  color: var(--link);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ---------- C. In the Category sheet ---------- */
+
+.ct-rowbtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.ct-rowbtn:hover {
+  text-decoration: underline;
+}
+.ct-group-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.ct-group-foot {
+  padding: 0 4px;
+}
+.a-group.card .ct-group-foot {
+  padding: 0 20px;
+  border-top: 1px solid var(--edge);
+}
