@@ -214,7 +214,9 @@ function Tabs({ k, dark }: { k: IconKey; dark: boolean }) {
           <Img k={k} form="favicon" size={16} />
         </div>
       </div>
-      <figcaption>Favicon at a true 16px, {dark ? "dark" : "light"} tabs</figcaption>
+      <figcaption>
+        Favicon at a true 16px, {dark ? "dark" : "light"} tabs
+      </figcaption>
     </figure>
   );
 }
@@ -258,7 +260,8 @@ function StatusBar({ colour, dark }: { colour: string; dark: boolean }) {
         <BudgetTop dark={dark} />
       </div>
       <figcaption>
-        Status bar on the Budget, {dark ? "dark" : "light"}: <code>{colour}</code>
+        Status bar on the Budget, {dark ? "dark" : "light"}:{" "}
+        <code>{colour}</code>
       </figcaption>
     </figure>
   );
@@ -453,7 +456,12 @@ export function PwaIconPrototype() {
           <figure className="pi-fig">
             <div className="pi-ladder">
               {[16, 24, 32, 48, 64].map((size) => (
-                <Img key={size} k={k} form={size < 32 ? "favicon" : "any"} size={size} />
+                <Img
+                  key={size}
+                  k={k}
+                  form={size < 32 ? "favicon" : "any"}
+                  size={size}
+                />
               ))}
             </div>
             <figcaption>16, 24 redrawn; 32, 48, 64 the full mark</figcaption>
@@ -469,7 +477,9 @@ export function PwaIconPrototype() {
               <Img k={k} form="maskable" size={192} />
               <span />
             </div>
-            <figcaption>Full bleed; the mark stays inside the 80% safe circle</figcaption>
+            <figcaption>
+              Full bleed; the mark stays inside the 80% safe circle
+            </figcaption>
           </figure>
         </div>
       </section>
@@ -489,7 +499,11 @@ export function PwaIconPrototype() {
       </section>
 
       <div className="pi-switch">
-        <button type="button" onClick={() => step(-1)} aria-label="Previous icon">
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          aria-label="Previous icon"
+        >
           ←
         </button>
         <strong>
