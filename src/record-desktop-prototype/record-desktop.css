@@ -1,0 +1,267 @@
+/* PROTOTYPE (prototype/record-desktop): throwaway. Builds on the Budget
+   screen, recording and Account screen prototypes' tokens and parts. */
+
+.re-kbd {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.65;
+  margin-left: 4px;
+}
+.rail > .re-record {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+}
+.re input[type="date"] {
+  color-scheme: inherit;
+}
+.re .btn {
+  cursor: pointer;
+}
+.re-after {
+  padding: 0 4px;
+}
+.re .rt-account select {
+  padding-right: 20px;
+  text-overflow: ellipsis;
+}
+.bs-phone .re-kbd {
+  display: none;
+}
+.re-after strong[data-state="overspent"] {
+  color: var(--negative);
+}
+.re-span {
+  grid-column: 1 / -1;
+}
+.re-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.re-body {
+  gap: 12px;
+}
+.re-amount-big {
+  gap: 10px;
+}
+.re-amount-big .b-amount-field,
+.re .b-amount-field {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  font-size: 32px;
+  font-weight: 700;
+}
+.re .b-amount-field[data-direction="in"] {
+  color: var(--positive);
+}
+.re .b-amount-field input {
+  border: 0;
+  background: none;
+  font-size: 40px;
+  field-sizing: content;
+  min-width: 2ch;
+  max-width: 100%;
+  text-align: left;
+}
+
+/* ---------- combobox ---------- */
+
+.re-combo {
+  position: relative;
+}
+.re-pop {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: 300px;
+  max-height: 264px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--soft-2);
+}
+.re-pop[hidden] {
+  display: none;
+}
+.re-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.re-option:hover,
+.re-option[aria-selected="true"] {
+  background: var(--raised);
+}
+.re-option-name {
+  min-width: 0;
+}
+.re-combo[data-inline="true"] {
+  padding: 8px 6px 6px;
+}
+.re-combo[data-inline="true"] > label,
+.re-combo[data-inline="true"] > input {
+  padding-inline: 8px;
+}
+.re-combo[data-inline="true"] .re-pop {
+  position: static;
+  max-height: none;
+  min-width: 0;
+  box-shadow: none;
+  background: none;
+  padding: 4px 0 0;
+}
+
+/* ---------- A ---------- */
+
+.re-dialog {
+  width: min(540px, calc(100vw - 32px));
+  overflow: visible;
+}
+.re-dialog .re-body {
+  overflow: visible;
+}
+.re-dialog .rt-foot {
+  border-radius: 0 0 28px 28px;
+}
+
+/* ---------- B ---------- */
+
+.bs-desktop[data-panel="true"] {
+  grid-template-columns: 248px minmax(0, 1fr) 420px;
+}
+.re-panel {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--edge);
+  background: var(--page);
+  z-index: 2;
+}
+.re-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 20px 12px;
+}
+.re-panel .rt-body {
+  padding-inline: 20px;
+}
+.re-panel .rt-foot {
+  padding: 12px 20px 56px;
+}
+.ac-row[data-selected="true"] {
+  background: color-mix(in srgb, var(--link) 14%, transparent);
+}
+.ac-row[data-flash="true"] {
+  animation: re-flash 1.6s ease-out;
+}
+@keyframes re-flash {
+  from {
+    background: color-mix(in srgb, var(--link) 26%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-row[data-flash="true"] {
+    animation: none;
+  }
+}
+
+/* ---------- C ---------- */
+
+.re-row {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.re-row[data-new="true"] {
+  position: sticky;
+  top: 12px;
+  z-index: 4;
+}
+.ac-li .re-row {
+  box-shadow: inset 0 0 0 1.5px var(--link);
+}
+.re-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.re-row-head .seg {
+  margin-left: auto;
+  min-width: 220px;
+}
+.re-cells {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+}
+.re-row-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.re-amount-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.re-amount-cell[data-direction="in"] {
+  color: var(--positive);
+}
+.re-sign {
+  border: 0;
+  background: none;
+  padding: 0;
+  width: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.re-row-read {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- Budget, trimmed ---------- */
+
+.re-brow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 110px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 20px;
+  border-top: 1px solid var(--edge);
+}
+.re-brow .pill {
+  justify-self: end;
+}
+.re-bspent {
+  text-align: right;
+}
+.bs-phone .re-brow {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px 16px;
+}
+.bs-phone .re-bspent {
+  display: none;
+}

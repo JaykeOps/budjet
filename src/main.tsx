@@ -21,7 +21,17 @@ if (!root) throw new Error("#root element missing from index.html");
 // prototype.
 // PROTOTYPE (prototype/first-run): `?first=` opens the first run prototype.
 // PROTOTYPE (prototype/categories): `?cats=` opens the Categories prototype.
+// PROTOTYPE (prototype/record-desktop): `?recd=` opens the desktop recording
+// and editing prototype.
 if (
+  import.meta.env.DEV &&
+  new URLSearchParams(window.location.search).has("recd")
+) {
+  const { RecordDesktopPrototype } = await import(
+    "./record-desktop-prototype/RecordDesktopPrototype"
+  );
+  createRoot(root).render(<RecordDesktopPrototype />);
+} else if (
   import.meta.env.DEV &&
   new URLSearchParams(window.location.search).has("cats")
 ) {

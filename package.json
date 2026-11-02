@@ -12,6 +12,7 @@
     "prototype:accounts": "vite --open '/?accounts=A'",
     "prototype:first-run": "vite --open '/?first=A'",
     "prototype:categories": "vite --open '/?cats=A'",
+    "prototype:record-desktop": "vite --open '/?recd=A'",
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
