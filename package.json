@@ -10,6 +10,7 @@
     "prototype:record": "vite --open '/?record=A'",
     "prototype:assign": "vite --open '/?assign=A'",
     "prototype:accounts": "vite --open '/?accounts=A'",
+    "prototype:first-run": "vite --open '/?first=A'",
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
