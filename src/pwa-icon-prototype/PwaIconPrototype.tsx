@@ -1,6 +1,6 @@
-// PROTOTYPE (prototype/pwa-icon): throwaway. Rounds of crown icons for Crownkeep, now minimal, flat coins, shown where
+// PROTOTYPE (prototype/pwa-icon): throwaway. Rounds of crown icons for Crownkeep, now refining the solid coin, shown where
 // an icon actually lives, plus what the status bar, title bar and splash do in
-// each scheme. Switch with `?icon=F1|F2|F3|F4|F5`, `?theme=page|fixed|graphite`,
+// each scheme. Switch with `?icon=G1|G2|G3|G4|G5`, `?theme=page|fixed|graphite`,
 // `?splash=dark|light`, `?scheme=dark|light`. The real tab's favicon and the
 // real theme-color metas follow the choice; the home screens are mock-ups.
 import { useEffect } from "react";
@@ -8,29 +8,24 @@ import "@fontsource-variable/geist";
 import { useUrlParameter } from "../url-parameter";
 import "./pwa-icon.css";
 
-const iconKeys = ["F1", "F2", "F3", "F4", "F5"] as const;
+const iconKeys = ["G1", "G2", "G3", "G4", "G5"] as const;
 type IconKey = (typeof iconKeys)[number];
 type Form = "any" | "maskable" | "apple" | "favicon";
 
 const light = "#f4f4f6";
-const green = "#5fdc9a";
 const flat = "#222228";
-const ink = "#18181d";
 
 const crownPoints = "M136 330 112 176 188 236 256 136 324 236 400 176 376 330Z";
-
-const lineCoin = (colour: string, weight: number) =>
-  `<circle cx="256" cy="256" r="170" fill="none" stroke="${colour}" stroke-width="${weight}"/><g transform="translate(256 262) scale(.62) translate(-256 -233)"><path d="${crownPoints}" fill="none" stroke="${colour}" stroke-width="${weight / 0.62}" stroke-linejoin="round"/></g>`;
+const softPoints = "M150 320 136 206 200 250 256 176 312 250 376 206 362 320Z";
 
 const solidCrown = (colour: string, scale: number) =>
   `<g transform="translate(256 262) scale(${scale}) translate(-256 -233)"><path d="${crownPoints}" fill="${colour}" stroke="${colour}" stroke-width="20" stroke-linejoin="round"/></g>`;
 
-/** Two notches cut from a disc's top edge leave a crown's three points. */
-const notchedCoin = (colour: string, ground: string) =>
-  `<circle cx="256" cy="256" r="170" fill="${colour}"/><path d="M128 50 188 214 244 50ZM268 50 324 214 384 50Z" fill="${ground}" stroke="${ground}" stroke-width="12" stroke-linejoin="round"/>`;
+const softCrown = (colour: string, scale: number) =>
+  `<g transform="translate(256 262) scale(${scale}) translate(-256 -248)"><path d="${softPoints}" fill="${colour}" stroke="${colour}" stroke-width="44" stroke-linejoin="round"/></g>`;
 
-const threeCoins = (middle: string) =>
-  `<circle cx="140" cy="226" r="40" fill="${light}"/><circle cx="256" cy="162" r="40" fill="${middle}"/><circle cx="372" cy="226" r="40" fill="${light}"/><rect x="112" y="320" width="288" height="40" rx="20" fill="${light}"/>`;
+const disc = (colour: string) =>
+  `<circle cx="256" cy="256" r="170" fill="${colour}"/>`;
 
 const icons: Record<
   IconKey,
@@ -38,51 +33,54 @@ const icons: Record<
     name: string;
     idea: string;
     ground: string;
+    /** The icon is the coin itself, with no tile behind it. */
+    round?: boolean;
     defs: string;
     mark: string;
     /** Redrawn for 16px, where the full mark would turn to mush. */
     small: string;
   }
 > = {
-  F1: {
-    name: "Line coin",
-    idea: "A ring and a crown, both in one white line on a flat ground. The quietest of the set, but the line gets thin when small.",
+  G1: {
+    name: "Solid coin (last round)",
+    idea: "F2 unchanged, kept here to compare against.",
     ground: flat,
     defs: "",
-    mark: lineCoin(light, 18),
-    small: lineCoin(light, 30),
+    mark: `${disc(light)}${solidCrown(flat, 0.72)}`,
+    small: `${disc(light)}${solidCrown(flat, 0.8)}`,
   },
-  F2: {
-    name: "Solid coin",
-    idea: "A plain white disc with a plain dark crown. Two flat shapes and nothing else.",
+  G2: {
+    name: "Big crown",
+    idea: "The crown grows until its points nearly reach the rim, so the coin becomes a frame and the crown does the talking.",
     ground: flat,
     defs: "",
-    mark: `<circle cx="256" cy="256" r="170" fill="${light}"/>${solidCrown(flat, 0.72)}`,
-    small: `<circle cx="256" cy="256" r="170" fill="${light}"/>${solidCrown(flat, 0.8)}`,
+    mark: `${disc(light)}${solidCrown(flat, 0.88)}`,
+    small: `${disc(light)}${solidCrown(flat, 0.92)}`,
   },
-  F3: {
-    name: "Notched coin",
-    idea: "One white disc with two notches cut from its top, so the crown is implied rather than drawn. The most logo-like, and it takes a moment to read.",
+  G3: {
+    name: "Soft crown",
+    idea: "A lower, wider crown with rounded points, to match the app's pill controls. Friendlier and less heraldic.",
     ground: flat,
     defs: "",
-    mark: notchedCoin(light, flat),
-    small: notchedCoin(light, flat),
+    mark: `${disc(light)}${softCrown(flat, 0.82)}`,
+    small: `${disc(light)}${softCrown(flat, 0.92)}`,
   },
-  F4: {
-    name: "Green line coin",
-    idea: "The line coin in dark on a flat Available green tile. Just as simple as the others, but it stands out among other apps.",
-    ground: green,
+  G4: {
+    name: "Inverted",
+    idea: "A white tile with a dark coin and a white crown. Same shapes, but the tile no longer disappears on a dark home screen.",
+    ground: light,
     defs: "",
-    mark: lineCoin(ink, 18),
-    small: lineCoin(ink, 30),
+    mark: `${disc(flat)}${solidCrown(light, 0.72)}`,
+    small: `${disc(flat)}${solidCrown(light, 0.8)}`,
   },
-  F5: {
-    name: "Three coins",
-    idea: "Three coins set out like a crown's points above a single bar, with one green. The most abstract, and the crown is only suggested.",
-    ground: flat,
+  G5: {
+    name: "Just the coin",
+    idea: "No tile at all: the white coin is the icon, where the platform allows it. The fewest shapes, though iOS always fills it out to its own squircle.",
+    ground: light,
+    round: true,
     defs: "",
-    mark: threeCoins(green),
-    small: threeCoins(green),
+    mark: solidCrown(flat, 0.86),
+    small: solidCrown(flat, 0.9),
   },
 };
 
@@ -95,7 +93,9 @@ const forms: Record<Form, { rx: number; scale: number }> = {
 
 function iconSvg(key: IconKey, form: Form) {
   const icon = icons[key];
-  const { rx, scale } = forms[form];
+  const { rx: tile, scale: formScale } = forms[form];
+  const rx = icon.round && tile > 0 ? 256 : tile;
+  const scale = icon.round ? 1 : formScale;
   const mark = form === "favicon" ? icon.small : icon.mark;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">${icon.defs}<rect width="512" height="512" rx="${rx}" fill="${icon.ground}"/><g transform="translate(256 256) scale(${scale}) translate(-256 -256)">${mark}</g></svg>`;
 }
@@ -349,7 +349,7 @@ export function PwaIconPrototype() {
   const [themeParam, setTheme] = useUrlParameter("theme");
   const [splashParam, setSplash] = useUrlParameter("splash");
   const [schemeParam, setScheme] = useUrlParameter("scheme");
-  const k: IconKey = iconKeys.find((i) => i === iconParam) ?? "F2";
+  const k: IconKey = iconKeys.find((i) => i === iconParam) ?? "G1";
   const themeKey: ThemeKey =
     themeParam === "fixed" || themeParam === "graphite" ? themeParam : "page";
   const splashKey = splashParam === "light" ? "light" : "dark";
