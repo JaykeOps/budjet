@@ -1,0 +1,68 @@
+/* PROTOTYPE (prototype/pwa-icon): throwaway. */
+.pi {
+  --page: #f2f2f5; --card: #ffffff; --raised: #ebebf0; --text: #18181d; --muted: #5c5c66;
+  min-height: 100vh; padding: 24px 16px 110px; background: var(--page); color: var(--text);
+  font-family: "Geist Variable", sans-serif;
+}
+.pi[data-dark="true"] {
+  --page: #18181d; --card: #222228; --raised: #2d2d35; --text: #f4f4f6; --muted: #a9a9b3;
+}
+.pi * { box-sizing: border-box; }
+.pi section { max-width: 1040px; margin: 0 auto 32px; }
+.pi h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; color: var(--muted); }
+.pi-head { max-width: 1040px; margin: 0 auto 32px; display: flex; gap: 16px; align-items: center; }
+.pi-head h1 { margin: 0 0 4px; font-size: 28px; letter-spacing: -0.02em; }
+.pi-head p { margin: 0; max-width: 60ch; color: var(--muted); }
+.pi-grid { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.pi-fig { margin: 0; max-width: 100%; }
+.pi-fig figcaption { margin-top: 8px; font-size: 12px; color: var(--muted); max-width: 300px; }
+.pi-fig code { font-size: 11px; }
+
+.pi-home {
+  width: 232px; padding: 16px 12px; border-radius: 24px; display: grid;
+  grid-template-columns: repeat(4, 1fr); row-gap: 14px;
+  background: linear-gradient(160deg, #e9dcc9, #b9c8d8); color: #18181d;
+}
+.pi-home[data-dark="true"] { background: linear-gradient(160deg, #1b2230, #0a0a0e); color: #f4f4f6; }
+.pi-app { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; }
+.pi-mask { width: 44px; height: 44px; overflow: hidden; border-radius: var(--radius); }
+.pi-mask img { width: 100%; height: 100%; }
+.pi-neighbour { display: grid; place-items: center; font-weight: 700; font-size: 18px; }
+
+.pi-tabs { width: 300px; display: flex; gap: 2px; padding: 8px 8px 0; border-radius: 10px 10px 0 0; background: #dfe1e5; color: #202124; font-size: 12px; }
+.pi-tabs[data-dark="true"] { background: #111114; color: #e8eaed; }
+.pi-tab { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 8px 8px 0 0; }
+.pi-tab-on { background: #ffffff; }
+.pi-tabs[data-dark="true"] .pi-tab-on { background: #2b2c30; }
+.pi-otherfav { width: 16px; height: 16px; border-radius: 3px; background: #e8503a; }
+
+.pi-ladder { display: flex; gap: 14px; align-items: flex-end; padding: 8px 0; }
+.pi-safe { position: relative; width: 192px; height: 192px; }
+.pi-safe span { position: absolute; inset: 10%; border-radius: 50%; border: 1.5px dashed #ff7a85; }
+
+.pi-phone { width: 180px; height: 320px; overflow: hidden; border-radius: 22px; border: 1px solid color-mix(in srgb, var(--text) 18%, transparent); display: flex; flex-direction: column; flex: none; }
+.pi-status { display: flex; justify-content: space-between; padding: 8px 14px 6px; font-size: 10px; font-weight: 600; }
+.pi-splash { flex: 1; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; font-size: 13px; }
+.pi-launch { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pi-arrow { color: var(--muted); }
+
+.pi-budget { --bg: #f2f2f5; --bg2: #ffffff; --fg: #18181d; --dim: #5c5c66; --track: #ebebf0; flex: 1; padding: 8px 12px; background: var(--bg); color: var(--fg); font-size: 11px; }
+.pi-budget[data-dark="true"] { --bg: #18181d; --bg2: #222228; --fg: #f4f4f6; --dim: #a9a9b3; --track: #2d2d35; }
+.pi-month { padding: 2px 0 8px; font-weight: 600; color: var(--dim); }
+.pi-rta { padding: 12px; margin-bottom: 8px; border-radius: 14px; color: #f4f4f6; background: linear-gradient(135deg, #5a5a66, #2e2e36 55%, #4a4a55); }
+.pi-rta small { display: block; font-size: 9px; }
+.pi-rta b { font-size: 22px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.pi-row { display: grid; grid-template-columns: 1fr auto; gap: 4px; padding: 8px; margin-bottom: 6px; border-radius: 10px; background: var(--bg2); }
+.pi-row em { font-style: normal; font-variant-numeric: tabular-nums; }
+.pi-row i { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+.pi-row u { display: block; height: 100%; border-radius: 3px; background: var(--dim); }
+
+.pi-window { width: 300px; height: 240px; overflow: hidden; border-radius: 10px; display: flex; flex-direction: column; border: 1px solid color-mix(in srgb, var(--text) 18%, transparent); }
+.pi-titlebar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; font-size: 12px; }
+.pi-winbuttons { margin-left: auto; font-size: 10px; letter-spacing: 3px; }
+
+.pi-state { margin: 0; padding: 16px; overflow-x: auto; border-radius: 16px; background: var(--card); font-size: 12px; line-height: 1.5; }
+
+.pi-switch { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; width: max-content; max-width: calc(100vw - 24px); padding: 8px 14px; border-radius: 22px; background: #ffe45c; color: #111; font: 13px system-ui, sans-serif; box-shadow: 0 6px 24px rgb(0 0 0 / 0.35); }
+.pi-switch button { width: 28px; height: 28px; border: 0; border-radius: 50%; background: #111; color: #ffe45c; cursor: pointer; }
+.pi-switch select { max-width: 170px; }

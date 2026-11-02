@@ -23,7 +23,17 @@ if (!root) throw new Error("#root element missing from index.html");
 // PROTOTYPE (prototype/categories): `?cats=` opens the Categories prototype.
 // PROTOTYPE (prototype/record-desktop): `?recd=` opens the desktop recording
 // and editing prototype.
+// PROTOTYPE (prototype/pwa-icon): `?icon=` opens the PWA icon and theme-color
+// prototype.
 if (
+  import.meta.env.DEV &&
+  new URLSearchParams(window.location.search).has("icon")
+) {
+  const { PwaIconPrototype } = await import(
+    "./pwa-icon-prototype/PwaIconPrototype"
+  );
+  createRoot(root).render(<PwaIconPrototype />);
+} else if (
   import.meta.env.DEV &&
   new URLSearchParams(window.location.search).has("recd")
 ) {
