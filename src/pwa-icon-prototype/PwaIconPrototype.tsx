@@ -1,6 +1,6 @@
-// PROTOTYPE (prototype/pwa-icon): throwaway. Four crown icons for Crownkeep, shown where
+// PROTOTYPE (prototype/pwa-icon): throwaway. Rounds of crown icons for Crownkeep, iterating on A (Crown) and D (Crown coin), shown where
 // an icon actually lives, plus what the status bar, title bar and splash do in
-// each scheme. Switch with `?icon=A|B|C|D`, `?theme=page|fixed|graphite`,
+// each scheme. Switch with `?icon=A|A1|A2|D|D1|D2|D3`, `?theme=page|fixed|graphite`,
 // `?splash=dark|light`, `?scheme=dark|light`. The real tab's favicon and the
 // real theme-color metas follow the choice; the home screens are mock-ups.
 import { useEffect } from "react";
@@ -8,7 +8,7 @@ import "@fontsource-variable/geist";
 import { useUrlParameter } from "../url-parameter";
 import "./pwa-icon.css";
 
-const iconKeys = ["A", "B", "C", "D"] as const;
+const iconKeys = ["A", "A1", "A2", "D", "D1", "D2", "D3"] as const;
 type IconKey = (typeof iconKeys)[number];
 type Form = "any" | "maskable" | "apple" | "favicon";
 
@@ -24,15 +24,21 @@ const crown = (colour: string) =>
 const band = (colour: string) =>
   `<rect x="140" y="346" width="232" height="34" rx="17" fill="${colour}"/>`;
 
-/** A crown made of a keep's battlements, as in a heraldic mural crown. */
-const battlements = (colour: string) =>
-  `<path d="M120 170H184V226H224V170H288V226H328V170H392L368 300H144Z" fill="${colour}" stroke="${colour}" stroke-width="20" stroke-linejoin="round"/>`;
+/** Thick round strokes and ball tips, to match the pill controls. */
+const softCrown = (colour: string) =>
+  `<path d="M136 330 118 196 196 252 256 156 316 252 394 196 376 330Z" fill="${colour}" stroke="${colour}" stroke-width="36" stroke-linejoin="round"/><circle cx="116" cy="172" r="24" fill="${colour}"/><circle cx="256" cy="126" r="24" fill="${colour}"/><circle cx="396" cy="172" r="24" fill="${colour}"/>`;
 
-const pills = (middle: string) =>
-  `<rect x="138" y="196" width="56" height="150" rx="28" fill="${light}" transform="rotate(-16 166 346)"/><rect x="318" y="196" width="56" height="150" rx="28" fill="${light}" transform="rotate(16 346 346)"/><rect x="228" y="130" width="56" height="216" rx="28" fill="${middle}"/><rect x="138" y="346" width="236" height="44" rx="22" fill="${light}"/>`;
+const softBand = (colour: string) =>
+  `<rect x="140" y="362" width="232" height="34" rx="17" fill="${colour}"/>`;
 
-const coin = (inner: string) =>
-  `<circle cx="256" cy="256" r="180" fill="${light}"/><g transform="translate(256 262) scale(.62) translate(-256 -258)">${inner}</g>`;
+const keyhole = (colour: string, grow = 1) =>
+  `<g transform="translate(256 280) scale(${grow}) translate(-256 -280)"><circle cx="256" cy="256" r="26" fill="${colour}"/><path d="M242 270 232 318H280L270 270Z" fill="${colour}" stroke="${colour}" stroke-width="6" stroke-linejoin="round"/></g>`;
+
+const coin = (fill: string, inner: string, scale: number) =>
+  `<circle cx="256" cy="256" r="180" fill="${fill}"/><g transform="translate(256 262) scale(${scale}) translate(-256 -258)">${inner}</g>`;
+
+const meterRing = (arc: string, inner: string, scale: number) =>
+  `<circle cx="256" cy="256" r="160" fill="none" stroke="${light}" stroke-opacity=".2" stroke-width="44"/><circle cx="256" cy="256" r="160" fill="none" stroke="${green}" stroke-width="44" stroke-linecap="round" stroke-dasharray="${arc}" transform="rotate(-90 256 256)"/><g transform="translate(256 262) scale(${scale}) translate(-256 -258)">${inner}</g>`;
 
 const icons: Record<
   IconKey,
@@ -47,36 +53,60 @@ const icons: Record<
   }
 > = {
   A: {
-    name: "Crown",
-    idea: "A plain crown on the Graphite card. Instantly read and says it's yours, with a green band as the only link to the product.",
+    name: "Crown (last round)",
+    idea: "The plain crown from last round, kept here to compare against.",
     ground: "url(#g)",
     defs: graphite,
     mark: `${crown(light)}${band(green)}`,
     small: `${crown(light)}${band(light)}`,
   },
-  B: {
-    name: "Battlements",
-    idea: "A crown made of a keep's battlements, like a heraldic mural crown. The whole name in one shape, though it may read as a castle first.",
+  A1: {
+    name: "Soft crown",
+    idea: "The same crown drawn in the app's own shapes: thick round strokes and ball tips, like the pills and bars. Friendlier and less like a stock crown.",
     ground: "url(#g)",
     defs: graphite,
-    mark: `${battlements(light)}<rect x="144" y="322" width="224" height="36" rx="18" fill="${green}"/>`,
-    small: `${battlements(light)}<rect x="144" y="322" width="224" height="36" rx="18" fill="${light}"/>`,
+    mark: `${softCrown(light)}${softBand(green)}`,
+    small: `${softCrown(light)}${softBand(light)}`,
   },
-  C: {
-    name: "Meter crown",
-    idea: "Three of the Budget's round bars standing up as a crown, the middle one green. The closest to the product, and the least like a logo you've seen.",
-    ground: "#222228",
-    defs: "",
-    mark: pills(green),
-    small: pills(green),
+  A2: {
+    name: "Keyhole crown",
+    idea: "A crown with a keyhole: this is yours, and it's kept. The only one that says the second half of the name, though the keyhole could suggest a password manager.",
+    ground: "url(#g)",
+    defs: graphite,
+    mark: `${crown(light)}${keyhole(ink)}${band(green)}`,
+    small: `${crown(light)}${keyhole(ink, 1.35)}`,
   },
   D: {
-    name: "Crown coin",
-    idea: "A crown stamped on a coin, the way money has always carried one. Clearly about money, though it can read as crypto.",
+    name: "Crown coin (last round)",
+    idea: "The crown coin from last round, kept here to compare against.",
     ground: "url(#g)",
     defs: graphite,
-    mark: coin(`${crown(ink)}${band("#0f7343")}`),
-    small: coin(`${crown(ink)}${band(ink)}`),
+    mark: coin(light, `${crown(ink)}${band("#0f7343")}`, 0.62),
+    small: coin(light, `${crown(ink)}${band(ink)}`, 0.62),
+  },
+  D1: {
+    name: "Big crown coin",
+    idea: "The crown grows until it nearly fills the coin, so it survives at 16px. A heavy, simple stamp.",
+    ground: "url(#g)",
+    defs: graphite,
+    mark: coin(light, `${crown(ink)}${band("#0f7343")}`, 0.8),
+    small: coin(light, `${crown(ink)}${band(ink)}`, 0.86),
+  },
+  D2: {
+    name: "Green coin",
+    idea: "The coin takes the Available green, so the icon is the app's one colour. The loudest on a home screen, and less crypto, more money you have.",
+    ground: "url(#g)",
+    defs: graphite,
+    mark: coin(green, `${crown(ink)}${band(ink)}`, 0.76),
+    small: coin(green, `${crown(ink)}${band(ink)}`, 0.86),
+  },
+  D3: {
+    name: "Meter coin",
+    idea: "The coin's rim is a Category meter, three-quarters green, around a white crown. Takes the crown from A, the round shape from D and the product's own meter.",
+    ground: "url(#g)",
+    defs: graphite,
+    mark: meterRing("754 1006", `${crown(light)}${band(light)}`, 0.52),
+    small: meterRing("1006 1006", `${crown(light)}${band(light)}`, 0.6),
   },
 };
 
@@ -343,7 +373,7 @@ export function PwaIconPrototype() {
   const [themeParam, setTheme] = useUrlParameter("theme");
   const [splashParam, setSplash] = useUrlParameter("splash");
   const [schemeParam, setScheme] = useUrlParameter("scheme");
-  const k: IconKey = iconKeys.find((i) => i === iconParam) ?? "A";
+  const k: IconKey = iconKeys.find((i) => i === iconParam) ?? "A1";
   const themeKey: ThemeKey =
     themeParam === "fixed" || themeParam === "graphite" ? themeParam : "page";
   const splashKey = splashParam === "light" ? "light" : "dark";
@@ -418,6 +448,24 @@ export function PwaIconPrototype() {
           <p>{icons[k].idea}</p>
         </div>
       </header>
+
+      <section>
+        <h2>All of them</h2>
+        <div className="pi-strip">
+          {iconKeys.map((key) => (
+            <button
+              type="button"
+              key={key}
+              data-on={key === k}
+              onClick={() => setIcon(key, "replace")}
+            >
+              <Img k={key} form="any" size={64} />
+              <Img k={key} form="favicon" size={16} />
+              <span>{key}</span>
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section>
         <h2>On a home screen</h2>

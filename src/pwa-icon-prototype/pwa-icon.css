@@ -61,6 +61,10 @@
 .pi-titlebar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; font-size: 12px; }
 .pi-winbuttons { margin-left: auto; font-size: 10px; letter-spacing: 3px; }
 
+.pi-strip { display: flex; flex-wrap: wrap; gap: 10px; }
+.pi-strip button { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; border: 1px solid transparent; border-radius: 16px; background: var(--card); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.pi-strip button[data-on="true"] { border-color: var(--text); }
+
 .pi-state { margin: 0; padding: 16px; overflow-x: auto; border-radius: 16px; background: var(--card); font-size: 12px; line-height: 1.5; }
 
 .pi-switch { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; width: max-content; max-width: calc(100vw - 24px); padding: 8px 14px; border-radius: 22px; background: #ffe45c; color: #111; font: 13px system-ui, sans-serif; box-shadow: 0 6px 24px rgb(0 0 0 / 0.35); }
