@@ -1,6 +1,6 @@
-// PROTOTYPE (prototype/pwa-icon): throwaway. Rounds of crown icons for Crownkeep, iterating on A (Crown) and D (Crown coin), shown where
+// PROTOTYPE (prototype/pwa-icon): throwaway. Rounds of crown icons for Crownkeep, now iterating on the coin, shown where
 // an icon actually lives, plus what the status bar, title bar and splash do in
-// each scheme. Switch with `?icon=A|A1|A2|D|D1|D2|D3`, `?theme=page|fixed|graphite`,
+// each scheme. Switch with `?icon=D1|D2|E1|E2|E3|E4|E5`, `?theme=page|fixed|graphite`,
 // `?splash=dark|light`, `?scheme=dark|light`. The real tab's favicon and the
 // real theme-color metas follow the choice; the home screens are mock-ups.
 import { useEffect } from "react";
@@ -8,7 +8,7 @@ import "@fontsource-variable/geist";
 import { useUrlParameter } from "../url-parameter";
 import "./pwa-icon.css";
 
-const iconKeys = ["A", "A1", "A2", "D", "D1", "D2", "D3"] as const;
+const iconKeys = ["D1", "D2", "E1", "E2", "E3", "E4", "E5"] as const;
 type IconKey = (typeof iconKeys)[number];
 type Form = "any" | "maskable" | "apple" | "favicon";
 
@@ -24,21 +24,28 @@ const crown = (colour: string) =>
 const band = (colour: string) =>
   `<rect x="140" y="346" width="232" height="34" rx="17" fill="${colour}"/>`;
 
-/** Thick round strokes and ball tips, to match the pill controls. */
-const softCrown = (colour: string) =>
-  `<path d="M136 330 118 196 196 252 256 156 316 252 394 196 376 330Z" fill="${colour}" stroke="${colour}" stroke-width="36" stroke-linejoin="round"/><circle cx="116" cy="172" r="24" fill="${colour}"/><circle cx="256" cy="126" r="24" fill="${colour}"/><circle cx="396" cy="172" r="24" fill="${colour}"/>`;
-
-const softBand = (colour: string) =>
-  `<rect x="140" y="362" width="232" height="34" rx="17" fill="${colour}"/>`;
-
-const keyhole = (colour: string, grow = 1) =>
-  `<g transform="translate(256 280) scale(${grow}) translate(-256 -280)"><circle cx="256" cy="256" r="26" fill="${colour}"/><path d="M242 270 232 318H280L270 270Z" fill="${colour}" stroke="${colour}" stroke-width="6" stroke-linejoin="round"/></g>`;
-
 const coin = (fill: string, inner: string, scale: number) =>
-  `<circle cx="256" cy="256" r="180" fill="${fill}"/><g transform="translate(256 262) scale(${scale}) translate(-256 -258)">${inner}</g>`;
+  `<circle cx="256" cy="256" r="180" fill="${fill}"/>${place(inner, 256, 262, scale)}`;
 
-const meterRing = (arc: string, inner: string, scale: number) =>
-  `<circle cx="256" cy="256" r="160" fill="none" stroke="${light}" stroke-opacity=".2" stroke-width="44"/><circle cx="256" cy="256" r="160" fill="none" stroke="${green}" stroke-width="44" stroke-linecap="round" stroke-dasharray="${arc}" transform="rotate(-90 256 256)"/><g transform="translate(256 262) scale(${scale}) translate(-256 -258)">${inner}</g>`;
+/** Sets a mark drawn around the crown's centre at a new centre and size. */
+const place = (inner: string, x: number, y: number, scale: number) =>
+  `<g transform="translate(${x} ${y}) scale(${scale}) translate(-256 -258)">${inner}</g>`;
+
+const crownOnly = (colour: string) => `${crown(colour)}${band(colour)}`;
+
+/** The ridges round the edge of a real coin. */
+const milling = Array.from(
+  { length: 40 },
+  (_, i) =>
+    `<rect x="252" y="84" width="8" height="20" rx="4" fill="${ink}" opacity=".45" transform="rotate(${i * 9} 256 256)"/>`,
+).join("");
+
+/** A coin seen from the side, as a pill. */
+const edge = (y: number, shift: number, fill: string) =>
+  `<rect x="${136 + shift}" y="${y}" width="240" height="56" rx="28" fill="${fill}"/>`;
+
+const oneShape = (inner: string) =>
+  `<path d="M96 276A160 160 0 0 0 416 276L404 136 334 196 256 96 178 196 108 136Z" fill="${green}" stroke="${green}" stroke-width="16" stroke-linejoin="round"/>${inner}`;
 
 const icons: Record<
   IconKey,
@@ -52,61 +59,61 @@ const icons: Record<
     small: string;
   }
 > = {
-  A: {
-    name: "Crown (last round)",
-    idea: "The plain crown from last round, kept here to compare against.",
-    ground: "url(#g)",
-    defs: graphite,
-    mark: `${crown(light)}${band(green)}`,
-    small: `${crown(light)}${band(light)}`,
-  },
-  A1: {
-    name: "Soft crown",
-    idea: "The same crown drawn in the app's own shapes: thick round strokes and ball tips, like the pills and bars. Friendlier and less like a stock crown.",
-    ground: "url(#g)",
-    defs: graphite,
-    mark: `${softCrown(light)}${softBand(green)}`,
-    small: `${softCrown(light)}${softBand(light)}`,
-  },
-  A2: {
-    name: "Keyhole crown",
-    idea: "A crown with a keyhole: this is yours, and it's kept. The only one that says the second half of the name, though the keyhole could suggest a password manager.",
-    ground: "url(#g)",
-    defs: graphite,
-    mark: `${crown(light)}${keyhole(ink)}${band(green)}`,
-    small: `${crown(light)}${keyhole(ink, 1.35)}`,
-  },
-  D: {
-    name: "Crown coin (last round)",
-    idea: "The crown coin from last round, kept here to compare against.",
-    ground: "url(#g)",
-    defs: graphite,
-    mark: coin(light, `${crown(ink)}${band("#0f7343")}`, 0.62),
-    small: coin(light, `${crown(ink)}${band(ink)}`, 0.62),
-  },
   D1: {
-    name: "Big crown coin",
-    idea: "The crown grows until it nearly fills the coin, so it survives at 16px. A heavy, simple stamp.",
+    name: "Big crown coin (last round)",
+    idea: "White coin from last round, kept here to compare against.",
     ground: "url(#g)",
     defs: graphite,
     mark: coin(light, `${crown(ink)}${band("#0f7343")}`, 0.8),
-    small: coin(light, `${crown(ink)}${band(ink)}`, 0.86),
+    small: coin(light, crownOnly(ink), 0.86),
   },
   D2: {
-    name: "Green coin",
-    idea: "The coin takes the Available green, so the icon is the app's one colour. The loudest on a home screen, and less crypto, more money you have.",
+    name: "Green coin (last round)",
+    idea: "Green coin from last round, kept here to compare against.",
     ground: "url(#g)",
     defs: graphite,
-    mark: coin(green, `${crown(ink)}${band(ink)}`, 0.76),
-    small: coin(green, `${crown(ink)}${band(ink)}`, 0.86),
+    mark: coin(green, crownOnly(ink), 0.76),
+    small: coin(green, crownOnly(ink), 0.86),
   },
-  D3: {
-    name: "Meter coin",
-    idea: "The coin's rim is a Category meter, three-quarters green, around a white crown. Takes the crown from A, the round shape from D and the product's own meter.",
+  E1: {
+    name: "Milled coin",
+    idea: "The green coin with the ridged edge of a real coin, so it reads as money in your hand rather than a token. The ridges disappear at 16px.",
     ground: "url(#g)",
     defs: graphite,
-    mark: meterRing("754 1006", `${crown(light)}${band(light)}`, 0.52),
-    small: meterRing("1006 1006", `${crown(light)}${band(light)}`, 0.6),
+    mark: coin(green, crownOnly(ink), 0.62) + milling,
+    small: coin(green, crownOnly(ink), 0.86),
+  },
+  E2: {
+    name: "Coin stack",
+    idea: "A stack of coins seen from the side, drawn as the app's own pills, with a crown on top. Your money, kept in a pile. The only one that isn't a circle.",
+    ground: "url(#g)",
+    defs: graphite,
+    mark: `${edge(342, 8, light)}${edge(278, -8, light)}${edge(214, 4, green)}${place(crownOnly(light), 256, 132, 0.5)}`,
+    small: `${edge(324, 0, light)}${edge(236, 0, green)}${place(crownOnly(light), 256, 136, 0.56)}`,
+  },
+  E3: {
+    name: "Crowned coin",
+    idea: "A coin wearing a crown, so the crown sits on top rather than inside. Warmer and more of a character, closer to the feel of Piggy.",
+    ground: "url(#g)",
+    defs: graphite,
+    mark: `<circle cx="256" cy="304" r="136" fill="${green}"/><circle cx="256" cy="304" r="98" fill="none" stroke="${ink}" stroke-opacity=".3" stroke-width="14"/>${place(crown(light), 256, 136, 0.62)}`,
+    small: `<circle cx="256" cy="304" r="136" fill="${green}"/>${place(crown(light), 256, 136, 0.62)}`,
+  },
+  E4: {
+    name: "Crown-edged coin",
+    idea: "One shape: the coin's top edge rises into a crown's three points. The most ownable silhouette, though it takes a moment to read as a coin.",
+    ground: "url(#g)",
+    defs: graphite,
+    mark: oneShape(`<circle cx="256" cy="288" r="76" fill="none" stroke="${ink}" stroke-width="28"/>`),
+    small: oneShape(`<circle cx="256" cy="288" r="64" fill="${ink}"/>`),
+  },
+  E5: {
+    name: "Thick coin",
+    idea: "The green coin with a darker edge beneath it, so it has weight, like the app's soft depth. The simplest step from last round's green coin.",
+    ground: "url(#g)",
+    defs: graphite,
+    mark: `<circle cx="256" cy="278" r="170" fill="#0f7343"/><circle cx="256" cy="246" r="170" fill="${green}"/>${place(crownOnly(ink), 256, 250, 0.72)}`,
+    small: `<circle cx="256" cy="278" r="170" fill="#0f7343"/><circle cx="256" cy="246" r="170" fill="${green}"/>${place(crownOnly(ink), 256, 250, 0.8)}`,
   },
 };
 
@@ -373,7 +380,7 @@ export function PwaIconPrototype() {
   const [themeParam, setTheme] = useUrlParameter("theme");
   const [splashParam, setSplash] = useUrlParameter("splash");
   const [schemeParam, setScheme] = useUrlParameter("scheme");
-  const k: IconKey = iconKeys.find((i) => i === iconParam) ?? "A1";
+  const k: IconKey = iconKeys.find((i) => i === iconParam) ?? "E1";
   const themeKey: ThemeKey =
     themeParam === "fixed" || themeParam === "graphite" ? themeParam : "page";
   const splashKey = splashParam === "light" ? "light" : "dark";
