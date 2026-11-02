@@ -1,6 +1,6 @@
-// PROTOTYPE (prototype/pwa-icon): throwaway. Rounds of crown icons for Crownkeep, now refining the solid coin, shown where
+// PROTOTYPE (prototype/pwa-icon): throwaway. Rounds of crown icons for Crownkeep, now experimental takes on coin and crown, shown where
 // an icon actually lives, plus what the status bar, title bar and splash do in
-// each scheme. Switch with `?icon=G1|G2|G3|G4|G5`, `?theme=page|fixed|graphite`,
+// each scheme. Switch with `?icon=G3|H1|H2|H3|H4|H5`, `?theme=page|fixed|graphite`,
 // `?splash=dark|light`, `?scheme=dark|light`. The real tab's favicon and the
 // real theme-color metas follow the choice; the home screens are mock-ups.
 import { useEffect } from "react";
@@ -8,7 +8,7 @@ import "@fontsource-variable/geist";
 import { useUrlParameter } from "../url-parameter";
 import "./pwa-icon.css";
 
-const iconKeys = ["G1", "G2", "G3", "G4", "G5"] as const;
+const iconKeys = ["G3", "H1", "H2", "H3", "H4", "H5"] as const;
 type IconKey = (typeof iconKeys)[number];
 type Form = "any" | "maskable" | "apple" | "favicon";
 
@@ -18,8 +18,34 @@ const flat = "#222228";
 const crownPoints = "M136 330 112 176 188 236 256 136 324 236 400 176 376 330Z";
 const softPoints = "M150 320 136 206 200 250 256 176 312 250 376 206 362 320Z";
 
-const solidCrown = (colour: string, scale: number) =>
-  `<g transform="translate(256 262) scale(${scale}) translate(-256 -233)"><path d="${crownPoints}" fill="${colour}" stroke="${colour}" stroke-width="20" stroke-linejoin="round"/></g>`;
+const crownAt = (colour: string, x: number, y: number, scale: number) =>
+  `<g transform="translate(${x} ${y}) scale(${scale}) translate(-256 -233)"><path d="${crownPoints}" fill="${colour}" stroke="${colour}" stroke-width="20" stroke-linejoin="round"/></g>`;
+
+/** A hole whose points leave white teeth facing in: a crown seen from above. */
+const topDown = (ground: string, points: number, outer: number, inner: number) => {
+  const corners = Array.from({ length: points * 2 }, (_, i) => {
+    const r = i % 2 === 0 ? outer : inner;
+    const a = (Math.PI * i) / points - Math.PI / 2;
+    return `${(256 + r * Math.cos(a)).toFixed(1)} ${(256 + r * Math.sin(a)).toFixed(1)}`;
+  });
+  return `<circle cx="256" cy="256" r="176" fill="${light}"/><path d="M${corners.join("L")}Z" fill="${ground}" stroke="${ground}" stroke-width="8" stroke-linejoin="round"/>`;
+};
+
+/** A crown with its middle point swapped for a coin held in its bowl. */
+const holding = (ground: string) =>
+  `<path d="M132 356 104 150 188 216 256 150 324 216 408 150 380 356Z" fill="${light}" stroke="${light}" stroke-width="16" stroke-linejoin="round"/><circle cx="256" cy="196" r="92" fill="${ground}"/><circle cx="256" cy="196" r="68" fill="${light}"/>`;
+
+const sides = `<clipPath id="l"><rect width="256" height="512"/></clipPath><clipPath id="r"><rect x="256" width="256" height="512"/></clipPath>`;
+const counterGround = "#34343d";
+const counterInk = "#18181d";
+const counterchange = `<circle cx="256" cy="256" r="176" fill="${counterInk}"/><circle cx="256" cy="256" r="176" fill="${light}" clip-path="url(#l)"/><g clip-path="url(#l)">${crownAt(counterInk, 256, 262, 0.8)}</g><g clip-path="url(#r)">${crownAt(light, 256, 262, 0.8)}</g>`;
+
+const reedShape = `<clipPath id="reed"><path d="M90 270A166 166 0 0 0 422 270L410 130 336 196 256 90 176 196 102 130Z"/></clipPath>`;
+const reeds = (each: number, pitch: number, reach: number) =>
+  `<g clip-path="url(#reed)">${Array.from({ length: reach * 2 + 1 }, (_, i) => `<rect x="${256 + (i - reach) * pitch - each / 2}" y="60" width="${each}" height="400" fill="${light}"/>`).join("")}</g>`;
+
+const printCoin = `<clipPath id="coin"><circle cx="220" cy="290" r="140"/></clipPath>`;
+const misprint = `<circle cx="220" cy="290" r="140" fill="#5fdc9a"/>${crownAt("#5b45d6", 290, 190, 0.78)}<g clip-path="url(#coin)">${crownAt("#18181d", 290, 190, 0.78)}</g>`;
 
 const softCrown = (colour: string, scale: number) =>
   `<g transform="translate(256 262) scale(${scale}) translate(-256 -248)"><path d="${softPoints}" fill="${colour}" stroke="${colour}" stroke-width="44" stroke-linejoin="round"/></g>`;
@@ -41,46 +67,53 @@ const icons: Record<
     small: string;
   }
 > = {
-  G1: {
-    name: "Solid coin (last round)",
-    idea: "F2 unchanged, kept here to compare against.",
-    ground: flat,
-    defs: "",
-    mark: `${disc(light)}${solidCrown(flat, 0.72)}`,
-    small: `${disc(light)}${solidCrown(flat, 0.8)}`,
-  },
-  G2: {
-    name: "Big crown",
-    idea: "The crown grows until its points nearly reach the rim, so the coin becomes a frame and the crown does the talking.",
-    ground: flat,
-    defs: "",
-    mark: `${disc(light)}${solidCrown(flat, 0.88)}`,
-    small: `${disc(light)}${solidCrown(flat, 0.92)}`,
-  },
   G3: {
-    name: "Soft crown",
-    idea: "A lower, wider crown with rounded points, to match the app's pill controls. Friendlier and less heraldic.",
+    name: "Soft crown (last round)",
+    idea: "The two-shape coin from last round, kept here to compare against.",
     ground: flat,
     defs: "",
     mark: `${disc(light)}${softCrown(flat, 0.82)}`,
     small: `${disc(light)}${softCrown(flat, 0.92)}`,
   },
-  G4: {
-    name: "Inverted",
-    idea: "A white tile with a dark coin and a white crown. Same shapes, but the tile no longer disappears on a dark home screen.",
-    ground: light,
+  H1: {
+    name: "Crown from above",
+    idea: "Look straight down into a crown and you see a circle with points: a crown and a coin are the same shape. Nobody else's mark, but it can read as a seal or a bottle cap.",
+    ground: flat,
     defs: "",
-    mark: `${disc(flat)}${solidCrown(light, 0.72)}`,
-    small: `${disc(flat)}${solidCrown(light, 0.8)}`,
+    mark: topDown(flat, 7, 132, 64),
+    small: topDown(flat, 5, 130, 56),
   },
-  G5: {
-    name: "Just the coin",
-    idea: "No tile at all: the white coin is the icon, where the platform allows it. The fewest shapes, though iOS always fills it out to its own squircle.",
-    ground: light,
-    round: true,
+  H2: {
+    name: "Held coin",
+    idea: "A crown with its middle point swapped for a coin, held in its bowl. Says keep in one picture: the crown is holding your money.",
+    ground: flat,
     defs: "",
-    mark: solidCrown(flat, 0.86),
-    small: solidCrown(flat, 0.9),
+    mark: holding(flat),
+    small: holding(flat),
+  },
+  H3: {
+    name: "Counterchange",
+    idea: "A heraldic trick: the coin splits down the middle and its colours swap across the line, so the crown is dark on the light half and light on the dark half. Two tones, very graphic.",
+    ground: counterGround,
+    defs: sides,
+    mark: counterchange,
+    small: counterchange,
+  },
+  H4: {
+    name: "Reeded crown",
+    idea: "The ridges on a coin's edge, unrolled into stripes, cut to a crown on top and a coin below. Also recalls the Budget's bars, though it can look like a barcode.",
+    ground: flat,
+    defs: reedShape,
+    mark: reeds(18, 32, 5),
+    small: reeds(40, 64, 2),
+  },
+  H5: {
+    name: "Misprint",
+    idea: "Two inks printed slightly out of line, like the Riso bars in the app: a green coin and a violet crown that go black where they overlap. The loudest, and the only one with colour.",
+    ground: light,
+    defs: `${printCoin}`,
+    mark: misprint,
+    small: misprint,
   },
 };
 
@@ -349,7 +382,7 @@ export function PwaIconPrototype() {
   const [themeParam, setTheme] = useUrlParameter("theme");
   const [splashParam, setSplash] = useUrlParameter("splash");
   const [schemeParam, setScheme] = useUrlParameter("scheme");
-  const k: IconKey = iconKeys.find((i) => i === iconParam) ?? "G1";
+  const k: IconKey = iconKeys.find((i) => i === iconParam) ?? "H1";
   const themeKey: ThemeKey =
     themeParam === "fixed" || themeParam === "graphite" ? themeParam : "page";
   const splashKey = splashParam === "light" ? "light" : "dark";
