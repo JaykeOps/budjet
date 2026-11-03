@@ -109,6 +109,13 @@
         <button id="read">4. Read the folder</button>
         <button id="install" hidden>Install this page</button>
       </div>
+      <h2 style="margin-top: 16px">Read speed</h2>
+      <p class="hint">Copies ten years of one device's data: 120 files of about 100 KB each, 12 MB in all, in "Crownkeep-probe/timing". It takes a while on a phone, so keep the page open. Your sync service will upload these files if it watches this folder, so delete them when you're done.</p>
+      <div class="buttons">
+        <button id="timing">Time reading 120 files</button>
+        <button id="timing-delete">Delete the test files</button>
+      </div>
+      <p id="timing-status" class="hint" style="margin-top: 10px" role="status"></p>
       <p class="hint" style="margin-top: 10px">To test coming back, close every tab of this page and reopen it, because a reload doesn't show the prompt. To test a lost folder, move or delete it in your file manager, then press "Read the folder".</p>
       <dl id="files" style="margin-top: 10px"></dl>
     </section>
@@ -243,6 +250,9 @@
         $("permission").disabled = !state.handle;
         $("write").disabled = !state.handle;
         $("read").disabled = !state.handle;
+        $("timing-delete").disabled = !state.handle;
+        if (!state.handle) $("timing").disabled = true;
+        else if ($("timing-status").textContent === "" || !$("timing-status").textContent.endsWith("...")) $("timing").disabled = false;
 
         const problems = [];
         if (!isSecureContext) problems.push("This address isn't HTTPS or localhost, so browsers hide the folder picker and may limit storage.");
@@ -338,6 +348,75 @@
       };
       $("write").onclick = () => writeLine().then(readFolder).catch((error) => failure("Writing", error));
       $("read").onclick = () => readFolder().catch((error) => failure("Reading the folder", error));
+
+      // --- Read speed. Sizes follow the spec's estimate: about 50,000 records
+      // over ten years, in one file per device per Month.
+      const TIMING_FILES = 120;
+      const TIMING_LINES = 400;
+      const TIMING_LINE = "x".repeat(250);
+      const status = (text) => { $("timing-status").textContent = text; };
+
+      async function timed(label, act) {
+        status(`${label}...`);
+        const started = performance.now();
+        await act();
+        const ms = Math.round(performance.now() - started);
+        note(`Timing, ${label}: ${ms} ms (${(ms / TIMING_FILES).toFixed(1)} ms per file)`);
+      }
+
+      $("timing").onclick = async () => {
+        $("timing").disabled = true;
+        try {
+          const probe = await state.handle.getDirectoryHandle(SUBFOLDER, { create: true });
+          const folder = await probe.getDirectoryHandle("timing", { create: true });
+          const name = (i) => `month-${String(i).padStart(3, "0")}.txt`;
+          const body = `${TIMING_LINE}\n`.repeat(TIMING_LINES);
+          await timed("writing 120 files, one at a time", async () => {
+            for (let i = 0; i < TIMING_FILES; i++) {
+              const entry = await folder.getFileHandle(name(i), { create: true });
+              const writable = await entry.createWritable();
+              await writable.write(body);
+              await writable.close();
+              status(`Writing file ${i + 1} of ${TIMING_FILES}...`);
+            }
+          });
+          const handles = [];
+          await timed("listing the folder", async () => {
+            for await (const entry of folder.values()) if (entry.kind === "file") handles.push(entry);
+          });
+          note(`Timing: listed ${handles.length} files`);
+          await timed("checking each file's date and size, one at a time", async () => {
+            for (const entry of handles) {
+              const file = await entry.getFile();
+              void file.lastModified;
+            }
+          });
+          let characters = 0;
+          await timed("reading every file, one at a time", async () => {
+            for (const entry of handles) characters += (await (await entry.getFile()).text()).length;
+          });
+          await timed("reading every file, all at once", async () => {
+            await Promise.all(handles.map(async (entry) => (await entry.getFile()).text()));
+          });
+          note(`Timing: read ${Math.round(characters / 1048576)} MB per pass`);
+          status("Done. Copy the results below.");
+        } catch (error) {
+          failure("Timing", error);
+          status("Failed. See the log below.");
+        } finally {
+          $("timing").disabled = false;
+        }
+      };
+      $("timing-delete").onclick = async () => {
+        try {
+          const probe = await state.handle.getDirectoryHandle(SUBFOLDER);
+          await probe.removeEntry("timing", { recursive: true });
+          note("Deleted the test files");
+          status("Deleted the test files.");
+        } catch (error) {
+          failure("Deleting the test files", error);
+        }
+      };
 
       // Background tabs can lose access, and sync can deliver files at any time.
       document.addEventListener("visibilitychange", async () => {
