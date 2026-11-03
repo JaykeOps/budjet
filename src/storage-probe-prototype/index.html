@@ -1,0 +1,425 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Answers the ticket "Does the Data Folder work in Brave
+  and Chromium on desktop and Android?", and how long browser storage survives.
+  Never merged. Keeps its own IndexedDB database, and only ever writes inside a
+  "Crownkeep-probe" subfolder of the folder you pick.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Storage probe</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <style>
+      :root {
+        color-scheme: dark light;
+        --bg: light-dark(#f2f2f5, #18181d);
+        --card: light-dark(#fff, #24242b);
+        --text: light-dark(#18181d, #f2f2f5);
+        --dim: light-dark(#5c5c66, #a8a8b3);
+        --line: light-dark(#d8d8de, #3a3a44);
+        --yes: light-dark(#14703f, #6fdc9f);
+        --no: light-dark(#b3261e, #ff8f87);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0 auto;
+        max-width: 44rem;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.45 system-ui, sans-serif;
+      }
+      h1 { font-size: 1.4rem; margin: 0 0 4px; }
+      h2 { font-size: 1.05rem; margin: 0 0 8px; }
+      section {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+        margin-top: 14px;
+      }
+      p { margin: 0 0 8px; }
+      .hint { color: var(--dim); font-size: 0.9rem; }
+      dl { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 4px 12px; margin: 0 0 10px; }
+      dt { color: var(--dim); font-size: 0.9rem; }
+      dd { margin: 0; overflow-wrap: anywhere; }
+      .yes { color: var(--yes); font-weight: 600; }
+      .no { color: var(--no); font-weight: 600; }
+      .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+      button {
+        font: inherit;
+        min-height: 44px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--bg);
+        color: inherit;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.5; cursor: default; }
+      textarea {
+        width: 100%;
+        height: 16rem;
+        font: 12px/1.4 ui-monospace, monospace;
+        background: var(--bg);
+        color: inherit;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+      }
+      #warning { border-color: var(--no); }
+      #warning[hidden] { display: none; }
+    </style>
+  </head>
+  <body>
+    <h1>Storage probe</h1>
+    <p class="hint">Throwaway test page. Nothing leaves this device, except through your own sync service if you pick a folder it watches.</p>
+
+    <section id="warning" role="alert" hidden>
+      <h2 class="no">These results can't be trusted here</h2>
+      <p id="warning-text"></p>
+    </section>
+
+    <section>
+      <h2>This browser</h2>
+      <dl id="environment"></dl>
+    </section>
+
+    <section>
+      <h2>Browser storage</h2>
+      <p class="hint">Open this page again after a few days, and again after 8+ days without opening it. "Visits" shows whether the saved data survived. Don't clear site data in between.</p>
+      <dl id="storage"></dl>
+      <div class="buttons">
+        <button id="persist">Request persistent storage</button>
+        <button id="wipe">Forget everything saved here</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Data Folder</h2>
+      <p class="hint">Pick a folder your sync service watches. The page writes only inside a "Crownkeep-probe" subfolder, one file per device. Run it on two devices with the same folder to test sync.</p>
+      <dl id="folder"></dl>
+      <div class="buttons">
+        <button id="choose">1. Choose a folder</button>
+        <button id="permission">2. Ask for permission again</button>
+        <button id="write">3. Write a line</button>
+        <button id="read">4. Read the folder</button>
+        <button id="install" hidden>Install this page</button>
+      </div>
+      <p class="hint" style="margin-top: 10px">To test coming back, close every tab of this page and reopen it, because a reload doesn't show the prompt. To test a lost folder, move or delete it in your file manager, then press "Read the folder".</p>
+      <dl id="files" style="margin-top: 10px"></dl>
+    </section>
+
+    <section>
+      <h2>Results to paste in the ticket</h2>
+      <div class="buttons" style="margin-bottom: 8px">
+        <button id="copy">Copy results</button>
+      </div>
+      <textarea id="report" readonly aria-label="Results"></textarea>
+    </section>
+
+    <script type="module">
+      const DATABASE = "storage-probe-PROTOTYPE-wipe-me";
+      const SUBFOLDER = "Crownkeep-probe";
+      const $ = (id) => document.getElementById(id);
+      const log = [];
+      const state = { handle: null, deviceId: "", visits: [], files: [], permission: "n/a" };
+
+      function note(message) {
+        log.push(`${new Date().toISOString()} ${message}`);
+        render();
+      }
+
+      function failure(what, error) {
+        note(`${what}: FAILED ${error?.name ?? "Error"}: ${error?.message ?? error}`);
+      }
+
+      // --- Small IndexedDB wrapper ---
+      function openDatabase() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(DATABASE, 1);
+          request.onupgradeneeded = () => request.result.createObjectStore("kv");
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+      async function kv(mode, act) {
+        const database = await openDatabase();
+        return new Promise((resolve, reject) => {
+          const transaction = database.transaction("kv", mode);
+          const request = act(transaction.objectStore("kv"));
+          let result;
+          if (request) request.onsuccess = () => { result = request.result; };
+          transaction.oncomplete = () => { database.close(); resolve(result); };
+          transaction.onerror = () => reject(transaction.error);
+          transaction.onabort = () => reject(transaction.error);
+        });
+      }
+      const get = (key) => kv("readonly", (store) => store.get(key));
+      const set = (key, value) => kv("readwrite", (store) => store.put(value, key));
+
+      // --- What this browser is ---
+      function isFramed() {
+        try { return window.top !== window.self; } catch { return true; }
+      }
+      function browserName() {
+        const brands = navigator.userAgentData?.brands?.map((b) => `${b.brand} ${b.version}`).join(", ");
+        const brave = navigator.brave ? " (navigator.brave present)" : "";
+        return (brands || navigator.userAgent) + brave;
+      }
+      const installed = () => matchMedia("(display-mode: standalone)").matches;
+      const hasPicker = () => typeof window.showDirectoryPicker === "function";
+
+      function yesNo(value) {
+        return { text: value ? "yes" : "no", className: value ? "yes" : "no" };
+      }
+      function fill(id, rows) {
+        const list = $(id);
+        list.replaceChildren();
+        for (const [label, value] of rows) {
+          const dt = document.createElement("dt");
+          dt.textContent = label;
+          const dd = document.createElement("dd");
+          if (value && typeof value === "object") {
+            dd.textContent = value.text;
+            dd.className = value.className;
+          } else {
+            dd.textContent = String(value);
+          }
+          list.append(dt, dd);
+        }
+      }
+
+      const storageInfo = { supported: "storage" in navigator && "persist" in (navigator.storage ?? {}), persisted: "unknown", usage: "unknown", quota: "unknown" };
+
+      async function refreshStorage() {
+        if (!navigator.storage) return;
+        try {
+          if (navigator.storage.persisted) storageInfo.persisted = await navigator.storage.persisted();
+          if (navigator.storage.estimate) {
+            const { usage, quota } = await navigator.storage.estimate();
+            storageInfo.usage = `${Math.round((usage ?? 0) / 1024)} KB`;
+            storageInfo.quota = `${Math.round((quota ?? 0) / 1048576)} MB`;
+          }
+        } catch (error) {
+          failure("Reading storage state", error);
+        }
+      }
+
+      function daysAgo(iso) {
+        return ((Date.now() - new Date(iso)) / 86400000).toFixed(1);
+      }
+
+      function render() {
+        fill("environment", [
+          ["Browser", browserName()],
+          ["Platform", navigator.userAgentData?.platform ?? navigator.platform],
+          ["Address", location.origin],
+          ["Secure context", yesNo(isSecureContext)],
+          ["Own tab (not embedded)", yesNo(!isFramed())],
+          ["Running installed", yesNo(installed())],
+        ]);
+        const first = state.visits[0];
+        const previous = state.visits.at(-2);
+        fill("storage", [
+          ["Storage API", yesNo(storageInfo.supported)],
+          ["Persistent now", typeof storageInfo.persisted === "boolean" ? yesNo(storageInfo.persisted) : storageInfo.persisted],
+          ["Used / quota", `${storageInfo.usage} / ${storageInfo.quota}`],
+          ["Visits saved", state.visits.length],
+          ["First saved", first ? `${first} (${daysAgo(first)} days ago)` : "none"],
+          ["Previous visit", previous ? `${previous} (${daysAgo(previous)} days ago)` : "none: first visit, or the data was erased"],
+        ]);
+        fill("folder", [
+          ["Folder picker present", yesNo(hasPicker())],
+          ["Folder remembered", state.handle ? state.handle.name : "none"],
+          ["Permission", state.permission],
+          ["This device's file", state.deviceId ? `${state.deviceId}.txt` : "none"],
+        ]);
+        fill("files", state.files.map((file) => [file.label, file.detail]));
+        $("choose").disabled = !hasPicker();
+        $("permission").disabled = !state.handle;
+        $("write").disabled = !state.handle;
+        $("read").disabled = !state.handle;
+
+        const problems = [];
+        if (!isSecureContext) problems.push("This address isn't HTTPS or localhost, so browsers hide the folder picker and may limit storage.");
+        if (isFramed()) problems.push("This page is embedded in another page, which blocks the folder picker and can separate its storage. Open it in its own tab.");
+        $("warning").hidden = problems.length === 0;
+        $("warning-text").textContent = problems.join(" ");
+
+        $("report").value = [
+          "Storage probe results",
+          `Browser: ${browserName()}`,
+          `User agent: ${navigator.userAgent}`,
+          `Address: ${location.origin}`,
+          `Secure context: ${isSecureContext}; embedded: ${isFramed()}; installed: ${installed()}`,
+          "",
+          "Browser storage",
+          `Storage API: ${storageInfo.supported}; persistent now: ${storageInfo.persisted}; used/quota: ${storageInfo.usage} / ${storageInfo.quota}`,
+          `Visits saved: ${state.visits.length}; first: ${first ?? "none"}; previous: ${previous ?? "none"}`,
+          "",
+          "Data Folder",
+          `Picker present: ${hasPicker()}; folder: ${state.handle?.name ?? "none"}; permission: ${state.permission}`,
+          ...state.files.map((file) => `File: ${file.label}: ${file.detail}`),
+          "",
+          "Log",
+          ...log,
+        ].join("\n");
+      }
+
+      // --- Data Folder ---
+      async function refreshPermission() {
+        if (!state.handle) return;
+        try {
+          state.permission = await state.handle.queryPermission({ mode: "readwrite" });
+          note(`queryPermission: ${state.permission}`);
+        } catch (error) {
+          failure("queryPermission", error);
+        }
+      }
+
+      async function readFolder() {
+        // Never creates anything: a lost folder has to show up as an error.
+        const sub = await state.handle.getDirectoryHandle(SUBFOLDER);
+        const files = [];
+        for await (const [name, entry] of sub.entries()) {
+          if (entry.kind !== "file") continue;
+          const file = await entry.getFile();
+          const lines = (await file.text()).trim().split("\n");
+          const mine = name === `${state.deviceId}.txt`;
+          files.push({
+            label: `${mine ? "This device" : "Another device"}: ${name}`,
+            detail: `${lines.length} lines, last: ${lines.at(-1)}`,
+          });
+        }
+        state.files = files;
+        note(`Read the folder: ${files.length} files, ${files.filter((f) => f.label.startsWith("Another")).length} from another device`);
+      }
+
+      async function writeLine() {
+        const sub = await state.handle.getDirectoryHandle(SUBFOLDER, { create: true });
+        const entry = await sub.getFileHandle(`${state.deviceId}.txt`, { create: true });
+        const file = await entry.getFile();
+        const writable = await entry.createWritable({ keepExistingData: true });
+        await writable.seek(file.size);
+        await writable.write(`${new Date().toISOString()}\n`);
+        await writable.close();
+        note("Wrote a line");
+      }
+
+      $("choose").onclick = async () => {
+        try {
+          const handle = await window.showDirectoryPicker({ mode: "readwrite", id: "storage-probe" });
+          state.handle = handle;
+          note(`Picked folder "${handle.name}"`);
+          try {
+            await set("handle", handle);
+            note("Remembered the folder in IndexedDB");
+          } catch (error) {
+            failure("Remembering the folder", error);
+          }
+          await refreshPermission();
+          await writeLine();
+          await readFolder();
+        } catch (error) {
+          failure("Choosing or using the folder", error);
+        }
+      };
+      $("permission").onclick = async () => {
+        try {
+          state.permission = await state.handle.requestPermission({ mode: "readwrite" });
+          note(`requestPermission: ${state.permission}`);
+        } catch (error) {
+          failure("requestPermission", error);
+        }
+      };
+      $("write").onclick = () => writeLine().then(readFolder).catch((error) => failure("Writing", error));
+      $("read").onclick = () => readFolder().catch((error) => failure("Reading the folder", error));
+
+      // Background tabs can lose access, and sync can deliver files at any time.
+      document.addEventListener("visibilitychange", async () => {
+        if (document.visibilityState !== "visible" || !state.handle) return;
+        note("Back in the foreground");
+        await refreshPermission();
+        if (state.permission === "granted") {
+          await readFolder().catch((error) => failure("Reading the folder", error));
+        }
+      });
+
+      // --- Browser storage ---
+      $("persist").onclick = async () => {
+        try {
+          const granted = await navigator.storage.persist();
+          note(`storage.persist(): ${granted}`);
+          await refreshStorage();
+          render();
+        } catch (error) {
+          failure("storage.persist()", error);
+        }
+      };
+      $("wipe").onclick = async () => {
+        await kv("readwrite", (store) => store.clear());
+        state.handle = null;
+        state.visits = [];
+        state.files = [];
+        state.permission = "n/a";
+        state.deviceId = crypto.randomUUID();
+        await set("deviceId", state.deviceId);
+        note("Forgot everything saved in IndexedDB. Files in the folder were left alone.");
+      };
+
+      // --- Copying results ---
+      $("copy").onclick = async () => {
+        $("report").select();
+        try {
+          await navigator.clipboard.writeText($("report").value);
+          note("Copied the results");
+        } catch {
+          document.execCommand("copy");
+        }
+      };
+
+      // --- Installing ---
+      let installPrompt;
+      window.addEventListener("beforeinstallprompt", (event) => {
+        event.preventDefault();
+        installPrompt = event;
+        $("install").hidden = false;
+        note("Browser offers installation");
+      });
+      $("install").onclick = async () => {
+        await installPrompt.prompt();
+        const { outcome } = await installPrompt.userChoice;
+        note(`Install prompt: ${outcome}`);
+      };
+
+      // --- On every load ---
+      async function start() {
+        render();
+        try {
+          state.visits = (await get("visits")) ?? [];
+          state.visits.push(new Date().toISOString());
+          await set("visits", state.visits);
+          state.deviceId = (await get("deviceId")) ?? crypto.randomUUID();
+          await set("deviceId", state.deviceId);
+          state.handle = (await get("handle")) ?? null;
+        } catch (error) {
+          failure("Using IndexedDB", error);
+        }
+        await refreshStorage();
+        note(`Loaded. Visit ${state.visits.length} on record. Picker present: ${hasPicker()}`);
+        if (state.handle) {
+          note(`Remembered folder "${state.handle.name}" after load`);
+          await refreshPermission();
+          if (state.permission === "granted") {
+            await readFolder().catch((error) => failure("Reading the folder", error));
+          }
+        }
+      }
+      start();
+    </script>
+  </body>
+</html>

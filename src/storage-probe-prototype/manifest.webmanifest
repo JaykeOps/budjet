@@ -1,0 +1,10 @@
+{
+  "name": "Storage probe (prototype)",
+  "short_name": "Storage probe",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "theme_color": "#18181d",
+  "background_color": "#18181d",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

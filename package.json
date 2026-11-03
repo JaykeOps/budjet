@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "prototype:storage-probe": "vite src/storage-probe-prototype --host 0.0.0.0 --port 4321 --strictPort",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
