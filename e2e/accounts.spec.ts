@@ -150,7 +150,7 @@ test("a user re-declares a balance, Transfers an Account to $0, closes it and re
         .getByRole("table", { name: "Transactions in Rainy day" })
         .getByRole("row")
         .nth(1),
-    ).toContainText(/Transfer to Bills.*-\$3,000\.00/);
+    ).toContainText(/Transfer to Bills.*−\$3,000\.00/);
     await expect(
       transactions.getByRole("form", { name: "Record a Transaction" }),
     ).toBeHidden();

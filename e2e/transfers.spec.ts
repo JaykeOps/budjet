@@ -51,7 +51,7 @@ test("a user moves money between Accounts and sees both balances change", async 
       name: "Transactions in Checking",
     });
     await expect(checking.getByRole("row").nth(1)).toContainText(
-      /2026-10-15.*Transfer to Savings.*Rainy day.*-\$200\.00/,
+      /2026-10-15.*Transfer to Savings.*Rainy day.*−\$200\.00/,
     );
     await page
       .getByRole("region", { name: "Transactions", exact: true })

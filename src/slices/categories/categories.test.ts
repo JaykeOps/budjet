@@ -311,7 +311,7 @@ describe("Hiding Categories", () => {
 
     expect(() =>
       hideCategory(budget.writer, phone, { currentMonth: "2026-10" }),
-    ).toThrow(/Phone still has -\$10\.00 Available/);
+    ).toThrow(/Phone still has −\$10\.00 Available/);
   });
 
   it("refuses to hide a Category with Assignments in later Months", () => {

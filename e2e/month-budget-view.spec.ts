@@ -48,7 +48,7 @@ test("Ready to Assign turns into a red warning once more is assigned than there 
   await page.getByLabel("Assignment for Rent").press("Enter");
 
   const expectWarning = async () => {
-    await expect(readyToAssign).toHaveText(/-\$200\.00/);
+    await expect(readyToAssign).toHaveText(/−\$200\.00/);
     await expect(readyToAssign).toHaveClass(/overassigned/);
     await expect(readyToAssign.locator("strong")).toHaveCSS(
       "color",
@@ -158,11 +158,11 @@ test("an Overspent Category is red in its Month and the next until an Assignment
   const overspent = page.getByRole("list", { name: "Overspent Categories" });
   const expectOverspent = async (month: string) => {
     const available = groceries(month).locator("td.available");
-    await expect(available).toHaveText("-$50.00");
+    await expect(available).toHaveText("−$50.00");
     await expect(available).toHaveClass(/overspent/);
     await expect(available).toHaveCSS("color", "rgb(178, 34, 34)");
     await expect(overspent.getByRole("listitem")).toHaveText([
-      /Groceries.*-\$50\.00/,
+      /Groceries.*−\$50\.00/,
     ]);
   };
 
@@ -185,6 +185,27 @@ test("an Overspent Category is red in its Month and the next until an Assignment
 
   await reloadWhenSaved(page);
   await covered();
+});
+
+test("a refund larger than the Month's money going out shows signed Spending", async ({
+  page,
+}) => {
+  await createBudget(page, "1000");
+  await assign(page, "Groceries", "100");
+  await recordSpending(page, "2026-10-03", "20", "Groceries");
+  const record = page.getByRole("form", { name: "Record a Transaction" });
+  await record.getByLabel("Date").fill("2026-10-05");
+  await record.getByLabel("Money").selectOption("in");
+  await record.getByLabel("Amount").fill("32");
+  await record.getByLabel("Category").selectOption({ label: "Groceries" });
+  await record.getByRole("button", { name: "Record Transaction" }).click();
+
+  const october = page.getByRole("table", { name: "October 2026" });
+  const groceries = october.getByRole("row", { name: /^Groceries/ });
+  await expect(groceries.getByRole("cell").nth(1)).toHaveText("−$12.00");
+  await expect(groceries.getByRole("cell").nth(2)).toHaveText("$112.00");
+  const everyday = october.getByRole("row", { name: /^Everyday/ });
+  await expect(everyday.getByRole("cell").nth(1)).toHaveText("−$12.00");
 });
 
 test("Category Groups show subtotals and collapse and expand", async ({
