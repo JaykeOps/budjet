@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { findFeatureSliceViolations } from "./check";
@@ -44,5 +45,56 @@ describe("the feature slice architecture check", () => {
     expect(findFeatureSliceViolations(example("query-cycle"))).toEqual([
       "query dependencies between slices form a cycle: accounts → categories → transactions → accounts",
     ]);
+  });
+
+  it("allows ui to import the kernel and ui, and slices and the app shell to import ui", () => {
+    expect(findFeatureSliceViolations(example("shared-ui-imports"))).toEqual(
+      [],
+    );
+  });
+
+  it("rejects ui importing a slice or the app shell", () => {
+    expect(findFeatureSliceViolations(example("ui-imports"))).toEqual([
+      'ui may import only the kernel and ui: ui/AccountCount.ts imports "../slices/accounts"',
+      'ui may import only the kernel and ui: ui/Title.ts imports "../App"',
+    ]);
+  });
+
+  it("rejects the kernel importing ui, a slice or the app shell", () => {
+    expect(findFeatureSliceViolations(example("kernel-imports"))).toEqual([
+      'the kernel may import only the kernel: kernel/count.ts imports "../slices/accounts"',
+      'the kernel may import only the kernel: kernel/label.ts imports "../ui/Card"',
+      'the kernel may import only the kernel: kernel/name.ts imports "../App"',
+    ]);
+  });
+
+  it("rejects records importing ui, the app shell or their own slice", () => {
+    expect(
+      findFeatureSliceViolations(example("records-outside-kernel")),
+    ).toEqual([
+      'records of slice "accounts" may import only the kernel: slices/accounts/records.ts imports "../../App"',
+      'records of slice "accounts" may import only the kernel: slices/accounts/records.ts imports "../../ui/Card"',
+      'records of slice "accounts" may import only the kernel: slices/accounts/records.ts imports "./helpers"',
+    ]);
+  });
+
+  it("rejects non-relative imports that resolve into the source tree, and leaves packages alone", () => {
+    expect(findFeatureSliceViolations(example("non-relative-imports"))).toEqual(
+      [
+        'imports inside the source tree must be relative: App.ts imports "kernel/money"',
+        'imports inside the source tree must be relative: App.ts imports "src/ui/Card.js"',
+        'imports inside the source tree must be relative: App.ts imports "@/ui/Card"',
+        'imports inside the source tree must be relative: App.ts imports "~/slices/accounts/helpers"',
+        'imports inside the source tree must be relative: App.ts imports "/src/kernel/money"',
+      ],
+    );
+  });
+
+  it("finds no path aliases in the TypeScript config", () => {
+    const { compilerOptions } = JSON.parse(
+      readFileSync(new URL("../../tsconfig.json", import.meta.url), "utf8"),
+    );
+    expect(compilerOptions).not.toHaveProperty("paths");
+    expect(compilerOptions).not.toHaveProperty("baseUrl");
   });
 });
