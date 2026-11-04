@@ -38,7 +38,7 @@ export function openAccount(
 /**
  * Records an Account's real balance. budjet keeps the difference from its
  * balance just before as an Adjustment, which goes into or comes out of
- * Ready to Assign.
+ * Ready to Assign. With no difference it is a Balance check, and nothing moves.
  */
 export function redeclareBalance(
   writer: ChangeLogWriter,

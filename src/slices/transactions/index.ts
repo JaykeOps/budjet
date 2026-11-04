@@ -9,6 +9,7 @@ export {
   type AdjustmentEntry,
   accountTransactionList,
   accountTransactions,
+  type BalanceCheckEntry,
   payees,
   type Transaction,
   type TransactionListEntry,

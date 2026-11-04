@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  type ChangeLog,
   createChangeLogWriter,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
@@ -16,7 +17,14 @@ import {
   redeclareBalance,
   renameAccount,
 } from "./commands";
-import { accountBalance, accounts, accountsTotal } from "./index";
+import {
+  accountBalance,
+  accounts,
+  accountsTotal,
+  adjustments,
+  balanceChecks,
+} from "./index";
+import type { BalanceRedeclared } from "./records";
 
 function budgetIn(currency: string) {
   const changeLog = createInMemoryChangeLog();
@@ -27,6 +35,13 @@ function budgetIn(currency: string) {
     { version: 1, currency },
   );
   return { changeLog, writer };
+}
+
+/** A second device writing to the same Change Log, with its clock reading `at`. */
+function deviceAt(changeLog: ChangeLog, deviceId: string, at: Date) {
+  return createChangeLogWriter(changeLog, deviceId, {
+    now: () => at.getTime(),
+  });
 }
 
 describe("Accounts", () => {
@@ -187,6 +202,241 @@ describe("Accounts", () => {
     );
   });
 
+  it("keeps re-declaring the current balance as a Balance check, not an Adjustment", () => {
+    const { changeLog, writer } = budgetIn("USD");
+    const checking = openAccount(writer, {
+      name: "Checking",
+      kind: "checking",
+      openingBalance: money(100000, "USD"),
+    });
+
+    const checked = deviceAt(
+      changeLog,
+      "this-device",
+      new Date(2100, 9, 18, 12),
+    ).write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+      checking,
+      "BalanceRedeclared",
+      { version: 1, balance: money(100000, "USD") },
+    );
+
+    expect(balanceChecks(changeLog.readAll())).toEqual([
+      {
+        id: checked.id,
+        accountId: checking,
+        date: "2100-10-18",
+        balance: money(100000, "USD"),
+      },
+    ]);
+    expect(adjustments(changeLog.readAll())).toEqual([]);
+    expect(accountBalance(changeLog.readAll(), checking)).toEqual(
+      money(100000, "USD"),
+    );
+  });
+
+  it("measures a Balance check against the balance just before it, once a late record arrives from another device", () => {
+    const { changeLog, writer } = budgetIn("USD");
+    const checking = openAccount(writer, {
+      name: "Checking",
+      kind: "checking",
+      openingBalance: money(100000, "USD"),
+    });
+    // Both devices saw $1,000. This one checks it on Oct 20; the other spent
+    // $10 on Oct 19 but its record only arrives afterwards.
+    const other = createChangeLogWriter(createInMemoryChangeLog(), "other", {
+      now: () => new Date(2100, 9, 19, 12).getTime(),
+    });
+    const spent = other.write<
+      TransactionRecorded["type"],
+      TransactionRecorded["payload"]
+    >("late", "TransactionRecorded", {
+      version: 1,
+      accountId: checking,
+      date: "2100-10-19",
+      amount: money(-1000, "USD"),
+      categoryId: "groceries",
+    });
+    const check = deviceAt(
+      changeLog,
+      "this-device",
+      new Date(2100, 9, 20, 12),
+    ).write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+      checking,
+      "BalanceRedeclared",
+      { version: 1, balance: money(100000, "USD") },
+    );
+    expect(balanceChecks(changeLog.readAll())).toHaveLength(1);
+
+    changeLog.append([spent]);
+
+    // Now it declares $10 more than the $990 just before it.
+    expect(balanceChecks(changeLog.readAll())).toEqual([]);
+    expect(adjustments(changeLog.readAll())).toEqual([
+      {
+        id: check.id,
+        accountId: checking,
+        date: "2100-10-20",
+        amount: money(1000, "USD"),
+      },
+    ]);
+    expect(accounts(changeLog.readAll())[0].lastChecked).toBe("2100-10-20");
+  });
+
+  describe("last checked", () => {
+    function checkingAccount() {
+      const { changeLog, writer } = budgetIn("USD");
+      const checking = openAccount(writer, {
+        name: "Checking",
+        kind: "checking",
+        openingBalance: money(100000, "USD"),
+      });
+      const lastChecked = () =>
+        accounts(changeLog.readAll()).find(({ id }) => id === checking)
+          ?.lastChecked;
+      return { changeLog, checking, lastChecked };
+    }
+
+    function redeclareOn(
+      changeLog: ChangeLog,
+      deviceId: string,
+      accountId: string,
+      at: Date,
+      minorUnits: number,
+    ) {
+      return deviceAt(changeLog, deviceId, at).write<
+        BalanceRedeclared["type"],
+        BalanceRedeclared["payload"]
+      >(accountId, "BalanceRedeclared", {
+        version: 1,
+        balance: money(minorUnits, "USD"),
+      });
+    }
+
+    it("doesn't count adding an Account", () => {
+      expect(checkingAccount().lastChecked()).toBeUndefined();
+    });
+
+    it("is the date of a Balance check", () => {
+      const { changeLog, checking, lastChecked } = checkingAccount();
+
+      redeclareOn(changeLog, "a", checking, new Date(2100, 9, 18, 12), 100000);
+
+      expect(lastChecked()).toBe("2100-10-18");
+    });
+
+    it("is the date of an Adjustment when that came after a Balance check", () => {
+      const { changeLog, checking, lastChecked } = checkingAccount();
+
+      redeclareOn(changeLog, "a", checking, new Date(2100, 9, 18, 12), 100000);
+      redeclareOn(changeLog, "a", checking, new Date(2100, 9, 20, 12), 90000);
+
+      expect(lastChecked()).toBe("2100-10-20");
+    });
+
+    it("is the date of a Balance check when that came after an Adjustment", () => {
+      const { changeLog, checking, lastChecked } = checkingAccount();
+
+      redeclareOn(changeLog, "a", checking, new Date(2100, 9, 18, 12), 90000);
+      redeclareOn(changeLog, "a", checking, new Date(2100, 9, 20, 12), 90000);
+
+      expect(lastChecked()).toBe("2100-10-20");
+    });
+
+    it("isn't changed by a Transaction", () => {
+      const { changeLog, checking, lastChecked } = checkingAccount();
+      redeclareOn(changeLog, "a", checking, new Date(2100, 9, 18, 12), 100000);
+
+      deviceAt(changeLog, "a", new Date(2100, 9, 20, 12)).write<
+        TransactionRecorded["type"],
+        TransactionRecorded["payload"]
+      >("spent", "TransactionRecorded", {
+        version: 1,
+        accountId: checking,
+        date: "2100-10-20",
+        amount: money(-1000, "USD"),
+        categoryId: "groceries",
+      });
+
+      expect(lastChecked()).toBe("2100-10-18");
+    });
+
+    it("belongs to the one Account", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      const first = openAccount(writer, {
+        name: "First",
+        kind: "checking",
+        openingBalance: money(0, "USD"),
+      });
+      const second = openAccount(writer, {
+        name: "Second",
+        kind: "savings",
+        openingBalance: money(0, "USD"),
+      });
+
+      redeclareOn(changeLog, "a", first, new Date(2100, 9, 18, 12), 0);
+
+      const byId = new Map(
+        accounts(changeLog.readAll()).map((account) => [account.id, account]),
+      );
+      expect(byId.get(first)?.lastChecked).toBe("2100-10-18");
+      expect(byId.get(second)?.lastChecked).toBeUndefined();
+    });
+
+    it("is the same whichever order two devices' records arrive in", () => {
+      const write = (order: "older first" | "newer first") => {
+        const { changeLog, checking, lastChecked } = checkingAccount();
+        const offline = createInMemoryChangeLog();
+        const older = redeclareOn(
+          offline,
+          "a",
+          checking,
+          new Date(2100, 9, 18, 12),
+          100000,
+        );
+        const newer = redeclareOn(
+          offline,
+          "b",
+          checking,
+          new Date(2100, 9, 20, 12),
+          100000,
+        );
+        changeLog.append(order === "older first" ? [older] : [newer]);
+        changeLog.append(order === "older first" ? [newer] : [older]);
+        return lastChecked();
+      };
+
+      expect(write("older first")).toBe("2100-10-20");
+      expect(write("newer first")).toBe("2100-10-20");
+    });
+
+    it("follows the Change Log, not the clock, when a device's clock is behind one it has seen", () => {
+      const { changeLog, checking, lastChecked } = checkingAccount();
+
+      redeclareOn(
+        changeLog,
+        "fast",
+        checking,
+        new Date(2100, 9, 20, 12),
+        100000,
+      );
+      // Written a moment later on a device whose clock says Oct 18: the hybrid
+      // logical clock stamps it after the record it has seen.
+      const later = redeclareOn(
+        changeLog,
+        "slow",
+        checking,
+        new Date(2100, 9, 18, 12),
+        90000,
+      );
+
+      expect(changeLog.readAll().at(-1)?.id).toBe(later.id);
+      expect(lastChecked()).toBe("2100-10-20");
+      expect(accountBalance(changeLog.readAll(), checking)).toEqual(
+        money(90000, "USD"),
+      );
+    });
+  });
+
   it("renames an Account, the latest name winning", () => {
     const { changeLog, writer } = budgetIn("USD");
     const id = openAccount(writer, {
@@ -235,6 +485,7 @@ describe("Accounts", () => {
         kind: "savings",
         closed: true,
         balance: money(0, "USD"),
+        lastChecked: expect.any(String),
       },
     ]);
     expect(() => closeAccount(writer, id)).toThrow(/Old savings is closed/);
