@@ -14,6 +14,7 @@ import {
 } from "./slices/accounts";
 import {
   closeAccount,
+  deleteRedeclaredBalance,
   openAccount,
   redeclareBalance,
   renameAccount,
@@ -123,6 +124,9 @@ function Shell() {
             onRecord={(input) => recordTransaction(writer, input)}
             onEdit={(id, input) => editTransaction(writer, id, input)}
             onDelete={(id) => deleteTransaction(writer, id)}
+            onDeleteRedeclaredBalance={(id) =>
+              deleteRedeclaredBalance(writer, id)
+            }
           />
         )}
         {place === "accounts" && (
