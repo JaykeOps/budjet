@@ -1,6 +1,6 @@
 import type { ChangeRecord } from "../../kernel/change-log";
 import { type Money, money } from "../../kernel/money";
-import { adjustments } from "../accounts";
+import { adjustments, balanceChecks } from "../accounts";
 import { currentTransfers } from "../transfers/records";
 import { type CurrentTransaction, currentTransactions } from "./records";
 
@@ -43,14 +43,25 @@ export type AdjustmentEntry = {
   amount: Money;
 };
 
+/** A re-declared balance that matched, as its Account's Transaction list shows it. */
+export type BalanceCheckEntry = {
+  kind: "balance-check";
+  /** The id of the record that re-declared the balance. */
+  id: string;
+  /** The day the balance was re-declared. */
+  date: string;
+  balance: Money;
+};
+
 export type TransactionListEntry =
   | ({ kind: "transaction" } & Transaction)
   | TransferEntry
-  | AdjustmentEntry;
+  | AdjustmentEntry
+  | BalanceCheckEntry;
 
 /**
  * What an Account's Transaction list shows: its Transactions, the
- * Transfers in and out of it and its Adjustments, newest date first. On the same date the most
+ * Transfers in and out of it, its Adjustments and its Balance checks, newest date first. On the same date the most
  * recently recorded comes first; an edit keeps its place. Expects records
  * oldest first, as `readAll` returns them.
  */
@@ -58,7 +69,7 @@ export function accountTransactionList(
   records: readonly ChangeRecord[],
   accountId: string,
 ): TransactionListEntry[] {
-  // Keyed by subject for Transactions and Transfers, by record for Adjustments.
+  // Keyed by subject for Transactions and Transfers, by record for re-declared balances.
   const firstRecorded = new Map<string, number>();
   records.forEach(({ id, subjectId }, index) => {
     if (!firstRecorded.has(subjectId)) firstRecorded.set(subjectId, index);
@@ -89,6 +100,12 @@ export function accountTransactionList(
       .map(
         ({ id, date, amount }) =>
           ({ kind: "adjustment", id, date, amount }) as const,
+      ),
+    ...balanceChecks(records)
+      .filter((check) => check.accountId === accountId)
+      .map(
+        ({ id, date, balance }) =>
+          ({ kind: "balance-check", id, date, balance }) as const,
       ),
   ];
   return entries.sort((a, b) =>
