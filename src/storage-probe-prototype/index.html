@@ -885,6 +885,11 @@
         const { outcome } = await installPrompt.userChoice;
         note(`Install prompt: ${outcome}`);
       };
+      window.addEventListener("appinstalled", () => note("Browser reports the page was installed"));
+      navigator.serviceWorker?.register("sw.js")
+        .then(() => navigator.serviceWorker.ready)
+        .then(() => note("Service worker active"))
+        .catch((error) => failure("Registering the service worker", error));
 
       // --- On every load ---
       async function start() {
