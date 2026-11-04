@@ -117,6 +117,46 @@ test("a user copies last Month's Assignments and moves money between Categories"
   await expectNovember();
 });
 
+test("moving more than a Category's Assignment takes the rest back from what it carried forward", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
+  await page.goto("/");
+  await page.getByLabel("Currency").selectOption("USD");
+  await page.getByRole("button", { name: "Create Budget" }).click();
+  const setup = page.getByRole("form", { name: "Add your first Account" });
+  await setup.getByLabel("Name").fill("Checking");
+  await setup.getByLabel("Opening Balance").fill("1000");
+  await setup.getByRole("button", { name: "Add Account" }).click();
+
+  const rent = page.getByRole("row", { name: /^Rent/ });
+  await page.getByLabel("Assignment for Rent").fill("600");
+  await page.getByLabel("Assignment for Rent").press("Enter");
+  await page.getByRole("button", { name: "Next Month" }).click();
+  await page.getByLabel("Assignment for Rent").fill("10");
+  await page.getByLabel("Assignment for Rent").press("Enter");
+
+  const move = page.getByRole("form", { name: "Move money" });
+  await move.getByLabel("From").selectOption("Rent");
+  await move.getByLabel("To").selectOption("Groceries");
+  await move.getByLabel("Amount").fill("52.50");
+  await move.getByRole("button", { name: "Move" }).click();
+
+  const expectTakenBack = async () => {
+    await expect(page.getByLabel("Assignment for Rent")).toHaveValue("0.00");
+    await expect(rent).toContainText("$42.50 taken back");
+    await expect(rent).toContainText("$557.50");
+    await expect(
+      page.getByRole("status", { name: "Ready to Assign" }),
+    ).toHaveText(/\$390\.00/);
+  };
+  await expectTakenBack();
+
+  await reloadWhenSaved(page);
+
+  await expectTakenBack();
+});
+
 test("moving money to the same Category is refused", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Currency").selectOption("USD");
