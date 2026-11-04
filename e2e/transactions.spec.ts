@@ -54,7 +54,7 @@ test("a user records spending and income and sees Available, Ready to Assign and
     });
     await expect(transactions.getByRole("row")).toHaveCount(3);
     await expect(transactions.getByRole("row").nth(1)).toContainText(
-      /Corner Shop.*Groceries.*Milk and bread.*-\$45\.50/,
+      /Corner Shop.*Groceries.*Milk and bread.*−\$45\.50/,
     );
     await expect(transactions.getByRole("row").nth(2)).toContainText(
       /Employer.*Ready to Assign.*\$2,000\.00/,
@@ -136,7 +136,7 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
     ).toContainText("$940.00");
     await expect(transactions.getByRole("row")).toHaveCount(2);
     await expect(transactions.getByRole("row").nth(1)).toContainText(
-      /Corner Store.*Groceries.*-\$60\.00/,
+      /Corner Store.*Groceries.*−\$60\.00/,
     );
   };
   await expectChanged();

@@ -37,8 +37,9 @@ export function readyToAssign(
 }
 
 /**
- * The money that went out of a Category in a Month, as a positive amount.
- * Undefined before a Budget exists.
+ * What a Category's Transactions took out of the Budget in a Month: money going
+ * out less refunds coming back in, so it is negative when refunds outweigh the
+ * money going out. Undefined before a Budget exists.
  */
 export function spending(
   records: readonly ChangeRecord[],
@@ -142,7 +143,7 @@ type CategoryMonths = {
   months: Month[];
   /** Available at the end of `months[i]`, in minor units. */
   availableAfter: number[];
-  /** Minor units going out in each Month, as a positive number. */
+  /** Each Month's Spending in minor units: positive for net money going out. */
   spent: Map<Month, number>;
 };
 
@@ -194,7 +195,7 @@ function calculateCategoryTotals(
       monthOfDate.set(date, of);
     }
     add(changes, categoryId, of, amount.minorUnits);
-    if (amount.minorUnits < 0) add(spent, categoryId, of, -amount.minorUnits);
+    add(spent, categoryId, of, -amount.minorUnits);
   }
 
   const categories = new Map<string, CategoryMonths>();
