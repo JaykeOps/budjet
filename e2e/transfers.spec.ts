@@ -102,7 +102,7 @@ test("a user edits and deletes a Transfer", async ({ page }) => {
 });
 
 test("a Transfer's More menu works from the keyboard", async ({ page }) => {
-  await createBudget(page);
+  await createBudgetWithSavings(page);
   const make = page.getByRole("form", { name: "Make a Transfer" });
   await make.getByLabel("Amount").fill("200");
   await make.getByRole("button", { name: "Make Transfer" }).click();
