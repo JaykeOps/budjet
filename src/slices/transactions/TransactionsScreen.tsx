@@ -355,6 +355,17 @@ function TransactionList({
                   <td style={cell}>{formatMoney(entry.amount)}</td>
                   <td style={cell} />
                 </tr>
+              ) : entry.kind === "balance-check" ? (
+                <tr key={entry.id} aria-rowindex={first + index + 2}>
+                  <td style={cell}>{entry.date}</td>
+                  <td style={cell}>Balance checked</td>
+                  <td style={cell} />
+                  <td style={cell}>
+                    Matched your bank at {formatMoney(entry.balance)}
+                  </td>
+                  <td style={cell} />
+                  <td style={cell} />
+                </tr>
               ) : entry.kind === "transfer" ? (
                 <tr key={entry.id} aria-rowindex={first + index + 2}>
                   <td style={cell}>{entry.date}</td>

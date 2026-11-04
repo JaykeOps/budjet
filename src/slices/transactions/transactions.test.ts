@@ -513,4 +513,24 @@ describe("Transactions", () => {
       },
     ]);
   });
+
+  it("lists re-declaring the current balance as a Balance check, not an Adjustment", () => {
+    const { changeLog, transactionList } = budget();
+    const checked = createChangeLogWriter(changeLog, "this-device", {
+      now: () => new Date(2100, 0, 14, 12).getTime(),
+    }).write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+      "checking",
+      "BalanceRedeclared",
+      { version: 1, balance: money(100000, "USD") },
+    );
+
+    expect(transactionList()).toEqual([
+      {
+        kind: "balance-check",
+        id: checked.id,
+        date: "2100-01-14",
+        balance: money(100000, "USD"),
+      },
+    ]);
+  });
 });

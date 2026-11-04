@@ -67,6 +67,41 @@ test("an Opening Balance that isn't an amount is refused", async ({ page }) => {
   ).toBeHidden();
 });
 
+test("a user confirms a balance matches the bank, which moves no money and is kept in the history", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
+  await createBudgetWithFirstAccount(page);
+  const row = page
+    .getByRole("table", { name: "Accounts" })
+    .getByRole("row", { name: /Everyday checking/ });
+  await expect(row).toContainText("Not checked yet");
+  const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
+  await expect(readyToAssign).toHaveText(/\$1,250\.50/);
+
+  await page.clock.setFixedTime(new Date("2026-10-18T12:00:00"));
+  const redeclare = page.getByRole("form", { name: "Re-declare a balance" });
+  await redeclare.getByLabel("Balance").fill("1250.50");
+  await redeclare.getByRole("button", { name: "Re-declare Balance" }).click();
+
+  const expectChecked = async () => {
+    await expect(row).toContainText("2026-10-18");
+    await expect(row).not.toContainText("Not checked yet");
+    await expect(readyToAssign).toHaveText(/\$1,250\.50/);
+    const check = page
+      .getByRole("table", { name: "Transactions in Everyday checking" })
+      .getByRole("row", { name: /Balance checked/ });
+    await expect(check).toContainText("2026-10-18");
+    await expect(check).toContainText("Matched your bank at $1,250.50");
+    await expect(check).not.toContainText("Ready to Assign");
+  };
+  await expectChecked();
+
+  await reloadWhenSaved(page);
+
+  await expectChecked();
+});
+
 test("a user re-declares a balance, Transfers an Account to $0, closes it and renames another", async ({
   page,
 }) => {
