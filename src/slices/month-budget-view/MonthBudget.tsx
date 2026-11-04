@@ -22,11 +22,9 @@ import {
 } from "../budget-totals";
 import type { Category, CategoryGroup } from "../categories";
 import { type GroupSubtotals, useGroupSubtotals } from "./group-subtotals";
+import styles from "./MonthBudget.module.css";
 import { type MoveInput, MoveMoneyForm } from "./MoveMoneyForm";
 import { useVisibleCategoryGroups } from "./visible-categories";
-
-/** The red that marks money problems: Overspent Categories and a negative Ready to Assign. */
-const WARNING_RED = "#b22222";
 
 export type AssignInput = { categoryId: string; month: Month; amount: Money };
 export type MoveMoneyInput = MoveInput & { month: Month };
@@ -166,13 +164,15 @@ function ReadyToAssign() {
       role="status"
       aria-labelledby={labelId}
       className={
-        overassigned ? "ready-to-assign overassigned" : "ready-to-assign"
+        overassigned
+          ? `${styles.readyToAssign} ${styles.overassigned}`
+          : styles.readyToAssign
       }
     >
-      <span id={labelId}>Ready to Assign</span>{" "}
-      <strong style={overassigned ? { color: WARNING_RED } : undefined}>
-        {formatMoney(amount)}
-      </strong>
+      <span id={labelId} className={styles.label}>
+        Ready to Assign
+      </span>{" "}
+      <strong className={styles.amount}>{formatMoney(amount)}</strong>
       {overassigned && " You have assigned more money than you have."}
     </p>
   );
@@ -246,7 +246,7 @@ function GroupRow({
 /** Available, in red when it is below zero. */
 function AvailableAmount({ amount }: { amount: Money }) {
   return (
-    <span style={amount.minorUnits < 0 ? { color: WARNING_RED } : undefined}>
+    <span className={amount.minorUnits < 0 ? styles.overspent : undefined}>
       {formatMoney(amount)}
     </span>
   );
@@ -307,10 +307,7 @@ function CategoryRow({
         </form>
       </td>
       <td>{formatMoney(spent)}</td>
-      <td
-        className={overspent ? "available overspent" : "available"}
-        style={overspent ? { color: WARNING_RED } : undefined}
-      >
+      <td className={overspent ? styles.overspent : undefined}>
         {formatMoney(available)}
       </td>
     </tr>

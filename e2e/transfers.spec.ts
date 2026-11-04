@@ -78,7 +78,9 @@ test("a user edits and deletes a Transfer", async ({ page }) => {
   await make.getByRole("button", { name: "Make Transfer" }).click();
   const transfers = page.getByRole("table", { name: "Transfers" });
 
-  await transfers.getByRole("button", { name: "Edit" }).click();
+  const more = transfers.getByRole("button", { name: /^More/ });
+  await more.click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
   const edit = page.getByRole("form", { name: "Edit Transfer" });
   await expect(edit.getByLabel("Amount")).toHaveValue("200.00");
   await edit.getByLabel("Amount").fill("50");
@@ -90,12 +92,33 @@ test("a user edits and deletes a Transfer", async ({ page }) => {
   await reloadWhenSaved(page);
   await expect(balanceOf(page, "Checking")).toContainText("$950.00");
 
-  await transfers.getByRole("button", { name: "Delete" }).click();
+  await more.click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
 
   await expect(transfers.getByRole("row")).toHaveCount(1);
   await expect(balanceOf(page, "Checking")).toContainText("$1,000.00");
   await reloadWhenSaved(page);
   await expect(balanceOf(page, "Savings")).toContainText("$500.00");
+});
+
+test("a Transfer's More menu works from the keyboard", async ({ page }) => {
+  await createBudgetWithSavings(page);
+  const make = page.getByRole("form", { name: "Make a Transfer" });
+  await make.getByLabel("Amount").fill("200");
+  await make.getByRole("button", { name: "Make Transfer" }).click();
+
+  const more = page
+    .getByRole("table", { name: "Transfers" })
+    .getByRole("button", { name: /^More/ });
+  await more.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menuitem", { name: "Edit" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("menuitem", { name: "Delete" })).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(more).toBeFocused();
 });
 
 test("a Transfer to the same Account is refused", async ({ page }) => {

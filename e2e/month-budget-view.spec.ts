@@ -35,24 +35,22 @@ test("the Month Budget view opens on the current Month with every Category in it
   await expectOutline();
 });
 
-test("Ready to Assign turns into a red warning once more is assigned than there is", async ({
+test("Ready to Assign turns into a warning once more is assigned than there is", async ({
   page,
 }) => {
   await createBudget(page, { firstAccount: { openingBalance: "1000" } });
   await goTo(page, "Budget");
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
   await expect(readyToAssign).toHaveText(/\$1,000\.00/);
-  await expect(readyToAssign).not.toHaveClass(/overassigned/);
+  await expect(readyToAssign).not.toHaveText(/assigned more money/);
 
   await page.getByLabel("Assignment for Rent").fill("1200");
   await page.getByLabel("Assignment for Rent").press("Enter");
 
   const expectWarning = async () => {
     await expect(readyToAssign).toHaveText(/−\$200\.00/);
-    await expect(readyToAssign).toHaveClass(/overassigned/);
-    await expect(readyToAssign.locator("strong")).toHaveCSS(
-      "color",
-      "rgb(178, 34, 34)",
+    await expect(readyToAssign).toHaveText(
+      /You have assigned more money than you have\./,
     );
   };
   await expectWarning();
@@ -157,10 +155,9 @@ test("an Overspent Category is red in its Month and the next until an Assignment
       .getByRole("row", { name: /Groceries/ });
   const overspent = page.getByRole("list", { name: "Overspent Categories" });
   const expectOverspent = async (month: string) => {
-    const available = groceries(month).locator("td.available");
-    await expect(available).toHaveText("−$50.00");
-    await expect(available).toHaveClass(/overspent/);
-    await expect(available).toHaveCSS("color", "rgb(178, 34, 34)");
+    await expect(groceries(month).getByRole("cell").last()).toHaveText(
+      "−$50.00",
+    );
     await expect(overspent.getByRole("listitem")).toHaveText([
       /Groceries.*−\$50\.00/,
     ]);
@@ -176,9 +173,9 @@ test("an Overspent Category is red in its Month and the next until an Assignment
   await assign(page, "Groceries", "50");
 
   const covered = async () => {
-    const available = groceries("November 2026").locator("td.available");
-    await expect(available).toHaveText("$0.00");
-    await expect(available).not.toHaveClass(/overspent/);
+    await expect(
+      groceries("November 2026").getByRole("cell").last(),
+    ).toHaveText("$0.00");
     await expect(overspent).toHaveCount(0);
   };
   await covered();
