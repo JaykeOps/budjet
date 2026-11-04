@@ -17,7 +17,11 @@ Code is organised as feature slices (ADR 0005). A slice lives in `src/slices/<sl
 - `records.ts`: the change record types it publishes, plus pure folds that read those records as they now stand (e.g. `currentTransactions`, applying ADR 0004's most recent edit wins). Any slice may read them. It imports only the kernel, so it never adds a dependency between slices.
 - `commands.ts` (or `commands/`): its commands. Only the app shell (code in `src/` outside `src/slices/`) may import them.
 
-Everything else in a slice is private. Query dependencies (one slice importing another's `index.ts`) must not form a cycle. `dagger call check-feature-slices` enforces all of this with `scripts/feature-slice-architecture/check.ts`, and it runs as part of `dagger call check`.
+Everything else in a slice is private. Query dependencies (one slice importing another's `index.ts`) must not form a cycle.
+
+`src/ui/` holds presentational code shared beside the kernel (ADR 0007): it imports only the kernel and itself, holds no Change Log hooks or queries, and a component moves in when a second slice needs it. Slice UI and the app shell may import it; the kernel, which imports only itself, and `records.ts` never do. Imports inside `src/` are always relative, with no path aliases.
+
+`dagger call check-feature-slices` enforces all of this with `scripts/feature-slice-architecture/check.ts`, and it runs as part of `dagger call check`.
 
 ## Checks
 
@@ -30,6 +34,8 @@ nix develop -c dagger call performance
 ```
 
 `dagger functions` lists the rest. New CI logic goes in the Dagger module so it runs locally first; the workflow YAML stays a thin `dagger call`. The one exception is the GitHub Pages deploy in `release.yml`, which uses GitHub's own actions for short-lived credentials.
+
+End-to-end specs create a Budget with `createBudget` and reach a place with `goTo`, both from `e2e/helpers.ts`, so navigation changes in one spot. Locators: `getByRole` and `getByLabel` first, `getByText` for content, `data-testid` only where no user-facing locator can work, and no CSS or DOM structure locators. If a control can't be found by name, fix its name.
 
 Hooks and install scripts stay off (ADR 0002): commit with plain `git commit`, and when a dependency fails `pnpm install` because it wants a build script, stop and ask the human whether to acknowledge it as `<pkg>: false` under `allowBuilds` in `pnpm-workspace.yaml`.
 

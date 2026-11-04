@@ -34,8 +34,12 @@ _Avoid_: Period, cycle
 The amount the user gives to one Category in one Month.
 _Avoid_: Allocation, budgeted amount, envelope fill
 
+**Take-back**:
+Money leaving a Category beyond that Month's Assignment, which comes out of what the Category carried forward and goes to Ready to Assign. An Assignment never goes below $0, so the rest is a Take-back. Each Category has one Take-back total per Month, and raising its Assignment later doesn't reduce it.
+_Avoid_: Negative Assignment, withdrawal, refund
+
 **Available**:
-The money a Category has to spend in a Month: what it carried forward from the previous Month, plus that Month's Assignment, minus that Month's Spending in it. Available always carries forward to the next Month, whether positive or negative.
+The money a Category has to spend in a Month: what it carried forward from the previous Month, minus that Month's Take-back, plus that Month's Assignment, minus that Month's Spending in it. Available always carries forward to the next Month, whether positive or negative.
 _Avoid_: Balance (that word belongs to Accounts), remaining
 
 **Spending**:
@@ -50,7 +54,7 @@ A Category whose Available is below zero. It stays Overspent, Month after Month,
 _Avoid_: In the red, deficit
 
 **Ready to Assign**:
-The money in the Budget that has not been given a job yet: everything that came in without a Category, minus every Assignment in every Month. It is one number for the whole Budget and can go below zero.
+The money in the Budget that has not been given a job yet: everything that came in without a Category, minus every Assignment in every Month, plus every Take-back. It is one number for the whole Budget and can go below zero.
 _Avoid_: To be budgeted, unassigned, free money
 
 **Transaction**:
@@ -72,6 +76,10 @@ _Avoid_: Move, transaction pair
 **Adjustment**:
 The difference budjet records when the user re-declares an Account's real balance. It goes into, or comes out of, Ready to Assign.
 _Avoid_: Correction, reconciliation, fix
+
+**Balance check**:
+The user confirming that an Account's balance in Crownkeep matches their bank. Crownkeep records the date, and nothing moves.
+_Avoid_: Reconciliation, verify, $0 Adjustment
 
 ## Delivery
 

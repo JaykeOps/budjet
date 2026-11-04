@@ -1,34 +1,29 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { addFirstAccount, createBudget, goTo, openApp } from "./helpers";
 import { reloadWhenSaved } from "./reload";
-
-async function addFirstAccount(page: Page, openingBalance: string) {
-  const setup = page.getByRole("form", { name: "Add your first Account" });
-  await setup.getByLabel("Name").fill("Checking");
-  await setup.getByLabel("Opening Balance").fill(openingBalance);
-  await setup.getByRole("button", { name: "Add Account" }).click();
-}
 
 test("a first-time user creates a Budget in their currency and adds their first Account", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openApp(page);
   await expect(
     page.getByRole("heading", { name: "Create your Budget" }),
   ).toBeVisible();
 
-  await page.getByLabel("Currency").selectOption("SEK");
-  await page.getByRole("button", { name: "Create Budget" }).click();
+  await createBudget(page, { currency: "SEK", firstAccount: null });
   await expect(
     page.getByRole("heading", { name: "Create your Budget" }),
   ).toBeHidden();
 
-  await addFirstAccount(page, "1500");
+  await addFirstAccount(page, { openingBalance: "1500" });
 
   const expectBudget = async () => {
+    await goTo(page, "Budget");
     await expect(
       page.getByRole("heading", { name: "Budget", exact: true }),
     ).toBeVisible();
     await expect(page.getByText("Kept in SEK")).toBeVisible();
+    await goTo(page, "Accounts");
     await expect(
       page
         .getByRole("table", { name: "Accounts" })
@@ -46,9 +41,7 @@ test("a first-time user creates a Budget in their currency and adds their first 
 });
 
 test("setup resumes at the first Account after a reload", async ({ page }) => {
-  await page.goto("/");
-  await page.getByLabel("Currency").selectOption("USD");
-  await page.getByRole("button", { name: "Create Budget" }).click();
+  await createBudget(page, { firstAccount: null });
   await expect(
     page.getByRole("heading", { name: "Add your first Account" }),
   ).toBeVisible();
@@ -67,16 +60,19 @@ test("a returning user's Budget opens with the network offline", async ({
   page,
   context,
 }) => {
-  await page.goto("/");
+  await openApp(page);
   await page.evaluate(() => navigator.serviceWorker.ready);
-  await page.getByLabel("Currency").selectOption("EUR");
-  await page.getByRole("button", { name: "Create Budget" }).click();
-  await addFirstAccount(page, "200");
+  await createBudget(page, {
+    currency: "EUR",
+    firstAccount: { openingBalance: "200" },
+  });
+  await goTo(page, "Budget");
   await expect(page.getByText("Kept in EUR")).toBeVisible();
 
   await context.setOffline(true);
   await reloadWhenSaved(page);
 
+  await goTo(page, "Budget");
   await expect(page.getByText("Kept in EUR")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Create your Budget" }),
@@ -86,15 +82,14 @@ test("a returning user's Budget opens with the network offline", async ({
 test("changes made after a reload come from the same device", async ({
   page,
 }) => {
-  await page.goto("/");
-  await page.getByLabel("Currency").selectOption("SEK");
-  await page.getByRole("button", { name: "Create Budget" }).click();
+  await createBudget(page, { currency: "SEK", firstAccount: null });
   await expect(
     page.getByRole("heading", { name: "Add your first Account" }),
   ).toBeVisible();
 
   await reloadWhenSaved(page);
-  await addFirstAccount(page, "100");
+  await addFirstAccount(page, { openingBalance: "100" });
+  await goTo(page, "Budget");
   await expect(page.getByText("Kept in SEK")).toBeVisible();
   await reloadWhenSaved(page);
 

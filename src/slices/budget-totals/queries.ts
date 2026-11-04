@@ -1,19 +1,16 @@
-import {
-  type ChangeRecord,
-  latestBySubject,
-  perSnapshot,
-} from "../../kernel/change-log";
+import { type ChangeRecord, perSnapshot } from "../../kernel/change-log";
 import { addMoney, type Money, money, subtractMoney } from "../../kernel/money";
 import { type Month, monthOf } from "../../kernel/month";
 import { adjustments } from "../accounts";
 import { isAccountOpened } from "../accounts/records";
-import { isAssignmentSet } from "../assignments/records";
+import { currentAssignments } from "../assignments/records";
 import { isBudgetCreated } from "../budget-setup/records";
 import { currentTransactions } from "../transactions/records";
 
 /**
  * The money with no job yet: every Opening Balance, every Adjustment and all
- * money coming in with no Category, less every Assignment in every Month. Undefined before a Budget exists. Can go below zero.
+ * money coming in with no Category, less every Assignment in every Month, plus
+ * every Take-back. Undefined before a Budget exists. Can go below zero.
  */
 export function readyToAssign(
   records: readonly ChangeRecord[],
@@ -32,10 +29,9 @@ export function readyToAssign(
   for (const { amount, categoryId } of currentTransactions(records)) {
     if (!categoryId) total = addMoney(total, amount);
   }
-  for (const assigned of latestBySubject(
-    records.filter(isAssignmentSet),
-  ).values()) {
-    total = subtractMoney(total, assigned.payload.amount);
+  for (const { assigned, takenBack } of currentAssignments(records).values()) {
+    if (assigned) total = subtractMoney(total, assigned);
+    if (takenBack) total = addMoney(total, takenBack);
   }
   return total;
 }
@@ -58,8 +54,8 @@ export function spending(
 
 /**
  * The money a Category has to spend in a Month: what it carried forward from
- * the previous Month, plus that Month's Assignment, plus money coming in to
- * it, less money going out of it. It carries forward whether positive or
+ * the previous Month, less that Month's Take-back, plus its Assignment, plus
+ * money coming in to it, less money going out of it. It carries forward whether positive or
  * negative. Undefined before a Budget exists.
  */
 export function available(
@@ -74,18 +70,20 @@ export function available(
 }
 
 /**
- * Whether a Category is in use: a Transaction is in it now, or its Assignment
- * in some Month is other than zero now. Like a deleted Transaction, an
- * Assignment set and later cleared back to zero leaves no trace.
+ * Whether a Category is in use: a Transaction is in it now, or in some Month
+ * its Assignment is other than zero now or it has a Take-back. Like a deleted
+ * Transaction, an Assignment set and later cleared back to zero leaves no trace.
  */
 export function categoryUsed(
   records: readonly ChangeRecord[],
   categoryId: string,
 ): boolean {
   return (
-    [...latestBySubject(records.filter(isAssignmentSet)).values()].some(
-      ({ payload }) =>
-        payload.categoryId === categoryId && payload.amount.minorUnits !== 0,
+    [...currentAssignments(records).values()].some(
+      (current) =>
+        current.categoryId === categoryId &&
+        (Boolean(current.assigned?.minorUnits) ||
+          Boolean(current.takenBack?.minorUnits)),
     ) ||
     currentTransactions(records).some(
       (transaction) => transaction.categoryId === categoryId,
@@ -99,14 +97,11 @@ export function assignedAfter(
   categoryId: string,
   of: Month,
 ): boolean {
-  for (const assigned of latestBySubject(
-    records.filter(isAssignmentSet),
-  ).values()) {
-    const { payload } = assigned;
+  for (const current of currentAssignments(records).values()) {
     if (
-      payload.categoryId === categoryId &&
-      payload.month > of &&
-      payload.amount.minorUnits !== 0
+      current.categoryId === categoryId &&
+      current.month > of &&
+      current.assigned?.minorUnits
     ) {
       return true;
     }
@@ -144,7 +139,7 @@ export function overspent(
 
 /** Each Category's Months in order, with what each Month added to its Available. */
 type CategoryMonths = {
-  /** Every Month with an Assignment or a Transaction, oldest first. */
+  /** Every Month with an Assignment, a Take-back or a Transaction, oldest first. */
   months: Month[];
   /** Available at the end of `months[i]`, in minor units. */
   availableAfter: number[];
@@ -184,11 +179,11 @@ function calculateCategoryTotals(
     months.set(of, (months.get(of) ?? 0) + minorUnits);
   };
 
-  for (const assigned of latestBySubject(
-    records.filter(isAssignmentSet),
-  ).values()) {
-    const { categoryId, month: of, amount } = assigned.payload;
-    add(changes, categoryId, of, amount.minorUnits);
+  for (const current of currentAssignments(records).values()) {
+    const { categoryId, month: of, assigned, takenBack } = current;
+    const minorUnits =
+      (assigned?.minorUnits ?? 0) - (takenBack?.minorUnits ?? 0);
+    add(changes, categoryId, of, minorUnits);
   }
   // Many Transactions share a date, so each date is read into a Month once.
   const monthOfDate = new Map<string, Month>();

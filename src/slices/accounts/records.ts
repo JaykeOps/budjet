@@ -42,8 +42,8 @@ export function isAccountClosed(record: ChangeRecord): record is AccountClosed {
 
 /**
  * The user's statement of what an Account really holds. The Adjustment is the
- * difference from the Account's balance just before this record. Its subject
- * is the Account's id.
+ * difference from the Account's balance just before this record; with no
+ * difference it is a Balance check. Its subject is the Account's id.
  */
 export type BalanceRedeclared = ChangeRecord<
   "BalanceRedeclared",
