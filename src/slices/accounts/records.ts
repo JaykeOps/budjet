@@ -55,3 +55,19 @@ export function isBalanceRedeclared(
 ): record is BalanceRedeclared {
   return record.type === "BalanceRedeclared";
 }
+
+/**
+ * A re-declared balance the user took back: an Adjustment or Balance check, but
+ * never an Opening Balance. Its subject is the id of the `BalanceRedeclared`
+ * record, which is ignored from then on (docs/adr/0006).
+ */
+export type RedeclaredBalanceDeleted = ChangeRecord<
+  "RedeclaredBalanceDeleted",
+  { version: 1 }
+>;
+
+export function isRedeclaredBalanceDeleted(
+  record: ChangeRecord,
+): record is RedeclaredBalanceDeleted {
+  return record.type === "RedeclaredBalanceDeleted";
+}

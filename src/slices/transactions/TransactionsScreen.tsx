@@ -14,10 +14,11 @@ import type { Transaction } from "./queries";
 
 /**
  * An Account's Transactions, newest first, with a form to record another in
- * it and a way to edit or delete each one, unless the Account is closed. The
- * app shell keeps which Account is selected (the first one when it names
- * none it knows) and decides what recording, editing and deleting do; an
- * error it throws is shown on the form.
+ * it and a way to edit or delete each one, and to delete an Adjustment or
+ * Balance check, unless the Account is closed. The app shell keeps which
+ * Account is selected (the first one when it names none it knows) and decides
+ * what recording, editing and deleting do; an error it throws is shown on the
+ * form.
  */
 export function TransactionsScreen({
   currency,
@@ -26,6 +27,7 @@ export function TransactionsScreen({
   onRecord,
   onEdit,
   onDelete,
+  onDeleteRedeclaredBalance,
 }: {
   currency: Currency;
   selectedAccountId?: string;
@@ -33,6 +35,7 @@ export function TransactionsScreen({
   onRecord: (input: TransactionInput) => void;
   onEdit: (id: string, input: TransactionInput) => void;
   onDelete: (id: string) => void;
+  onDeleteRedeclaredBalance: (recordId: string) => void;
 }) {
   const headingId = useId();
   const accounts = useAccounts();
@@ -97,6 +100,7 @@ export function TransactionsScreen({
           if (editing?.id === id) setEditing(undefined);
           onDelete(id);
         }}
+        onDeleteRedeclaredBalance={onDeleteRedeclaredBalance}
       />
     </section>
   );
@@ -297,10 +301,12 @@ function TransactionList({
   account,
   onEdit,
   onDelete,
+  onDeleteRedeclaredBalance,
 }: {
   account: Account;
   onEdit: (transaction: Transaction) => void;
   onDelete: (id: string) => void;
+  onDeleteRedeclaredBalance: (recordId: string) => void;
 }) {
   const headingId = useId();
   const entries = useAccountTransactionList(account.id);
@@ -318,6 +324,12 @@ function TransactionList({
     Math.ceil((scrollTop + VIEW_HEIGHT) / ROW_HEIGHT) + OVERSCAN,
   );
   const cell = { height: ROW_HEIGHT, padding: "0 0.5em" } as const;
+  const deleteRedeclared = (recordId: string) =>
+    !account.closed && (
+      <button type="button" onClick={() => onDeleteRedeclaredBalance(recordId)}>
+        Delete
+      </button>
+    );
 
   return (
     <>
@@ -353,7 +365,7 @@ function TransactionList({
                   <td style={cell}>Ready to Assign</td>
                   <td style={cell} />
                   <td style={cell}>{formatMoney(entry.amount)}</td>
-                  <td style={cell} />
+                  <td style={cell}>{deleteRedeclared(entry.id)}</td>
                 </tr>
               ) : entry.kind === "balance-check" ? (
                 <tr key={entry.id} aria-rowindex={first + index + 2}>
@@ -364,7 +376,7 @@ function TransactionList({
                     Matched your bank at {formatMoney(entry.balance)}
                   </td>
                   <td style={cell} />
-                  <td style={cell} />
+                  <td style={cell}>{deleteRedeclared(entry.id)}</td>
                 </tr>
               ) : entry.kind === "transfer" ? (
                 <tr key={entry.id} aria-rowindex={first + index + 2}>
