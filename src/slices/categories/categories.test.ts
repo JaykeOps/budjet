@@ -6,7 +6,11 @@ import {
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
-import { type AssignmentSet, assignmentSubject } from "../assignments/records";
+import {
+  type AssignmentSet,
+  assignmentSubject,
+  type TakeBackSet,
+} from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
 import type { TransactionRecorded } from "../transactions/records";
 import {
@@ -369,6 +373,25 @@ describe("Deleting Categories and Category Groups", () => {
       "Bills",
       ["Rent", "Power", "Phone", "Internet"],
     ]);
+  });
+
+  it("refuses to delete a Category with a Take-back", () => {
+    const budget = budgetWithStarterSet();
+    const power = budget.id("Power");
+    budget.writer.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+      assignmentSubject(power, "2026-10"),
+      "TakeBackSet",
+      {
+        version: 1,
+        categoryId: power,
+        month: "2026-10",
+        amount: money(2500, "USD"),
+      },
+    );
+
+    expect(() => deleteCategory(budget.writer, power)).toThrow(
+      CategoryInUseError,
+    );
   });
 
   it("deletes an empty Category Group, but not one with Categories in it", () => {
