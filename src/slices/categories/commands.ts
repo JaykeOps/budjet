@@ -6,9 +6,9 @@ import { categoryGroups } from "./queries";
 import type { CategoriesRecord } from "./records";
 
 const starterSet = [
-  ["Bills", ["Rent", "Power", "Phone", "Internet"]],
-  ["Everyday", ["Groceries", "Transport", "Dining Out"]],
-  ["Savings", ["Emergency Fund"]],
+  ["Bills", ["Rent", "Power", "Phone", "Internet"], { leftOut: false }],
+  ["Everyday", ["Groceries", "Transport", "Dining Out"], { leftOut: false }],
+  ["Savings", ["Emergency Fund"], { leftOut: true }],
 ] as const;
 
 /** Gives a new Budget its starter Category Groups and Categories. */
@@ -16,8 +16,9 @@ export function addStarterSet(writer: ChangeLogWriter): void {
   if (categoryGroups(writer.changeLog.readAll()).length > 0) {
     throw new Error("The Budget already has Category Groups");
   }
-  for (const [groupName, categoryNames] of starterSet) {
+  for (const [groupName, categoryNames, { leftOut }] of starterSet) {
     const groupId = createCategoryGroup(writer, { name: groupName });
+    if (leftOut) setCategoryGroupSpentThisMonth(writer, groupId, { leftOut });
     for (const name of categoryNames) {
       createCategory(writer, { groupId, name });
     }
@@ -76,6 +77,19 @@ export function renameCategory(
   write(writer, categoryId, "CategoryRenamed", {
     version: 1,
     name: validName(name),
+  });
+}
+
+/** Leaves a Category Group out of Spent this Month, or counts it again. */
+export function setCategoryGroupSpentThisMonth(
+  writer: ChangeLogWriter,
+  groupId: string,
+  { leftOut }: { leftOut: boolean },
+): void {
+  findGroup(writer, groupId);
+  write(writer, groupId, "CategoryGroupSpentThisMonthSet", {
+    version: 1,
+    leftOut,
   });
 }
 
