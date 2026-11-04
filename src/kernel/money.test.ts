@@ -48,7 +48,8 @@ describe("Money", () => {
 
   it("formats with the currency's own number of minor digits", () => {
     expect(formatMoney(money(123456, "USD"), "en-US")).toBe("$1,234.56");
-    expect(formatMoney(money(-500, "JPY"), "en-US")).toBe("-¥500");
+    expect(formatMoney(money(-500, "JPY"), "en-US")).toBe("−¥500");
+    expect(formatMoney(money(-1200, "USD"), "en-US")).toBe("−$12.00");
   });
 
   it("reads a typed amount exactly, in the currency's minor units", () => {
