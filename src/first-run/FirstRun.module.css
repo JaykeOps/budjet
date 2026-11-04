@@ -1,0 +1,179 @@
+.page {
+  justify-content: center;
+  width: min(480px, 100%);
+  min-height: 100dvh;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.back {
+  padding: 6px 0;
+  box-shadow: none;
+  color: var(--link);
+}
+
+.brand {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.title {
+  margin: 0;
+  outline: none;
+}
+
+.lead {
+  margin: 0;
+  color: var(--muted);
+}
+
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.primary,
+.submit {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 15px;
+}
+
+.primary {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--primary-top) 55%, var(--primary)),
+    var(--primary)
+  );
+  box-shadow: var(--depth-primary);
+  color: var(--on-primary);
+}
+
+.secondary {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 15px;
+}
+
+.field {
+  display: flex;
+  width: 100%;
+}
+
+.field input,
+.field select {
+  width: 100%;
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--depth-card);
+  font-size: 15px;
+  text-align: left;
+  white-space: normal;
+}
+
+.choice[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 2px var(--primary),
+    var(--depth-card);
+}
+
+.accounts {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 4px 16px;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+  list-style: none;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-block: 10px;
+}
+
+.account + .account {
+  border-top: 1px solid var(--edge);
+}
+
+.accountName {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.form {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 12px;
+  margin: 0;
+}
+
+.kinds {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.kinds legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.kind {
+  position: relative;
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  box-shadow: inset 0 0 0 1px var(--control-border);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  align-items: center;
+}
+
+.kind input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.kind:has(:checked) {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.kind:has(:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

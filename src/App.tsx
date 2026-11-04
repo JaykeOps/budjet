@@ -1,10 +1,12 @@
-import type { ComponentProps } from "react";
+import { type ComponentProps, useEffect } from "react";
+import { FirstRun } from "./first-run/FirstRun";
 import type { ChangeLogWriter } from "./kernel/change-log";
 import {
   ChangeLogWriterProvider,
   useChangeLogWriter,
 } from "./kernel/use-change-log-query";
 import { useMonthInUrl } from "./month-in-url";
+import { requestPersistentStorage } from "./persistent-storage";
 import {
   AccountsScreen,
   OpenAccountForm,
@@ -21,10 +23,8 @@ import {
   moveMoney,
   setAssignment,
 } from "./slices/assignments/commands";
-import { BudgetSetupForm, useBudget } from "./slices/budget-setup";
-import { createBudget } from "./slices/budget-setup/commands";
+import { type Budget, useBudget } from "./slices/budget-setup";
 import { CategoryList, categoryGroups } from "./slices/categories";
-import { addStarterSet } from "./slices/categories/commands";
 import { MonthBudget } from "./slices/month-budget-view";
 import { TransactionsScreen } from "./slices/transactions";
 import {
@@ -43,34 +43,39 @@ import { useUrlParameter } from "./url-parameter";
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
     <ChangeLogWriterProvider value={writer}>
-      <main>
-        <h1>budjet</h1>
-        <Shell />
-        <p>Version {__APP_VERSION__}</p>
-      </main>
+      <Root />
     </ChangeLogWriterProvider>
   );
 }
 
-/**
- * Walks a new user through setup (the Budget, then its first Account), then
- * shows the Budget.
- */
-function Shell() {
-  const writer = useChangeLogWriter();
+/** First run until there's a Budget, then the Budget. */
+function Root() {
   const budget = useBudget();
+  const hasBudget = budget !== undefined;
+
+  // Asking once there's something to keep, because some browsers show a prompt.
+  useEffect(() => {
+    if (hasBudget) requestPersistentStorage();
+  }, [hasBudget]);
+
+  if (!budget) return <FirstRun />;
+  return (
+    <main>
+      <h1>budjet</h1>
+      <Shell budget={budget} />
+      <p>Version {__APP_VERSION__}</p>
+    </main>
+  );
+}
+
+/**
+ * Shows the Budget. A Budget with no Account yet can only come from an older
+ * setup, or a page closed while first run was writing, so it asks for one.
+ */
+function Shell({ budget }: { budget: Budget }) {
+  const writer = useChangeLogWriter();
   const accounts = useAccounts();
 
-  if (!budget) {
-    return (
-      <BudgetSetupForm
-        onCreate={({ currency }) => {
-          createBudget(writer, { currency });
-          addStarterSet(writer);
-        }}
-      />
-    );
-  }
   if (accounts.length === 0) {
     return (
       <OpenAccountForm

@@ -5,7 +5,7 @@ import { assignedAfter, available, categoryUsed } from "../budget-totals";
 import { categoryGroups } from "./queries";
 import type { CategoriesRecord } from "./records";
 
-const starterSet = [
+export const starterSet = [
   ["Bills", ["Rent", "Power", "Phone", "Internet"]],
   ["Everyday", ["Groceries", "Transport", "Dining Out"]],
   ["Savings", ["Emergency Fund"]],
