@@ -194,8 +194,9 @@ describe("Budget Totals", () => {
     totals.record("2026-10-12", -7000, "rent");
     totals.record("2026-10-25", 300000);
 
+    // $145.50 going out less the $10 refund.
     expect(totals.spending("groceries", "2026-10")).toEqual(
-      money(14550, "USD"),
+      money(13550, "USD"),
     );
     // $400 assigned + $10 coming in − $145.50 going out.
     expect(totals.available("groceries", "2026-10")).toEqual(
@@ -203,6 +204,55 @@ describe("Budget Totals", () => {
     );
     expect(totals.spending("dining-out", "2026-10")).toEqual(money(0, "USD"));
     expect(totals.available("dining-out", "2026-10")).toEqual(money(0, "USD"));
+  });
+
+  it.each([
+    {
+      size: "smaller than",
+      refunded: 2000,
+      expectedSpending: 3000,
+      expectedAvailable: 7000,
+    },
+    {
+      size: "equal to",
+      refunded: 5000,
+      expectedSpending: 0,
+      expectedAvailable: 10000,
+    },
+    {
+      size: "larger than",
+      refunded: 6200,
+      expectedSpending: -1200,
+      expectedAvailable: 11200,
+    },
+  ])(
+    "nets a refund $size the Month's money going out, without changing Available",
+    ({ refunded, expectedSpending, expectedAvailable }) => {
+      const totals = budget();
+      totals.openAccount(100000);
+      totals.assign("groceries", "2026-10", 10000);
+
+      totals.record("2026-10-03", -5000, "groceries");
+      totals.record("2026-10-20", refunded, "groceries");
+
+      expect(totals.spending("groceries", "2026-10")).toEqual(
+        money(expectedSpending, "USD"),
+      );
+      expect(totals.available("groceries", "2026-10")).toEqual(
+        money(expectedAvailable, "USD"),
+      );
+    },
+  );
+
+  it("counts a refund only in its own Month's Spending", () => {
+    const totals = budget();
+    totals.record("2026-10-03", -5000, "groceries");
+    totals.record("2026-11-02", 1200, "groceries");
+
+    expect(totals.spending("groceries", "2026-10")).toEqual(money(5000, "USD"));
+    expect(totals.spending("groceries", "2026-11")).toEqual(
+      money(-1200, "USD"),
+    );
   });
 
   it("lets spending take a Category's Available below zero", () => {
