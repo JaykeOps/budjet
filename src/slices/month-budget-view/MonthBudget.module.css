@@ -1,0 +1,33 @@
+.readyToAssign {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-block: 12px;
+  padding: 24px;
+  border-radius: var(--radius-card);
+  background: var(--graphite-card);
+  box-shadow: var(--depth-card);
+  color: var(--graphite-text);
+}
+
+/* Below zero: the card stops being calm, in the pair that holds in both schemes. */
+.overassigned {
+  background: var(--overspent-tint);
+  color: var(--on-overspent-tint);
+}
+
+.label {
+  font-weight: 500;
+}
+
+.amount {
+  font-size: var(--amount-ready-to-assign);
+  font-weight: var(--amount-weight);
+  letter-spacing: var(--amount-tracking);
+  line-height: 1;
+}
+
+.overspent {
+  color: var(--overspent);
+  white-space: nowrap;
+}

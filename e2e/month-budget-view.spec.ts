@@ -1,21 +1,16 @@
 import { expect, type Page, test } from "@playwright/test";
+import { createBudget, goTo } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
-async function createBudget(page: Page, openingBalance: string) {
-  await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
-  await page.goto("/");
-  await page.getByLabel("Currency").selectOption("USD");
-  await page.getByRole("button", { name: "Create Budget" }).click();
-  const setup = page.getByRole("form", { name: "Add your first Account" });
-  await setup.getByLabel("Name").fill("Checking");
-  await setup.getByLabel("Opening Balance").fill(openingBalance);
-  await setup.getByRole("button", { name: "Add Account" }).click();
-}
+test.beforeEach(({ page }) =>
+  page.clock.setFixedTime(new Date("2026-10-15T12:00:00")),
+);
 
 test("the Month Budget view opens on the current Month with every Category in its Category Group", async ({
   page,
 }) => {
-  await createBudget(page, "0");
+  await createBudget(page, { firstAccount: { openingBalance: "0" } });
+  await goTo(page, "Budget");
   await page.getByRole("button", { name: "Move Savings up" }).click();
 
   const month = page.getByRole("table", { name: "October 2026" });
@@ -40,23 +35,22 @@ test("the Month Budget view opens on the current Month with every Category in it
   await expectOutline();
 });
 
-test("Ready to Assign turns into a red warning once more is assigned than there is", async ({
+test("Ready to Assign turns into a warning once more is assigned than there is", async ({
   page,
 }) => {
-  await createBudget(page, "1000");
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
   await expect(readyToAssign).toHaveText(/\$1,000\.00/);
-  await expect(readyToAssign).not.toHaveClass(/overassigned/);
+  await expect(readyToAssign).not.toHaveText(/assigned more money/);
 
   await page.getByLabel("Assignment for Rent").fill("1200");
   await page.getByLabel("Assignment for Rent").press("Enter");
 
   const expectWarning = async () => {
     await expect(readyToAssign).toHaveText(/−\$200\.00/);
-    await expect(readyToAssign).toHaveClass(/overassigned/);
-    await expect(readyToAssign.locator("strong")).toHaveCSS(
-      "color",
-      "rgb(178, 34, 34)",
+    await expect(readyToAssign).toHaveText(
+      /You have assigned more money than you have\./,
     );
   };
   await expectWarning();
@@ -69,7 +63,8 @@ test("Ready to Assign turns into a red warning once more is assigned than there 
 test("a user steps between Months, assigns money in a future Month and stays on it after a reload", async ({
   page,
 }) => {
-  await createBudget(page, "1000");
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
   await expect(page.getByRole("table", { name: "October 2026" })).toBeVisible();
 
@@ -110,7 +105,8 @@ test("a user steps between Months, assigns money in a future Month and stays on 
 test("Months before the Budget was created can't be opened", async ({
   page,
 }) => {
-  await createBudget(page, "0");
+  await createBudget(page, { firstAccount: { openingBalance: "0" } });
+  await goTo(page, "Budget");
   await expect(page.getByRole("table", { name: "October 2026" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Previous Month" }),
@@ -130,11 +126,13 @@ async function recordSpending(
   amount: string,
   category: string,
 ) {
+  await goTo(page, "Activity");
   const record = page.getByRole("form", { name: "Record a Transaction" });
   await record.getByLabel("Date").fill(date);
   await record.getByLabel("Amount").fill(amount);
   await record.getByLabel("Category").selectOption({ label: category });
   await record.getByRole("button", { name: "Record Transaction" }).click();
+  await goTo(page, "Budget");
 }
 
 async function assign(page: Page, category: string, amount: string) {
@@ -146,7 +144,8 @@ async function assign(page: Page, category: string, amount: string) {
 test("an Overspent Category is red in its Month and the next until an Assignment covers it", async ({
   page,
 }) => {
-  await createBudget(page, "1000");
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
   await assign(page, "Groceries", "100");
   await recordSpending(page, "2026-10-12", "150", "Groceries");
 
@@ -156,10 +155,9 @@ test("an Overspent Category is red in its Month and the next until an Assignment
       .getByRole("row", { name: /Groceries/ });
   const overspent = page.getByRole("list", { name: "Overspent Categories" });
   const expectOverspent = async (month: string) => {
-    const available = groceries(month).locator("td.available");
-    await expect(available).toHaveText("−$50.00");
-    await expect(available).toHaveClass(/overspent/);
-    await expect(available).toHaveCSS("color", "rgb(178, 34, 34)");
+    await expect(groceries(month).getByRole("cell").last()).toHaveText(
+      "−$50.00",
+    );
     await expect(overspent.getByRole("listitem")).toHaveText([
       /Groceries.*−\$50\.00/,
     ]);
@@ -175,9 +173,9 @@ test("an Overspent Category is red in its Month and the next until an Assignment
   await assign(page, "Groceries", "50");
 
   const covered = async () => {
-    const available = groceries("November 2026").locator("td.available");
-    await expect(available).toHaveText("$0.00");
-    await expect(available).not.toHaveClass(/overspent/);
+    await expect(
+      groceries("November 2026").getByRole("cell").last(),
+    ).toHaveText("$0.00");
     await expect(overspent).toHaveCount(0);
   };
   await covered();
@@ -189,9 +187,11 @@ test("an Overspent Category is red in its Month and the next until an Assignment
 test("a refund larger than the Month's money going out shows signed Spending", async ({
   page,
 }) => {
-  await createBudget(page, "1000");
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
   await assign(page, "Groceries", "100");
   await recordSpending(page, "2026-10-03", "20", "Groceries");
+  await goTo(page, "Activity");
   const record = page.getByRole("form", { name: "Record a Transaction" });
   await record.getByLabel("Date").fill("2026-10-05");
   await record.getByLabel("Money").selectOption("in");
@@ -199,6 +199,7 @@ test("a refund larger than the Month's money going out shows signed Spending", a
   await record.getByLabel("Category").selectOption({ label: "Groceries" });
   await record.getByRole("button", { name: "Record Transaction" }).click();
 
+  await goTo(page, "Budget");
   const october = page.getByRole("table", { name: "October 2026" });
   const groceries = october.getByRole("row", { name: /^Groceries/ });
   await expect(groceries.getByRole("cell").nth(1)).toHaveText("−$12.00");
@@ -210,7 +211,8 @@ test("a refund larger than the Month's money going out shows signed Spending", a
 test("Category Groups show subtotals and collapse and expand", async ({
   page,
 }) => {
-  await createBudget(page, "1000");
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
   await assign(page, "Groceries", "300");
   await assign(page, "Transport", "50.50");
   await recordSpending(page, "2026-10-03", "20", "Groceries");

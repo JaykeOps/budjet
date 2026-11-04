@@ -1,10 +1,12 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import type { ChangeLogWriter } from "./kernel/change-log";
 import {
   ChangeLogWriterProvider,
   useChangeLogWriter,
 } from "./kernel/use-change-log-query";
 import { useMonthInUrl } from "./month-in-url";
+import { NavigationShell } from "./NavigationShell";
+import { usePlace } from "./place-in-url";
 import {
   AccountsScreen,
   OpenAccountForm,
@@ -44,84 +46,112 @@ import { useUrlParameter } from "./url-parameter";
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
     <ChangeLogWriterProvider value={writer}>
-      <main>
-        <h1>budjet</h1>
-        <Shell />
-        <p>Version {__APP_VERSION__}</p>
-      </main>
+      <Shell />
     </ChangeLogWriterProvider>
   );
 }
 
+function Page({ children }: { children: ReactNode }) {
+  return (
+    <main>
+      <h1>budjet</h1>
+      {children}
+      <p>Version {__APP_VERSION__}</p>
+    </main>
+  );
+}
+
 /**
- * Walks a new user through setup (the Budget, then its first Account), then
- * shows the Budget.
+ * Walks a new user through setup (the Budget, then its first Account), which
+ * has no navigation, then shows the place the user is at, inside it.
  */
 function Shell() {
   const writer = useChangeLogWriter();
   const budget = useBudget();
   const accounts = useAccounts();
+  const place = usePlace();
 
   if (!budget) {
     return (
-      <BudgetSetupForm
-        onCreate={({ currency }) => {
-          createBudget(writer, { currency });
-          addStarterSet(writer);
-        }}
-      />
+      <Page>
+        <BudgetSetupForm
+          onCreate={({ currency }) => {
+            createBudget(writer, { currency });
+            addStarterSet(writer);
+          }}
+        />
+      </Page>
     );
   }
   if (accounts.length === 0) {
     return (
-      <OpenAccountForm
-        heading="Add your first Account"
-        currency={budget.currency}
-        onOpen={(input) => openAccount(writer, input)}
-      />
+      <Page>
+        <OpenAccountForm
+          heading="Add your first Account"
+          currency={budget.currency}
+          onOpen={(input) => openAccount(writer, input)}
+        />
+      </Page>
     );
   }
   return (
-    <>
-      <BudgetMonth
-        firstMonth={budget.firstMonth}
-        currency={budget.currency}
-        onAssign={(input) => setAssignment(writer, input)}
-        onCopyLastMonth={(month) =>
-          copyLastMonth(writer, { month, skipping: hiddenCategoryIds(writer) })
-        }
-        onMoveMoney={(input) => moveMoney(writer, input)}
-      />
-      <section aria-labelledby="budget-heading">
-        <h2 id="budget-heading">Budget</h2>
-        <p>Kept in {budget.currency}.</p>
-        <CategoryList />
-      </section>
-      <AccountsScreen
-        currency={budget.currency}
-        onOpenAccount={(input) => openAccount(writer, input)}
-        onRedeclareBalance={(accountId, balance) =>
-          redeclareBalance(writer, accountId, { balance })
-        }
-        onRename={(accountId, name) =>
-          renameAccount(writer, accountId, { name })
-        }
-        onClose={(accountId) => closeAccount(writer, accountId)}
-      />
-      <AccountTransactions
-        currency={budget.currency}
-        onRecord={(input) => recordTransaction(writer, input)}
-        onEdit={(id, input) => editTransaction(writer, id, input)}
-        onDelete={(id) => deleteTransaction(writer, id)}
-        onDeleteRedeclaredBalance={(id) => deleteRedeclaredBalance(writer, id)}
-      />
-      <TransfersScreen
-        currency={budget.currency}
-        onMake={(input) => makeTransfer(writer, input)}
-        onEdit={(id, input) => editTransfer(writer, id, input)}
-        onDelete={(id) => deleteTransfer(writer, id)}
-      />
-    </>
+    <NavigationShell>
+      <Page>
+        {place === "budget" && (
+          <>
+            <BudgetMonth
+              firstMonth={budget.firstMonth}
+              currency={budget.currency}
+              onAssign={(input) => setAssignment(writer, input)}
+              onCopyLastMonth={(month) =>
+                copyLastMonth(writer, {
+                  month,
+                  skipping: hiddenCategoryIds(writer),
+                })
+              }
+              onMoveMoney={(input) => moveMoney(writer, input)}
+            />
+            <section aria-labelledby="budget-heading">
+              <h2 id="budget-heading">Budget</h2>
+              <p>Kept in {budget.currency}.</p>
+              <CategoryList />
+            </section>
+          </>
+        )}
+        {place === "activity" && (
+          <AccountTransactions
+            currency={budget.currency}
+            onRecord={(input) => recordTransaction(writer, input)}
+            onEdit={(id, input) => editTransaction(writer, id, input)}
+            onDelete={(id) => deleteTransaction(writer, id)}
+            onDeleteRedeclaredBalance={(id) =>
+              deleteRedeclaredBalance(writer, id)
+            }
+          />
+        )}
+        {place === "accounts" && (
+          <>
+            <AccountsScreen
+              currency={budget.currency}
+              onOpenAccount={(input) => openAccount(writer, input)}
+              onRedeclareBalance={(accountId, balance) =>
+                redeclareBalance(writer, accountId, { balance })
+              }
+              onRename={(accountId, name) =>
+                renameAccount(writer, accountId, { name })
+              }
+              onClose={(accountId) => closeAccount(writer, accountId)}
+            />
+            <TransfersScreen
+              currency={budget.currency}
+              onMake={(input) => makeTransfer(writer, input)}
+              onEdit={(id, input) => editTransfer(writer, id, input)}
+              onDelete={(id) => deleteTransfer(writer, id)}
+            />
+          </>
+        )}
+      </Page>
+    </NavigationShell>
   );
 }
 

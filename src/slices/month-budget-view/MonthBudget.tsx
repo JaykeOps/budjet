@@ -13,7 +13,7 @@ import {
   nextMonth,
   previousMonth,
 } from "../../kernel/month";
-import { useAssignment } from "../assignments";
+import { useAssignment, useTakeBack } from "../assignments";
 import {
   useAvailable,
   useOverspent,
@@ -22,11 +22,9 @@ import {
 } from "../budget-totals";
 import type { Category, CategoryGroup } from "../categories";
 import { type GroupSubtotals, useGroupSubtotals } from "./group-subtotals";
+import styles from "./MonthBudget.module.css";
 import { type MoveInput, MoveMoneyForm } from "./MoveMoneyForm";
 import { useVisibleCategoryGroups } from "./visible-categories";
-
-/** The red that marks money problems: Overspent Categories and a negative Ready to Assign. */
-const WARNING_RED = "#b22222";
 
 export type AssignInput = { categoryId: string; month: Month; amount: Money };
 export type MoveMoneyInput = MoveInput & { month: Month };
@@ -166,13 +164,15 @@ function ReadyToAssign() {
       role="status"
       aria-labelledby={labelId}
       className={
-        overassigned ? "ready-to-assign overassigned" : "ready-to-assign"
+        overassigned
+          ? `${styles.readyToAssign} ${styles.overassigned}`
+          : styles.readyToAssign
       }
     >
-      <span id={labelId}>Ready to Assign</span>{" "}
-      <strong style={overassigned ? { color: WARNING_RED } : undefined}>
-        {formatMoney(amount)}
-      </strong>
+      <span id={labelId} className={styles.label}>
+        Ready to Assign
+      </span>{" "}
+      <strong className={styles.amount}>{formatMoney(amount)}</strong>
       {overassigned && " You have assigned more money than you have."}
     </p>
   );
@@ -246,15 +246,15 @@ function GroupRow({
 /** Available, in red when it is below zero. */
 function AvailableAmount({ amount }: { amount: Money }) {
   return (
-    <span style={amount.minorUnits < 0 ? { color: WARNING_RED } : undefined}>
+    <span className={amount.minorUnits < 0 ? styles.overspent : undefined}>
       {formatMoney(amount)}
     </span>
   );
 }
 
 /**
- * A Category with its spending and Available, and its Assignment, set by
- * typing an amount and pressing Enter or leaving the field.
+ * A Category with any Take-back, its spending and Available, and its
+ * Assignment, set by typing an amount and pressing Enter or leaving the field.
  */
 function CategoryRow({
   category,
@@ -272,6 +272,7 @@ function CategoryRow({
   const assigned = useAssignment(category.id, month) ?? money(0, currency);
   const spent = useSpending(category.id, month) ?? money(0, currency);
   const available = useAvailable(category.id, month) ?? money(0, currency);
+  const takenBack = useTakeBack(category.id, month);
   const overspent = available.minorUnits < 0;
   const [draft, setDraft] = useState<string>();
 
@@ -294,7 +295,12 @@ function CategoryRow({
 
   return (
     <tr>
-      <th scope="row">{category.name}</th>
+      <th scope="row">
+        {category.name}
+        {takenBack && takenBack.minorUnits !== 0 && (
+          <small> {formatMoney(takenBack)} taken back</small>
+        )}
+      </th>
       <td>
         <form onSubmit={submit}>
           <input
@@ -307,10 +313,7 @@ function CategoryRow({
         </form>
       </td>
       <td>{formatMoney(spent)}</td>
-      <td
-        className={overspent ? "available overspent" : "available"}
-        style={overspent ? { color: WARNING_RED } : undefined}
-      >
+      <td className={overspent ? styles.overspent : undefined}>
         {formatMoney(available)}
       </td>
     </tr>

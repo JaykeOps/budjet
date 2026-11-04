@@ -1,4 +1,4 @@
-import { type ChangeLogWriter, latestBySubject } from "../../kernel/change-log";
+import type { ChangeLogWriter } from "../../kernel/change-log";
 import { addMoney, type Money, money, subtractMoney } from "../../kernel/money";
 import { type Month, previousMonth } from "../../kernel/month";
 import { isBudgetCreated } from "../budget-setup/records";
@@ -6,7 +6,9 @@ import { assignment } from "./queries";
 import {
   type AssignmentSet,
   assignmentSubject,
+  currentAssignments,
   isAssignmentSet,
+  type TakeBackSet,
 } from "./records";
 
 export type AssignmentInput = {
@@ -17,7 +19,8 @@ export type AssignmentInput = {
 
 /**
  * Sets a Category's Assignment for a Month, replacing any earlier one. It may
- * be more than Ready to Assign; the Month Budget view warns about that.
+ * be more than Ready to Assign; the Month Budget view warns about that. An
+ * amount below zero sets it to zero and takes the rest back.
  */
 export function setAssignment(
   writer: ChangeLogWriter,
@@ -37,20 +40,14 @@ export function copyLastMonth(
   writer: ChangeLogWriter,
   { month, skipping = [] }: { month: Month; skipping?: Iterable<string> },
 ): void {
-  const latest = latestBySubject(
-    writer.changeLog.readAll().filter(isAssignmentSet),
-  );
+  const current = currentAssignments(writer.changeLog.readAll());
   const lastMonth = previousMonth(month);
   const skipped = new Set(skipping);
-  for (const { payload } of latest.values()) {
-    if (payload.month !== lastMonth) continue;
-    if (skipped.has(payload.categoryId)) continue;
-    if (latest.has(assignmentSubject(payload.categoryId, month))) continue;
-    setAssignment(writer, {
-      categoryId: payload.categoryId,
-      month,
-      amount: payload.amount,
-    });
+  for (const { categoryId, month: of, assigned } of current.values()) {
+    if (of !== lastMonth || !assigned) continue;
+    if (skipped.has(categoryId)) continue;
+    if (current.get(assignmentSubject(categoryId, month))?.assigned) continue;
+    setAssignment(writer, { categoryId, month, amount: assigned });
   }
 }
 
@@ -63,8 +60,8 @@ export type MoveMoneyInput = {
 
 /**
  * Moves money between two Categories in one Month: lowers one Assignment and
- * raises the other by the same amount, just as editing both would. The
- * lowered Assignment may go below zero.
+ * raises the other by the same amount, just as editing both would. What the
+ * lowered Assignment can't cover is taken back from what it carried forward.
  */
 export function moveMoney(
   writer: ChangeLogWriter,
@@ -97,13 +94,43 @@ function checkInBudgetCurrency(writer: ChangeLogWriter, amount: Money): void {
   }
 }
 
+/**
+ * Writes an Assignment. An amount below zero is written as zero, with the part
+ * beyond it added to the Month's Take-back. A Take-back is written only when it
+ * changes, so an Assignment on one device can't undo a Take-back on another.
+ */
 function write(
   writer: ChangeLogWriter,
   { categoryId, month, amount }: AssignmentInput,
 ): void {
+  const records = writer.changeLog.readAll();
+  const subject = assignmentSubject(categoryId, month);
+  const beyond = Math.max(0, -amount.minorUnits);
+  const replaced = records
+    .filter(isAssignmentSet)
+    .findLast((record) => record.subjectId === subject)?.payload.amount;
+  // A stored negative Assignment holds a Take-back only until it's replaced.
+  if (beyond > 0 || (replaced && replaced.minorUnits < 0)) {
+    const earlier = currentAssignments(records).get(subject)?.takenBack;
+    writer.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+      subject,
+      "TakeBackSet",
+      {
+        version: 1,
+        categoryId,
+        month,
+        amount: money((earlier?.minorUnits ?? 0) + beyond, amount.currency),
+      },
+    );
+  }
   writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
-    assignmentSubject(categoryId, month),
+    subject,
     "AssignmentSet",
-    { version: 1, categoryId, month, amount },
+    {
+      version: 1,
+      categoryId,
+      month,
+      amount: money(Math.max(0, amount.minorUnits), amount.currency),
+    },
   );
 }

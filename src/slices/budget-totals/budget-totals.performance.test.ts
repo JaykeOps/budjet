@@ -3,7 +3,11 @@ import type { ChangeRecord } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import { type Month, month, nextMonth } from "../../kernel/month";
 import type { AccountOpened } from "../accounts/records";
-import { type AssignmentSet, assignmentSubject } from "../assignments/records";
+import {
+  type AssignmentSet,
+  assignmentSubject,
+  type TakeBackSet,
+} from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
 import type { TransactionRecorded } from "../transactions/records";
 import { available, overspent, readyToAssign } from "./index";
@@ -13,7 +17,7 @@ const ACCOUNTS = ["checking", "savings", "cash"];
 
 /**
  * About ten years of heavy use: three Accounts, 24 Categories assigned every
- * Month (some changed twice), two paydays and about 390 Transactions a Month,
+ * Month (some changed twice, some with a Take-back), two paydays and about 390 Transactions a Month,
  * a few of them refunds.
  */
 function tenYearsOfRecords(): ChangeRecord[] {
@@ -59,6 +63,14 @@ function tenYearsOfRecords(): ChangeRecord[] {
           month: of,
           amount: money(Math.round(random() * 50000), "USD"),
         } satisfies AssignmentSet["payload"]);
+      }
+      if (random() < 0.1) {
+        write(assignmentSubject(categoryId, of), "TakeBackSet", {
+          version: 1,
+          categoryId,
+          month: of,
+          amount: money(Math.round(random() * 10000), "USD"),
+        } satisfies TakeBackSet["payload"]);
       }
     }
     for (let t = 0; t < 390; t++) {

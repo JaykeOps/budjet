@@ -343,7 +343,9 @@ function TransactionList({
           aria-rowcount={entries.length + 1}
           style={{ borderCollapse: "collapse", whiteSpace: "nowrap" }}
         >
-          <thead style={{ position: "sticky", top: 0, background: "Canvas" }}>
+          <thead
+            style={{ position: "sticky", top: 0, background: "var(--card)" }}
+          >
             <tr aria-rowindex={1}>
               <th scope="col">Date</th>
               <th scope="col">Payee</th>
