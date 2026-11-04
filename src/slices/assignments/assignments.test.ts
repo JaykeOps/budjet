@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  type ChangeLogWriter,
   createChangeLogWriter,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import { month } from "../../kernel/month";
 import type { BudgetCreated } from "../budget-setup/records";
+import { available, readyToAssign } from "../budget-totals";
 import { copyLastMonth, moveMoney, setAssignment } from "./commands";
-import { assignment } from "./index";
+import { assignment, takeBack } from "./index";
+import { type AssignmentSet, assignmentSubject } from "./records";
 
 const october = month(2026, 10);
 const november = month(2026, 11);
@@ -253,5 +256,221 @@ describe("Assignments", () => {
         expect(changeLog.readAll()).toEqual(before);
       },
     );
+  });
+
+  describe("Take-backs", () => {
+    const rent = { categoryId: "rent", month: october };
+    const dollars = (amount: number) => money(amount * 100, "USD");
+
+    function moveFromRent(writer: ChangeLogWriter, amount: number) {
+      moveMoney(writer, {
+        fromCategoryId: "rent",
+        toCategoryId: "groceries",
+        month: october,
+        amount: dollars(amount),
+      });
+    }
+
+    /** Stores an Assignment the way older versions could: below zero. */
+    function storeNegativeAssignment(writer: ChangeLogWriter, amount: number) {
+      writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+        assignmentSubject(rent.categoryId, rent.month),
+        "AssignmentSet",
+        { version: 1, ...rent, amount: dollars(-amount) },
+      );
+    }
+
+    it("has no Take-back until money leaves a Category beyond its Assignment", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      setAssignment(writer, { ...rent, amount: dollars(100) });
+      moveFromRent(writer, 100);
+
+      const records = changeLog.readAll();
+      expect(assignment(records, "rent", october)).toEqual(dollars(0));
+      expect(takeBack(records, "rent", october)).toBeUndefined();
+    });
+
+    it("takes back what moving money needs beyond the Assignment, which stops at zero", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      setAssignment(writer, { ...rent, amount: dollars(30) });
+
+      moveFromRent(writer, 50);
+
+      const records = changeLog.readAll();
+      expect(assignment(records, "rent", october)).toEqual(dollars(0));
+      expect(takeBack(records, "rent", october)).toEqual(dollars(20));
+      expect(assignment(records, "groceries", october)).toEqual(dollars(50));
+      expect(takeBack(records, "rent", november)).toBeUndefined();
+    });
+
+    it("turns an Assignment typed below zero into zero plus a Take-back", () => {
+      const { changeLog, writer } = budgetIn("USD");
+
+      setAssignment(writer, { ...rent, amount: dollars(-40) });
+
+      const records = changeLog.readAll();
+      expect(assignment(records, "rent", october)).toEqual(dollars(0));
+      expect(takeBack(records, "rent", october)).toEqual(dollars(40));
+    });
+
+    it("keeps one total per Category per Month, growing with each Take-back", () => {
+      const { changeLog, writer } = budgetIn("USD");
+
+      moveFromRent(writer, 20);
+      setAssignment(writer, { ...rent, amount: dollars(-5) });
+      moveFromRent(writer, 10);
+
+      expect(takeBack(changeLog.readAll(), "rent", october)).toEqual(
+        dollars(35),
+      );
+    });
+
+    it("keeps a Take-back when the Assignment is raised later", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      moveFromRent(writer, 20);
+
+      setAssignment(writer, { ...rent, amount: dollars(70) });
+      moveMoney(writer, {
+        fromCategoryId: "groceries",
+        toCategoryId: "rent",
+        month: october,
+        amount: dollars(5),
+      });
+
+      const records = changeLog.readAll();
+      expect(assignment(records, "rent", october)).toEqual(dollars(75));
+      expect(takeBack(records, "rent", october)).toEqual(dollars(20));
+    });
+
+    it("keeps the most recent Take-back, whichever device's records arrive first", () => {
+      const laptop = budgetIn("USD", "laptop", () => 5000);
+      moveFromRent(laptop.writer, 20);
+      // The phone's clock is behind, but it has seen the laptop's records.
+      const phoneLog = createInMemoryChangeLog();
+      phoneLog.append(laptop.changeLog.readAll());
+      const phone = createChangeLogWriter(phoneLog, "phone", {
+        now: () => 1000,
+      });
+      moveFromRent(phone, 10);
+      const [first, second] = [laptop.changeLog.readAll(), phoneLog.readAll()];
+
+      for (const order of [
+        [first, second],
+        [second, first],
+      ]) {
+        const merged = createInMemoryChangeLog();
+        for (const records of order) merged.append(records);
+        expect(takeBack(merged.readAll(), "rent", october)).toEqual(
+          dollars(30),
+        );
+      }
+    });
+
+    it("leaves Ready to Assign unchanged overall by a Move Money that includes a Take-back", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      setAssignment(writer, {
+        ...rent,
+        month: month(2026, 9),
+        amount: dollars(600),
+      });
+      setAssignment(writer, { ...rent, amount: dollars(10) });
+      const before = readyToAssign(changeLog.readAll());
+
+      moveFromRent(writer, 52.5);
+
+      const records = changeLog.readAll();
+      expect(readyToAssign(records)).toEqual(before);
+      expect(available(records, "rent", october)).toEqual(dollars(557.5));
+      expect(available(records, "groceries", october)).toEqual(dollars(52.5));
+    });
+
+    it("keeps the later of two Take-backs made without seeing each other", () => {
+      const laptop = budgetIn("USD", "laptop", () => 5000);
+      const phone = budgetIn("USD", "phone", () => 1000);
+      moveFromRent(laptop.writer, 20);
+      moveFromRent(phone.writer, 10);
+      const [first, second] = [
+        laptop.changeLog.readAll(),
+        phone.changeLog.readAll(),
+      ];
+
+      for (const order of [
+        [first, second],
+        [second, first],
+      ]) {
+        const merged = createInMemoryChangeLog();
+        for (const records of order) merged.append(records);
+        expect(takeBack(merged.readAll(), "rent", october)).toEqual(
+          dollars(20),
+        );
+      }
+    });
+
+    describe("an Assignment stored below zero", () => {
+      it("reads as zero plus a Take-back of the difference", () => {
+        const { changeLog, writer } = budgetIn("USD");
+        storeNegativeAssignment(writer, 50);
+
+        const records = changeLog.readAll();
+        expect(assignment(records, "rent", october)).toEqual(dollars(0));
+        expect(takeBack(records, "rent", october)).toEqual(dollars(50));
+      });
+
+      it("keeps its Take-back when a new Assignment replaces it", () => {
+        const { changeLog, writer } = budgetIn("USD");
+        storeNegativeAssignment(writer, 50);
+
+        setAssignment(writer, { ...rent, amount: dollars(70) });
+
+        const records = changeLog.readAll();
+        expect(assignment(records, "rent", october)).toEqual(dollars(70));
+        expect(takeBack(records, "rent", october)).toEqual(dollars(50));
+      });
+
+      it("adds to its Take-back when more money leaves", () => {
+        const { changeLog, writer } = budgetIn("USD");
+        storeNegativeAssignment(writer, 50);
+
+        moveFromRent(writer, 20);
+
+        const records = changeLog.readAll();
+        expect(assignment(records, "rent", october)).toEqual(dollars(0));
+        expect(takeBack(records, "rent", october)).toEqual(dollars(70));
+      });
+
+      it("adds to a Take-back recorded for the same Month on another device", () => {
+        const { changeLog, writer } = budgetIn("USD");
+        moveFromRent(writer, 30);
+        storeNegativeAssignment(writer, 50);
+
+        expect(takeBack(changeLog.readAll(), "rent", october)).toEqual(
+          dollars(80),
+        );
+      });
+
+      it("copies into next Month as zero, leaving the Take-back behind", () => {
+        const { changeLog, writer } = budgetIn("USD");
+        storeNegativeAssignment(writer, 50);
+
+        copyLastMonth(writer, { month: november });
+
+        const records = changeLog.readAll();
+        expect(assignment(records, "rent", november)).toEqual(dollars(0));
+        expect(takeBack(records, "rent", november)).toBeUndefined();
+      });
+    });
+
+    it("never stores a negative Assignment", () => {
+      const { changeLog, writer } = budgetIn("USD");
+
+      moveFromRent(writer, 20);
+      setAssignment(writer, { ...rent, amount: dollars(-5) });
+
+      const stored = changeLog
+        .readAll()
+        .filter(({ type }) => type === "AssignmentSet")
+        .map(({ payload }) => (payload as AssignmentSet["payload"]).amount);
+      expect(stored.every(({ minorUnits }) => minorUnits >= 0)).toBe(true);
+    });
   });
 });

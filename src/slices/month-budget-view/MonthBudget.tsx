@@ -13,7 +13,7 @@ import {
   nextMonth,
   previousMonth,
 } from "../../kernel/month";
-import { useAssignment } from "../assignments";
+import { useAssignment, useTakeBack } from "../assignments";
 import {
   useAvailable,
   useOverspent,
@@ -253,8 +253,8 @@ function AvailableAmount({ amount }: { amount: Money }) {
 }
 
 /**
- * A Category with its spending and Available, and its Assignment, set by
- * typing an amount and pressing Enter or leaving the field.
+ * A Category with any Take-back, its spending and Available, and its
+ * Assignment, set by typing an amount and pressing Enter or leaving the field.
  */
 function CategoryRow({
   category,
@@ -272,6 +272,7 @@ function CategoryRow({
   const assigned = useAssignment(category.id, month) ?? money(0, currency);
   const spent = useSpending(category.id, month) ?? money(0, currency);
   const available = useAvailable(category.id, month) ?? money(0, currency);
+  const takenBack = useTakeBack(category.id, month);
   const overspent = available.minorUnits < 0;
   const [draft, setDraft] = useState<string>();
 
@@ -294,7 +295,12 @@ function CategoryRow({
 
   return (
     <tr>
-      <th scope="row">{category.name}</th>
+      <th scope="row">
+        {category.name}
+        {takenBack && takenBack.minorUnits !== 0 && (
+          <small> {formatMoney(takenBack)} taken back</small>
+        )}
+      </th>
       <td>
         <form onSubmit={submit}>
           <input
