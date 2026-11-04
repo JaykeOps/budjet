@@ -190,9 +190,11 @@ test("an Overspent Category is red in its Month and the next until an Assignment
 test("a refund larger than the Month's money going out shows signed Spending", async ({
   page,
 }) => {
-  await createBudget(page, "1000");
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
   await assign(page, "Groceries", "100");
   await recordSpending(page, "2026-10-03", "20", "Groceries");
+  await goTo(page, "Activity");
   const record = page.getByRole("form", { name: "Record a Transaction" });
   await record.getByLabel("Date").fill("2026-10-05");
   await record.getByLabel("Money").selectOption("in");
@@ -200,6 +202,7 @@ test("a refund larger than the Month's money going out shows signed Spending", a
   await record.getByLabel("Category").selectOption({ label: "Groceries" });
   await record.getByRole("button", { name: "Record Transaction" }).click();
 
+  await goTo(page, "Budget");
   const october = page.getByRole("table", { name: "October 2026" });
   const groceries = october.getByRole("row", { name: /^Groceries/ });
   await expect(groceries.getByRole("cell").nth(1)).toHaveText("−$12.00");
