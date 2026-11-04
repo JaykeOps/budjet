@@ -42,6 +42,9 @@ _Avoid_: Balance (that word belongs to Accounts), remaining
 What a Category's Transactions took out of the Budget in one Month: money going out, less refunds coming back in. A Month whose refunds outweigh its money going out has negative Spending. Transfers and Adjustments are never Spending.
 _Avoid_: Expenses, activity, outflow
 
+**Spent this Month**:
+The Spending of a Month across the Budget's Categories, of that Month's Assignments to them, leaving out any Category Group the user has left out of it so that saving doesn't read as spending. A Category counts by the Category Group it is in now, even for past Months. Nothing else changes when a Category Group is left out.
+
 **Overspent**:
 A Category whose Available is below zero. It stays Overspent, Month after Month, until the user raises its Assignment to cover it.
 _Avoid_: In the red, deficit
