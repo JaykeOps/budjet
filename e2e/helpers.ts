@@ -51,14 +51,22 @@ export async function createBudget(
 }
 
 /**
- * Reaches a place. Every place is on one screen today, so this only checks it
- * is showing. Navigation changes belong here, not in the specs.
+ * Reaches a place through whichever navigation this device has: tabs on a
+ * phone, the rail on desktop. Until the Accounts screen is rebuilt, the rail
+ * reaches it through "+ Add Account".
  */
 export async function goTo(page: Page, place: Place): Promise<void> {
+  const places = page.getByRole("navigation", { name: "Places" });
+  const links = {
+    Budget: places.getByRole("link", { name: "Budget", exact: true }),
+    Activity: places.getByRole("link", { name: /^(Activity|All Accounts)/ }),
+    Accounts: places.getByRole("link", { name: /^(Accounts|\+ Add Account)$/ }),
+  };
   const landmarks = {
     Budget: page.getByRole("heading", { name: "Budget", exact: true }),
     Activity: page.getByRole("region", { name: "Transactions", exact: true }),
     Accounts: page.getByRole("region", { name: "Accounts", exact: true }),
   };
+  await links[place].click();
   await expect(landmarks[place]).toBeVisible();
 }
