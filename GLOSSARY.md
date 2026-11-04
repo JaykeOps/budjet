@@ -70,6 +70,10 @@ _Avoid_: Move, transaction pair
 The difference budjet records when the user re-declares an Account's real balance. It goes into, or comes out of, Ready to Assign.
 _Avoid_: Correction, reconciliation, fix
 
+**Balance check**:
+The user confirming that an Account's balance in Crownkeep matches their bank. Crownkeep records the date, and nothing moves.
+_Avoid_: Reconciliation, verify, $0 Adjustment
+
 ## Delivery
 
 **Release**:

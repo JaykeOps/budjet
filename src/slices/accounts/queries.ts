@@ -25,6 +25,12 @@ export type Account = {
   kind: AccountKind;
   closed: boolean;
   balance: Money;
+  /**
+   * The day of the latest re-declaration, Adjustment or Balance check, on this
+   * device's calendar, "YYYY-MM-DD". Absent until the first one: adding an
+   * Account doesn't count.
+   */
+  lastChecked?: string;
 };
 
 /** The money a re-declared balance added to (above zero) or took from an Account. */
@@ -35,6 +41,16 @@ export type Adjustment = {
   /** The day the balance was re-declared, on this device's calendar, "YYYY-MM-DD". */
   date: string;
   amount: Money;
+};
+
+/** A re-declared balance equal to the balance just before it. Nothing moved. */
+export type BalanceCheck = {
+  /** The id of the record that re-declared the balance. */
+  id: string;
+  accountId: string;
+  /** The day the balance was re-declared, on this device's calendar, "YYYY-MM-DD". */
+  date: string;
+  balance: Money;
 };
 
 /**
@@ -65,21 +81,36 @@ export function accounts(records: readonly ChangeRecord[]): Account[] {
     } else if (isAccountClosed(record)) {
       const account = byId.get(record.subjectId);
       if (account) account.closed = true;
+    } else if (isBalanceRedeclared(record)) {
+      const account = byId.get(record.subjectId);
+      if (account) account.lastChecked = localDate(record.timestamp.wallTime);
     }
   }
   return [...byId.values()];
 }
 
 /**
- * Every Adjustment, oldest first: each re-declared balance less the
- * Account's balance just before it, in Change Log order. Every slice that
- * counts Adjustments reads them through this. Expects records oldest first,
- * as `readAll` returns them.
+ * Every Adjustment, oldest first: each re-declared balance that differs from
+ * the Account's balance just before it, less that balance, in Change Log
+ * order. Every slice that counts Adjustments reads them through this. Expects
+ * records oldest first, as `readAll` returns them.
  */
 export function adjustments(
   records: readonly ChangeRecord[],
 ): readonly Adjustment[] {
   return ledger(records).adjustments;
+}
+
+/**
+ * Every Balance check, oldest first: each re-declared balance equal to the
+ * Account's balance just before it, in Change Log order. A record that arrives
+ * late from another device can turn one into an Adjustment, and back. Expects
+ * records oldest first, as `readAll` returns them.
+ */
+export function balanceChecks(
+  records: readonly ChangeRecord[],
+): readonly BalanceCheck[] {
+  return ledger(records).balanceChecks;
 }
 
 /** An Account's balance. */
@@ -111,6 +142,7 @@ type Ledger = {
   /** Each Account's balance now, in minor units, by Account id. */
   balances: ReadonlyMap<string, number>;
   adjustments: readonly Adjustment[];
+  balanceChecks: readonly BalanceCheck[];
 };
 
 /**
@@ -138,7 +170,8 @@ const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
     for (const [accountId, minorUnits] of now) move(accountId, minorUnits);
     effects.set(subjectId, now);
   };
-  const found: Adjustment[] = [];
+  const foundAdjustments: Adjustment[] = [];
+  const foundChecks: BalanceCheck[] = [];
   for (const record of records) {
     if (isAccountOpened(record)) {
       move(record.subjectId, record.payload.openingBalance.minorUnits);
@@ -146,13 +179,20 @@ const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
       const { balance } = record.payload;
       const difference =
         balance.minorUnits - (balances.get(record.subjectId) ?? 0);
-      move(record.subjectId, difference);
-      found.push({
+      const redeclared = {
         id: record.id,
         accountId: record.subjectId,
         date: localDate(record.timestamp.wallTime),
-        amount: money(difference, balance.currency),
-      });
+      };
+      if (difference === 0) {
+        foundChecks.push({ ...redeclared, balance });
+      } else {
+        move(record.subjectId, difference);
+        foundAdjustments.push({
+          ...redeclared,
+          amount: money(difference, balance.currency),
+        });
+      }
     } else if (isTransactionRecorded(record) || isTransactionEdited(record)) {
       const { accountId, amount } = record.payload;
       replace(record.subjectId, [[accountId, amount.minorUnits]]);
@@ -166,7 +206,11 @@ const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
       replace(record.subjectId, []);
     }
   }
-  return { balances, adjustments: found };
+  return {
+    balances,
+    adjustments: foundAdjustments,
+    balanceChecks: foundChecks,
+  };
 });
 
 function localDate(wallTime: number): string {

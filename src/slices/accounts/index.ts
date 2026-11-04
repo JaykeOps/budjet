@@ -7,6 +7,8 @@ import {
   accounts,
   accountsTotal,
   adjustments,
+  type BalanceCheck,
+  balanceChecks,
 } from "./queries";
 
 export { AccountsScreen } from "./AccountsScreen";
@@ -19,6 +21,8 @@ export {
   accounts,
   accountsTotal,
   adjustments,
+  type BalanceCheck,
+  balanceChecks,
 };
 
 export function useAccounts(): Account[] {
