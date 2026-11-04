@@ -1,5 +1,7 @@
 # Feature slices, not a layered core
 
+Amended by [0007](0007-presentational-ui-is-shared-beside-the-kernel.md).
+
 budjet is organised as feature slices (Budget Setup, Accounts, Transactions, Transfers, Categories, Assignments, Budget Totals, Month Budget view), each owning its UI, commands, change record types, queries and tests, instead of UI, domain and storage layers shared by every feature. We want a change to land in one slice without rippling through the rest. Shared code is a thin kernel: the Money and Month value types, and the Change Log, the append-only store of change records (ADR 0004) that is the only home of domain state. No global client store (Redux, Zustand, Jotai) holds a second copy of it.
 
 ## Rules
