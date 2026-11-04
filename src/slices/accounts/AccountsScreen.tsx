@@ -50,6 +50,7 @@ export function AccountsScreen({
             <th scope="col">Account</th>
             <th scope="col">Type</th>
             <th scope="col">Balance</th>
+            <th scope="col">Last checked</th>
             <th scope="col" aria-label="Actions" />
           </tr>
         </thead>
@@ -62,6 +63,7 @@ export function AccountsScreen({
               </th>
               <td>{KIND_LABELS[account.kind]}</td>
               <td>{formatMoney(account.balance)}</td>
+              <td>{account.lastChecked ?? "Not checked yet"}</td>
               <td>
                 {!account.closed && (
                   <button
@@ -83,6 +85,7 @@ export function AccountsScreen({
                 Total
               </th>
               <td>{formatMoney(total)}</td>
+              <td />
               <td />
             </tr>
           </tfoot>

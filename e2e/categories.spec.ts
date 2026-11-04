@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { createBudget, goTo } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 /** Each Category Group's name followed by its Categories' names, in order. */
@@ -21,13 +22,11 @@ async function outline(page: Page) {
 test("a user organises Categories into Category Groups and the order is kept", async ({
   page,
 }) => {
-  await page.goto("/");
-  await page.getByLabel("Currency").selectOption("SEK");
-  await page.getByRole("button", { name: "Create Budget" }).click();
-  const setup = page.getByRole("form", { name: "Add your first Account" });
-  await setup.getByLabel("Name").fill("Checking");
-  await setup.getByLabel("Opening Balance").fill("0");
-  await setup.getByRole("button", { name: "Add Account" }).click();
+  await createBudget(page, {
+    currency: "SEK",
+    firstAccount: { openingBalance: "0" },
+  });
+  await goTo(page, "Budget");
 
   await expect
     .poll(() => outline(page))
@@ -70,13 +69,8 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
   page,
 }) => {
   await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
-  await page.goto("/");
-  await page.getByLabel("Currency").selectOption("USD");
-  await page.getByRole("button", { name: "Create Budget" }).click();
-  const setup = page.getByRole("form", { name: "Add your first Account" });
-  await setup.getByLabel("Name").fill("Checking");
-  await setup.getByLabel("Opening Balance").fill("1000");
-  await setup.getByRole("button", { name: "Add Account" }).click();
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
 
   const categories = page.getByRole("region", { name: "Categories" });
   const alert = categories.getByRole("alert");
@@ -96,10 +90,12 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
 
   // Paying the rent spends it, and a used Category can't be deleted: the
   // refusal offers to hide it.
+  await goTo(page, "Activity");
   const record = page.getByRole("form", { name: "Record a Transaction" });
   await record.getByLabel("Amount").fill("50");
   await record.getByLabel("Category").selectOption({ label: "Rent" });
   await record.getByRole("button", { name: "Record Transaction" }).click();
+  await goTo(page, "Budget");
   await expect(month.getByRole("row", { name: /Rent/ })).toContainText(
     /\$50\.00.*\$0\.00/,
   );
@@ -120,6 +116,7 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
   await categories.getByRole("button", { name: "Delete Savings" }).click();
 
   const expectRentHidden = async () => {
+    await goTo(page, "Budget");
     await expect(month.getByRole("rowheader")).toHaveText([
       "Bills",
       "Power",
@@ -129,7 +126,9 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
       "Transport",
       "Dining Out",
     ]);
+    await goTo(page, "Activity");
     await expect(picker.getByRole("option", { name: "Rent" })).toHaveCount(0);
+    await goTo(page, "Budget");
     await expect(
       categories.getByRole("button", { name: "Unhide Rent" }),
     ).toBeVisible();
@@ -146,6 +145,7 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
   await categories.getByRole("button", { name: "Unhide Rent" }).click();
 
   const expectRentBack = async () => {
+    await goTo(page, "Budget");
     await expect(month.getByRole("rowheader")).toHaveText([
       "Bills",
       "Rent",
@@ -156,6 +156,7 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
       "Transport",
       "Dining Out",
     ]);
+    await goTo(page, "Activity");
     await expect(picker.getByRole("option", { name: "Rent" })).toHaveCount(1);
   };
   await expectRentBack();

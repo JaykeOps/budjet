@@ -331,7 +331,9 @@ function TransactionList({
           aria-rowcount={entries.length + 1}
           style={{ borderCollapse: "collapse", whiteSpace: "nowrap" }}
         >
-          <thead style={{ position: "sticky", top: 0, background: "Canvas" }}>
+          <thead
+            style={{ position: "sticky", top: 0, background: "var(--card)" }}
+          >
             <tr aria-rowindex={1}>
               <th scope="col">Date</th>
               <th scope="col">Payee</th>
@@ -353,6 +355,17 @@ function TransactionList({
                   <td style={cell}>Ready to Assign</td>
                   <td style={cell} />
                   <td style={cell}>{formatMoney(entry.amount)}</td>
+                  <td style={cell} />
+                </tr>
+              ) : entry.kind === "balance-check" ? (
+                <tr key={entry.id} aria-rowindex={first + index + 2}>
+                  <td style={cell}>{entry.date}</td>
+                  <td style={cell}>Balance checked</td>
+                  <td style={cell} />
+                  <td style={cell}>
+                    Matched your bank at {formatMoney(entry.balance)}
+                  </td>
+                  <td style={cell} />
                   <td style={cell} />
                 </tr>
               ) : entry.kind === "transfer" ? (

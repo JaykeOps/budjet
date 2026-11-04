@@ -6,6 +6,7 @@ export type CategoryGroup = {
   id: string;
   name: string;
   hidden: boolean;
+  leftOutOfSpentThisMonth: boolean;
   categories: Category[];
 };
 
@@ -20,7 +21,7 @@ type Placed = { id: string; name: string; position: number };
 export function categoryGroups(
   records: readonly ChangeRecord[],
 ): CategoryGroup[] {
-  const groups = new Map<string, Placed>();
+  const groups = new Map<string, Placed & { leftOut: boolean }>();
   const categories = new Map<
     string,
     Placed & { groupId: string; hidden: boolean }
@@ -36,13 +37,16 @@ export function categoryGroups(
     const category = categories.get(id);
     switch (record.type) {
       case "CategoryGroupCreated":
-        groups.set(id, { id, ...pick(record.payload) });
+        groups.set(id, { id, ...pick(record.payload), leftOut: false });
         break;
       case "CategoryGroupRenamed":
         if (group) group.name = record.payload.name;
         break;
       case "CategoryGroupPlaced":
         if (group) group.position = record.payload.position;
+        break;
+      case "CategoryGroupSpentThisMonthSet":
+        if (group) group.leftOut = record.payload.leftOut;
         break;
       case "CategoryCreated":
         categories.set(id, {
@@ -78,6 +82,7 @@ export function categoryGroups(
     id: group.id,
     name: group.name,
     hidden: false,
+    leftOutOfSpentThisMonth: group.leftOut,
     categories: inOrder(all.filter(({ groupId }) => groupId === group.id)).map(
       ({ id, name, hidden }) => ({ id, name, hidden }),
     ),

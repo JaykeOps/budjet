@@ -6,7 +6,11 @@ import {
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import type { AccountOpened, BalanceRedeclared } from "../accounts/records";
-import { type AssignmentSet, assignmentSubject } from "../assignments/records";
+import {
+  type AssignmentSet,
+  assignmentSubject,
+  type TakeBackSet,
+} from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
 import type {
   TransactionDeleted,
@@ -52,6 +56,18 @@ function budget() {
           version: 1,
           categoryId,
           month: assigned,
+          amount: money(amount, "USD"),
+        },
+      );
+    },
+    takeBack(categoryId: string, of: Month, amount: number) {
+      writer.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+        assignmentSubject(categoryId, of),
+        "TakeBackSet",
+        {
+          version: 1,
+          categoryId,
+          month: of,
           amount: money(amount, "USD"),
         },
       );
@@ -178,6 +194,17 @@ describe("Budget Totals", () => {
     totals.redeclare(80000);
 
     expect(totals.readyToAssign()).toEqual(money(105000, "USD"));
+  });
+
+  it("leaves Ready to Assign alone when a re-declared balance equals the current one", () => {
+    const totals = budget();
+    totals.openAccount(100000, "checking");
+    totals.record("2026-10-12", -20000, "groceries");
+    const before = totals.readyToAssign();
+
+    totals.redeclare(80000);
+
+    expect(totals.readyToAssign()).toEqual(before);
   });
 
   it("calculates a Category's spending and Available in a Month from its Assignment and Transactions", () => {
@@ -485,5 +512,80 @@ describe("Budget Totals", () => {
     expect(totals.assignedAfter("rent", "2026-10")).toBe(false);
     // An Assignment of zero gives the Category no money in that Month.
     expect(totals.assignedAfter("gifts", "2026-10")).toBe(false);
+  });
+
+  describe("Take-backs", () => {
+    it("takes a Take-back out of Available, in its Month and every later one", () => {
+      const totals = budget();
+      totals.assign("holiday", "2026-09", 60000);
+      totals.assign("holiday", "2026-10", 10000);
+      totals.record("2026-10-12", -2500, "holiday");
+
+      totals.takeBack("holiday", "2026-10", 4250);
+
+      // carried forward 600.00 - taken back 42.50 + assigned 100.00 - spent 25.00
+      expect(totals.available("holiday", "2026-10")).toEqual(
+        money(63250, "USD"),
+      );
+      expect(totals.available("holiday", "2026-09")).toEqual(
+        money(60000, "USD"),
+      );
+      expect(totals.available("holiday", "2026-11")).toEqual(
+        money(63250, "USD"),
+      );
+    });
+
+    it("counts only the latest Take-back for a Category in a Month", () => {
+      const totals = budget();
+      totals.assign("holiday", "2026-09", 60000);
+
+      totals.takeBack("holiday", "2026-10", 4000);
+      totals.takeBack("holiday", "2026-10", 1000);
+
+      expect(totals.available("holiday", "2026-10")).toEqual(
+        money(59000, "USD"),
+      );
+    });
+
+    it("puts a Take-back back in Ready to Assign", () => {
+      const totals = budget();
+      totals.openAccount(100000);
+      totals.assign("holiday", "2026-09", 60000);
+
+      totals.takeBack("holiday", "2026-10", 4250);
+
+      expect(totals.readyToAssign()).toEqual(money(44250, "USD"));
+    });
+
+    it("keeps a Budget's numbers when it stored a negative Assignment", () => {
+      const totals = budget();
+      totals.openAccount(100000);
+      totals.assign("holiday", "2026-09", 60000);
+
+      totals.assign("holiday", "2026-10", -4250);
+
+      expect(totals.available("holiday", "2026-10")).toEqual(
+        money(55750, "USD"),
+      );
+      expect(totals.readyToAssign()).toEqual(money(44250, "USD"));
+    });
+
+    it("counts a Take-back as using a Category, including one stored as a negative Assignment", () => {
+      const totals = budget();
+      totals.takeBack("holiday", "2026-10", 4250);
+      totals.assign("gifts", "2026-10", -100);
+
+      expect(totals.used("holiday")).toBe(true);
+      expect(totals.used("gifts")).toBe(true);
+    });
+
+    it("does not count a Take-back in a later Month as an Assignment there", () => {
+      const totals = budget();
+      totals.takeBack("holiday", "2026-12", 4250);
+      totals.assign("gifts", "2026-12", -100);
+
+      expect(totals.assignedAfter("holiday", "2026-10")).toBe(false);
+      expect(totals.assignedAfter("gifts", "2026-10")).toBe(false);
+    });
   });
 });

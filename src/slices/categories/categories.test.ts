@@ -6,7 +6,11 @@ import {
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
-import { type AssignmentSet, assignmentSubject } from "../assignments/records";
+import {
+  type AssignmentSet,
+  assignmentSubject,
+  type TakeBackSet,
+} from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
 import type { TransactionRecorded } from "../transactions/records";
 import {
@@ -21,6 +25,7 @@ import {
   moveCategoryGroup,
   renameCategory,
   renameCategoryGroup,
+  setCategoryGroupSpentThisMonth,
   unhideCategory,
 } from "./commands";
 import { type CategoryGroup, categoryGroups } from "./index";
@@ -208,6 +213,80 @@ describe("Categories", () => {
   });
 });
 
+describe("Leaving a Category Group out of Spent this Month", () => {
+  it("starts a new Category Group counted, whatever its name", () => {
+    const { writer, groups } = setUp();
+
+    createCategoryGroup(writer, { name: "Savings" });
+
+    expect(groups()[0].leftOutOfSpentThisMonth).toBe(false);
+  });
+
+  it("starts the starter set with only its Savings Group left out", () => {
+    const { writer, groups } = setUp();
+
+    addStarterSet(writer);
+
+    expect(
+      groups().map(({ name, leftOutOfSpentThisMonth }) => [
+        name,
+        leftOutOfSpentThisMonth,
+      ]),
+    ).toEqual([
+      ["Bills", false],
+      ["Everyday", false],
+      ["Savings", true],
+    ]);
+  });
+
+  it("can be set and set back, and the latest setting wins", () => {
+    const { writer, groups } = setUp();
+    const id = createCategoryGroup(writer, { name: "Fun" });
+
+    setCategoryGroupSpentThisMonth(writer, id, { leftOut: true });
+    expect(groups()[0].leftOutOfSpentThisMonth).toBe(true);
+
+    setCategoryGroupSpentThisMonth(writer, id, { leftOut: false });
+    expect(groups()[0].leftOutOfSpentThisMonth).toBe(false);
+  });
+
+  it("is refused for a Category Group that doesn't exist", () => {
+    const { writer } = setUp();
+
+    expect(() =>
+      setCategoryGroupSpentThisMonth(writer, "nowhere", { leftOut: true }),
+    ).toThrow(/no such Category Group/);
+  });
+
+  it("keeps the most recent setting when two devices set it, in either order", () => {
+    const settings = [false, true].map((laptopFirst) => {
+      const shared = setUp();
+      const id = createCategoryGroup(shared.writer, { name: "Fun" });
+
+      // The phone's clock runs behind, but it sets this after seeing the
+      // laptop's change, so the phone's is the most recent edit.
+      const laptop = deviceCopy(
+        shared.writer.changeLog,
+        "laptop",
+        2_000_000_000_000,
+      );
+      setCategoryGroupSpentThisMonth(laptop.writer, id, { leftOut: true });
+      const phone = deviceCopy(laptop.changeLog, "phone", 1);
+      setCategoryGroupSpentThisMonth(phone.writer, id, { leftOut: false });
+
+      const merged = createInMemoryChangeLog();
+      const sources = [laptop.changeLog, phone.changeLog];
+      for (const source of laptopFirst ? sources : sources.reverse()) {
+        const seen = new Set(merged.readAll().map(({ id }) => id));
+        merged.append(source.readAll().filter(({ id }) => !seen.has(id)));
+      }
+      return categoryGroups(merged.readAll())[0].leftOutOfSpentThisMonth;
+    });
+
+    expect(settings).toEqual([false, false]);
+  });
+});
+
 function groupsAfterStarterSet() {
   const { writer, groups } = setUp();
   addStarterSet(writer);
@@ -369,6 +448,25 @@ describe("Deleting Categories and Category Groups", () => {
       "Bills",
       ["Rent", "Power", "Phone", "Internet"],
     ]);
+  });
+
+  it("refuses to delete a Category with a Take-back", () => {
+    const budget = budgetWithStarterSet();
+    const power = budget.id("Power");
+    budget.writer.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+      assignmentSubject(power, "2026-10"),
+      "TakeBackSet",
+      {
+        version: 1,
+        categoryId: power,
+        month: "2026-10",
+        amount: money(2500, "USD"),
+      },
+    );
+
+    expect(() => deleteCategory(budget.writer, power)).toThrow(
+      CategoryInUseError,
+    );
   });
 
   it("deletes an empty Category Group, but not one with Categories in it", () => {

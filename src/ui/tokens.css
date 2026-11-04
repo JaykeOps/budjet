@@ -1,0 +1,235 @@
+/*
+ * The design tokens, and the look a plain element takes from them
+ * (docs/adr/0008). Imported once, by the app shell.
+ *
+ * Element rules sit in :where() so they weigh nothing: any CSS Module wins.
+ */
+@import "@fontsource-variable/geist/wght.css";
+
+:root {
+  color-scheme: light dark;
+
+  /* Colour: light-dark(<light>, <dark>), so the system setting picks. */
+  --page: light-dark(#f2f2f5, #18181d);
+  --card: light-dark(#ffffff, #222228);
+  --raised: light-dark(#ebebf0, #2d2d35);
+  --text: light-dark(#18181d, #f4f4f6);
+  --muted: light-dark(#5c5c66, #a9a9b3);
+  --control-border: light-dark(#85858f, #75757f);
+  --primary: light-dark(#18181d, #f4f4f6);
+  --primary-top: light-dark(#3a3a42, #ffffff);
+  --on-primary: light-dark(#ffffff, #18181d);
+  --link: light-dark(#5b45d6, #c3b5ff);
+  --focus: light-dark(#5b45d6, #c3b5ff);
+  --available: light-dark(#0f7343, #5fdc9a);
+  --available-tint: light-dark(#e0f4e8, #1d3328);
+  --on-available-tint: light-dark(#0c6639, #73e8aa);
+  --overspent: light-dark(#c8283a, #ff7a85);
+  --overspent-tint: light-dark(#fde5e8, #3d2228);
+  --on-overspent-tint: light-dark(#a81f30, #ff9aa3);
+  --meter-track: light-dark(#e4e4ea, #3a3a43);
+  --meter-fill: light-dark(#18181d, #f4f4f6);
+  --meter-over: light-dark(#d63044, #ff7a85);
+
+  /* The Graphite card: the same in both schemes. */
+  --graphite-text: #f4f4f6;
+  --graphite-button-text: #18181d;
+  --graphite-card:
+    radial-gradient(circle at 0% 0%, #5a5a66, transparent 60%),
+    radial-gradient(circle at 100% 100%, #4a4a55, transparent 65%), #2e2e36;
+
+  /* Type */
+  --font: "Geist Variable", system-ui, sans-serif;
+  --amount-weight: 600;
+  --amount-tracking: -0.045em;
+  --amount-ready-to-assign: 52px;
+  --amount-transaction: 56px;
+
+  /* Shape */
+  --radius-control: 999px;
+  --radius-card: 24px;
+  --size-tile: 40px;
+
+  /* Depth: hairline edges at 9% text opacity, wide faint shadows. */
+  --edge: color-mix(in srgb, var(--text) 9%, transparent);
+  --shadow: light-dark(
+    color-mix(in srgb, #2a2a40 22%, transparent),
+    color-mix(in srgb, #050507 80%, transparent)
+  );
+  --shadow-soft: light-dark(
+    color-mix(in srgb, #2a2a40 11%, transparent),
+    color-mix(in srgb, #050507 50%, transparent)
+  );
+  --top-light: light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.07));
+  --depth-card:
+    inset 0 1px 0 var(--top-light), 0 0 0 1px var(--edge),
+    0 1px 2px var(--shadow-soft), 0 12px 32px -16px var(--shadow);
+  --depth-primary:
+    inset 0 1px 0 rgb(255 255 255 / 0.2), 0 1px 2px var(--shadow),
+    0 6px 14px -8px var(--shadow);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:where(body) {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+:where(main) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding: 24px 16px 48px;
+}
+
+:where(main > section, main > form) {
+  background: var(--card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--depth-card);
+  padding: clamp(16px, 4vw, 24px);
+  overflow-x: auto;
+}
+
+:where(h1, h2, h3, h4) {
+  margin: 0 0 8px;
+  line-height: 1.15;
+  font-weight: 600;
+}
+:where(h1) {
+  font-size: 28px;
+  letter-spacing: -0.035em;
+}
+:where(h2) {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+:where(h3, h4) {
+  font-size: 15px;
+}
+:where(p) {
+  margin: 0 0 8px;
+}
+:where(a) {
+  color: var(--link);
+}
+:where(:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+:where([role="alert"]) {
+  color: var(--overspent);
+  font-weight: 500;
+}
+
+:where(button) {
+  appearance: none;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: 6px 14px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--control-border);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+:where(button:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+:where(button[type="submit"]) {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--primary-top) 55%, var(--primary)),
+    var(--primary)
+  );
+  box-shadow: var(--depth-primary);
+  color: var(--on-primary);
+}
+@media (prefers-reduced-motion: no-preference) {
+  :where(button[type="submit"]) {
+    transition:
+      transform 120ms ease-out,
+      filter 120ms ease-out;
+  }
+  :where(button[type="submit"]:active:not(:disabled)) {
+    transform: scale(0.97);
+    filter: brightness(0.94);
+  }
+}
+
+:where(input, select) {
+  max-width: 100%;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  padding: 6px 12px;
+  background: var(--card);
+  box-shadow: 0 1px 2px var(--shadow-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+:where(td input) {
+  width: 5.5em;
+}
+
+:where(form) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  margin-block: 12px;
+}
+:where(form > :is(h2, h3, h4, p)) {
+  flex-basis: 100%;
+  margin-bottom: 0;
+}
+:where(td form) {
+  margin: 0;
+}
+:where(label) {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+:where(table) {
+  width: 100%;
+  border-collapse: collapse;
+}
+:where(th, td) {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--edge);
+  text-align: left;
+  font-weight: 400;
+}
+:where(thead th) {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+:where(tbody th, tfoot th) {
+  font-weight: 600;
+}
+
+:where(ul) {
+  margin: 0 0 8px;
+  padding-inline-start: 20px;
+}

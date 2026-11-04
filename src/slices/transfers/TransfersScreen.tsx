@@ -6,6 +6,7 @@ import {
   typedMoney,
 } from "../../kernel/money";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
+import { Menu } from "../../ui/Menu";
 import { type Account, useAccounts } from "../accounts";
 import type { TransferInput } from "./commands";
 import { transfers as allTransfers, type Transfer } from "./queries";
@@ -85,29 +86,33 @@ export function TransfersScreen({
               <td>{formatMoney(transfer.amount)}</td>
               <td>
                 {touchesOpenAccountsOnly(transfer) && (
-                  <>
-                    <button type="button" onClick={() => setEditing(transfer)}>
-                      Edit
-                    </button>{" "}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        try {
-                          onDelete(transfer.id);
-                          setError(undefined);
-                        } catch (failure) {
-                          setError(
-                            failure instanceof Error
-                              ? failure.message
-                              : String(failure),
-                          );
-                        }
-                        if (editing?.id === transfer.id) setEditing(undefined);
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </>
+                  <Menu
+                    label={`More for the Transfer of ${formatMoney(transfer.amount)} on ${transfer.date}`}
+                    actions={[
+                      {
+                        label: "Edit",
+                        onAction: () => setEditing(transfer),
+                      },
+                      {
+                        label: "Delete",
+                        onAction: () => {
+                          try {
+                            onDelete(transfer.id);
+                            setError(undefined);
+                          } catch (failure) {
+                            setError(
+                              failure instanceof Error
+                                ? failure.message
+                                : String(failure),
+                            );
+                          }
+                          if (editing?.id === transfer.id) {
+                            setEditing(undefined);
+                          }
+                        },
+                      },
+                    ]}
+                  />
                 )}
               </td>
             </tr>
