@@ -1,7 +1,8 @@
 <!doctype html>
 <!--
   PROTOTYPE, throwaway. Answers the ticket "Does the Data Folder work in Brave
-  and Chromium on desktop and Android?", and how long browser storage survives.
+  and Chromium on desktop and Android?", how long browser storage survives, and
+  "How does a Budget open quickly from a Data Folder on Android?".
   Never merged. Keeps its own IndexedDB database, and only ever writes inside a
   "Crownkeep-probe" subfolder of the folder you pick.
 -->
@@ -60,6 +61,17 @@
         cursor: pointer;
       }
       button:disabled { opacity: 0.5; cursor: default; }
+      input {
+        font: inherit;
+        width: 100%;
+        min-height: 44px;
+        margin-top: 4px;
+        padding: 8px;
+        background: var(--bg);
+        color: inherit;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
       textarea {
         width: 100%;
         height: 16rem;
@@ -93,8 +105,8 @@
       <p class="hint">Open this page again after a few days, and again after 8+ days without opening it. "Visits" shows whether the saved data survived. Don't clear site data in between.</p>
       <dl id="storage"></dl>
       <div class="buttons">
-        <button id="persist">Request persistent storage</button>
-        <button id="wipe">Forget everything saved here</button>
+        <button type="button" id="persist">Request persistent storage</button>
+        <button type="button" id="wipe">Forget everything saved here</button>
       </div>
     </section>
 
@@ -103,17 +115,17 @@
       <p class="hint">Pick a folder your sync service watches. The page writes only inside a "Crownkeep-probe" subfolder, one file per device. Run it on two devices with the same folder to test sync.</p>
       <dl id="folder"></dl>
       <div class="buttons">
-        <button id="choose">1. Choose a folder</button>
-        <button id="permission">2. Ask for permission again</button>
-        <button id="write">3. Write a line</button>
-        <button id="read">4. Read the folder</button>
-        <button id="install" hidden>Install this page</button>
+        <button type="button" id="choose">1. Choose a folder</button>
+        <button type="button" id="permission">2. Ask for permission again</button>
+        <button type="button" id="write">3. Write a line</button>
+        <button type="button" id="read">4. Read the folder</button>
+        <button type="button" id="install" hidden>Install this page</button>
       </div>
       <h2 style="margin-top: 16px">Read speed</h2>
       <p class="hint">Copies ten years of one device's data: 120 files of about 100 KB each, 12 MB in all, in "Crownkeep-probe/timing". It takes a while on a phone, so keep the page open. Your sync service will upload these files if it watches this folder, so delete them when you're done.</p>
       <div class="buttons">
-        <button id="timing">Time reading 120 files</button>
-        <button id="timing-delete">Delete the test files</button>
+        <button type="button" id="timing">Time reading 120 files</button>
+        <button type="button" id="timing-delete">Delete the test files</button>
       </div>
       <p id="timing-status" class="hint" style="margin-top: 10px" role="status"></p>
       <p class="hint" style="margin-top: 10px">To test coming back, close every tab of this page and reopen it, because a reload doesn't show the prompt. To test a lost folder, move or delete it in your file manager, then press "Read the folder".</p>
@@ -121,9 +133,21 @@
     </section>
 
     <section>
+      <h2>Layout test</h2>
+      <p class="hint">Compares file layouts and times loading a Budget from browser storage. It has two parts, so press the button once, then again after reopening the page when it asks. The first part writes about 25 MB and can take 10 minutes or more on a phone; the second is shorter and deletes the test files. Keep this page on screen while it runs. A sync service watching the folder will upload the test files.</p>
+      <p><label>Where is the folder? <input id="layout-where" placeholder="e.g. phone storage, Downloads" /></label></p>
+      <p><label>Sync service watching it (blank if none) <input id="layout-sync" placeholder="e.g. Syncthing" /></label></p>
+      <div class="buttons">
+        <button type="button" id="layout-run">Run all tests</button>
+        <button type="button" id="layout-delete">Delete the test files and start over</button>
+      </div>
+      <p id="layout-status" class="hint" style="margin-top: 10px" role="status" aria-live="polite"></p>
+    </section>
+
+    <section>
       <h2>Results to paste in the ticket</h2>
       <div class="buttons" style="margin-bottom: 8px">
-        <button id="copy">Copy results</button>
+        <button type="button" id="copy">Copy results</button>
       </div>
       <textarea id="report" readonly aria-label="Results"></textarea>
     </section>
@@ -133,7 +157,7 @@
       const SUBFOLDER = "Crownkeep-probe";
       const $ = (id) => document.getElementById(id);
       const log = [];
-      const state = { handle: null, deviceId: "", visits: [], files: [], permission: "n/a" };
+      const state = { handle: null, deviceId: "", visits: [], files: [], permission: "n/a", layoutRuns: [] };
 
       function note(message) {
         log.push(`${new Date().toISOString()} ${message}`);
@@ -275,6 +299,7 @@
           `Picker present: ${hasPicker()}; folder: ${state.handle?.name ?? "none"}; permission: ${state.permission}`,
           ...state.files.map((file) => `File: ${file.label}: ${file.detail}`),
           "",
+          ...layoutReport(),
           "Log",
           ...log,
         ].join("\n");
@@ -418,8 +443,393 @@
         }
       };
 
+      // --- Layout test ---
+      // "How does a Budget open quickly from a Data Folder on Android?" Each set
+      // holds about ten years of one device's records in a different layout, or
+      // a same-count set of tiny files to separate file count from file size.
+      const LAYOUT_FOLDER = "layout-test";
+      const LAYOUT_DATABASE = "storage-probe-layout-PROTOTYPE-wipe-me";
+      const LAYOUT_SETS = [
+        { key: "120 files of 100 KB", folder: "many-100kb", files: 120, lines: 400 },
+        { key: "10 files of 1.2 MB", folder: "few-1200kb", files: 10, lines: 4800 },
+        { key: "120 tiny files", folder: "many-tiny", files: 120, lines: 1 },
+      ];
+      const APPENDS = 5;
+      const LOADS = 3;
+      const RECORDS = 50000;
+      const RECORDS_PER_ROW = 400;
+      let layoutBusy = false;
+      let wakeLock = null;
+
+      const layoutStatus = (text) => { $("layout-status").textContent = text; };
+      const currentRun = () => state.layoutRuns.at(-1);
+      const pendingRun = () => (currentRun()?.phase === "reopen" ? currentRun() : null);
+      const saveRuns = () => set("layoutRuns", state.layoutRuns);
+
+      function layoutReport() {
+        if (state.layoutRuns.length === 0) return [];
+        const lines = ["Layout test"];
+        for (const run of state.layoutRuns) {
+          lines.push(
+            `Run ${run.startedAt}: ${run.phase}`,
+            `Device: ${run.device}`,
+            `Folder: ${run.folder}; where: ${run.where || "not stated"}; sync: ${run.sync || "none stated"}`,
+            `Page went to the background during the run: ${run.hidden}`,
+            ...run.lines,
+            "",
+          );
+        }
+        return lines;
+      }
+
+      function markHidden() {
+        const run = currentRun();
+        if (run && !run.hidden) run.hidden = true;
+      }
+
+      async function keepAwake() {
+        try {
+          wakeLock = await navigator.wakeLock?.request("screen");
+        } catch {
+          // The result still counts, as long as the page stayed on screen.
+        }
+      }
+
+      async function deviceSummary() {
+        let details = {};
+        try {
+          details = (await navigator.userAgentData?.getHighEntropyValues(["model", "platformVersion"])) ?? {};
+        } catch {
+          // Only some browsers share this.
+        }
+        return [
+          browserName(),
+          details.model && `model ${details.model}`,
+          details.platformVersion && `platform ${details.platformVersion}`,
+          navigator.deviceMemory && `${navigator.deviceMemory} GB memory or more`,
+          `${navigator.hardwareConcurrency} CPU threads`,
+        ].filter(Boolean).join("; ");
+      }
+
+      // About 250 bytes, shaped like the Change Log's records.
+      function recordLine(index) {
+        return JSON.stringify({
+          id: crypto.randomUUID(),
+          subjectId: crypto.randomUUID().slice(0, 8),
+          deviceId: state.deviceId.slice(0, 8),
+          timestamp: { wallTime: 1700000000000 + index, counter: 0 },
+          type: "Transaction",
+          payload: { accountId: "a1", categoryId: "c1", amount: -1250, date: "2026-11-03" },
+        });
+      }
+
+      function fileBody(lines) {
+        let body = "";
+        for (let i = 0; i < lines; i++) body += `${recordLine(i)}\n`;
+        return body;
+      }
+
+      async function timedMs(act) {
+        const started = performance.now();
+        await act();
+        return Math.round(performance.now() - started);
+      }
+
+      async function record(line) {
+        currentRun().lines.push(line);
+        await saveRuns();
+        render();
+      }
+
+      const perFile = (ms, files) => `${ms} ms (${(ms / files).toFixed(1)} ms per file)`;
+      const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+      const yieldToScreen = () => new Promise((resolve) => setTimeout(resolve));
+
+      async function layoutRoot(create = false) {
+        const probe = await state.handle.getDirectoryHandle(SUBFOLDER, { create });
+        return probe.getDirectoryHandle(LAYOUT_FOLDER, { create });
+      }
+
+      async function writeSet(root, set) {
+        const folder = await root.getDirectoryHandle(set.folder, { create: true });
+        let writing = 0;
+        for (let i = 0; i < set.files; i++) {
+          const body = fileBody(set.lines);
+          layoutStatus(`Writing ${set.key}: file ${i + 1} of ${set.files}...`);
+          await yieldToScreen();
+          const started = performance.now();
+          const entry = await folder.getFileHandle(`file-${String(i).padStart(3, "0")}.txt`, { create: true });
+          const writable = await entry.createWritable();
+          await writable.write(body);
+          await writable.close();
+          writing += performance.now() - started;
+        }
+        await record(`  ${set.key}, writing: ${perFile(Math.round(writing), set.files)}`);
+      }
+
+      async function readSet(root, set, label) {
+        const folder = await root.getDirectoryHandle(set.folder);
+        const handles = [];
+        layoutStatus(`${label}: listing ${set.key}...`);
+        const listing = await timedMs(async () => {
+          for await (const entry of folder.values()) if (entry.kind === "file") handles.push(entry);
+        });
+        await record(`  ${set.key}, listing: ${perFile(listing, handles.length)}`);
+        if (handles.length !== set.files) await record(`  WARNING: expected ${set.files} files, found ${handles.length}`);
+
+        layoutStatus(`${label}: checking dates and sizes of ${set.key}...`);
+        const checking = await timedMs(async () => {
+          for (const entry of handles) {
+            const file = await entry.getFile();
+            void file.lastModified;
+            void file.size;
+          }
+        });
+        await record(`  ${set.key}, checking date and size: ${perFile(checking, set.files)}`);
+
+        layoutStatus(`${label}: reading ${set.key} one at a time...`);
+        let characters = 0;
+        const oneByOne = await timedMs(async () => {
+          for (const entry of handles) characters += (await (await entry.getFile()).text()).length;
+        });
+        await record(`  ${set.key}, reading one at a time: ${perFile(oneByOne, set.files)}, ${(characters / 1048576).toFixed(2)} MB`);
+
+        layoutStatus(`${label}: reading ${set.key} all at once...`);
+        const allAtOnce = await timedMs(() => Promise.all(handles.map(async (entry) => (await entry.getFile()).text())));
+        await record(`  ${set.key}, reading all at once: ${perFile(allAtOnce, set.files)}`);
+      }
+
+      async function appendToSet(root, set) {
+        const folder = await root.getDirectoryHandle(set.folder);
+        const entry = await folder.getFileHandle("file-000.txt");
+        const times = [];
+        for (let i = 0; i < APPENDS; i++) {
+          layoutStatus(`Adding a record to a file from ${set.key}: ${i + 1} of ${APPENDS}...`);
+          const line = `${recordLine(i)}\n`;
+          times.push(await timedMs(async () => {
+            const file = await entry.getFile();
+            const writable = await entry.createWritable({ keepExistingData: true });
+            await writable.seek(file.size);
+            await writable.write(line);
+            await writable.close();
+          }));
+          await yieldToScreen();
+        }
+        await record(`  Add one record to a file from ${set.key}: median ${median(times)} ms (runs: ${times.join(", ")} ms)`);
+      }
+
+      function openLayoutDatabase() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(LAYOUT_DATABASE, 1);
+          request.onupgradeneeded = () => {
+            request.result.createObjectStore("byRecord");
+            request.result.createObjectStore("byFile");
+          };
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      function deleteLayoutDatabase() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.deleteDatabase(LAYOUT_DATABASE);
+          request.onsuccess = () => resolve();
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      function putRows(database, storeName, rows) {
+        return new Promise((resolve, reject) => {
+          const transaction = database.transaction(storeName, "readwrite");
+          const store = transaction.objectStore(storeName);
+          for (const [key, value] of rows) store.put(value, key);
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = () => reject(transaction.error);
+          transaction.onabort = () => reject(transaction.error);
+        });
+      }
+
+      async function fillLayoutDatabase() {
+        const database = await openLayoutDatabase();
+        try {
+          let index = 0;
+          const writing = { byRecord: 0, byFile: 0 };
+          while (index < RECORDS) {
+            const lines = [];
+            for (let i = 0; i < RECORDS_PER_ROW && index < RECORDS; i++, index++) lines.push(recordLine(index));
+            layoutStatus(`Filling browser storage: ${index} of ${RECORDS} records...`);
+            await yieldToScreen();
+            writing.byRecord += await timedMs(() => putRows(database, "byRecord", lines.map((line, i) => [`${index}-${i}`, line])));
+            writing.byFile += await timedMs(() => putRows(database, "byFile", [[`row-${index}`, lines.join("\n")]]));
+          }
+          await record(`  Browser storage, writing ${RECORDS} records: one row per record ${writing.byRecord} ms; one row per ${RECORDS_PER_ROW} records ${writing.byFile} ms`);
+        } finally {
+          database.close();
+        }
+      }
+
+      function readAllRows(database, storeName) {
+        return new Promise((resolve, reject) => {
+          const request = database.transaction(storeName).objectStore(storeName).getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      // The whole of opening from a Local Copy, as the Change Log does it today:
+      // open the database, read every row, parse every record.
+      async function loadFromDatabase(storeName, parseRows) {
+        const times = { opening: 0, reading: 0, parsing: 0 };
+        let database;
+        times.opening = await timedMs(async () => { database = await openLayoutDatabase(); });
+        try {
+          let rows;
+          times.reading = await timedMs(async () => { rows = await readAllRows(database, storeName); });
+          let parsed = 0;
+          times.parsing = await timedMs(() => { parsed = parseRows(rows); });
+          if (parsed !== RECORDS) await record(`  WARNING: parsed ${parsed} records, expected ${RECORDS}`);
+        } finally {
+          database.close();
+        }
+        return times;
+      }
+
+      async function timeLoads(label) {
+        const stores = [
+          ["byRecord", "one row per record", (rows) => rows.map((row) => JSON.parse(row)).length],
+          ["byFile", `one row per ${RECORDS_PER_ROW} records`, (rows) => rows.flatMap((row) => row.split("\n").map((line) => JSON.parse(line))).length],
+        ];
+        for (const [storeName, name, parseRows] of stores) {
+          for (let i = 0; i < LOADS; i++) {
+            layoutStatus(`${label}: loading ${RECORDS} records from browser storage, ${name}, ${i + 1} of ${LOADS}...`);
+            await yieldToScreen();
+            const t = await loadFromDatabase(storeName, parseRows);
+            await record(`  Browser storage, ${name}, load ${i + 1}: ${t.opening + t.reading + t.parsing} ms (opening ${t.opening}, reading ${t.reading}, parsing ${t.parsing})`);
+          }
+        }
+      }
+
+      async function deleteLayoutFiles() {
+        await deleteLayoutDatabase();
+        if (!state.handle) return;
+        try {
+          const probe = await state.handle.getDirectoryHandle(SUBFOLDER);
+          await probe.removeEntry(LAYOUT_FOLDER, { recursive: true });
+        } catch (error) {
+          if (error?.name !== "NotFoundError") throw error;
+        }
+      }
+
+      // Runs inside the button's click, because a phone drops folder permission
+      // within minutes and asking again needs a tap.
+      async function layoutFolderAccess() {
+        if (!state.handle) {
+          state.handle = await window.showDirectoryPicker({ mode: "readwrite", id: "storage-probe" });
+          await set("handle", state.handle);
+        }
+        state.permission = await state.handle.requestPermission({ mode: "readwrite" });
+        if (state.permission !== "granted") throw new Error(`Folder permission: ${state.permission}`);
+      }
+
+      async function firstPart() {
+        state.layoutRuns.push({
+          startedAt: new Date().toISOString(),
+          phase: "first part interrupted",
+          device: await deviceSummary(),
+          folder: state.handle.name,
+          where: $("layout-where").value,
+          sync: $("layout-sync").value,
+          hidden: document.visibilityState !== "visible",
+          lines: [],
+        });
+        await saveRuns();
+        layoutStatus("Clearing any earlier test files...");
+        await deleteLayoutFiles();
+        const root = await layoutRoot(true);
+        await record(" First part, files just written");
+        for (const set of LAYOUT_SETS) await writeSet(root, set);
+        for (const set of LAYOUT_SETS) await readSet(root, set, "First part");
+        for (const set of LAYOUT_SETS) await appendToSet(root, set);
+        await fillLayoutDatabase();
+        await timeLoads("First part");
+        await refreshStorage();
+        await record(`  Browser storage used after filling: ${storageInfo.usage}`);
+        currentRun().phase = "reopen";
+        await saveRuns();
+        layoutStatus("First part done. Close every tab of this page, open it again, and press \"Run all tests\" once more.");
+      }
+
+      async function secondPart() {
+        const run = pendingRun();
+        const navigation = performance.getEntriesByType("navigation")[0]?.type ?? "unknown";
+        await record(` Second part, after reopening (how this page was opened: ${navigation})`);
+        const root = await layoutRoot();
+        // The other way round from the first part, so no set always goes first.
+        for (const set of [...LAYOUT_SETS].reverse()) await readSet(root, set, "Second part");
+        await timeLoads("Second part");
+        layoutStatus("Deleting the test files...");
+        const deleting = await timedMs(deleteLayoutFiles);
+        await record(`  Deleting the test files: ${deleting} ms`);
+        run.phase = "finished";
+        await saveRuns();
+        layoutStatus("All done, and the test files are deleted. Copy the results below and paste them into the chat.");
+      }
+
+      $("layout-run").onclick = async () => {
+        if (layoutBusy) return;
+        layoutBusy = true;
+        $("layout-run").disabled = true;
+        $("layout-delete").disabled = true;
+        const started = performance.now();
+        const part = pendingRun() ? "Second part" : "First part";
+        try {
+          await layoutFolderAccess();
+          await keepAwake();
+          if (pendingRun()) await secondPart();
+          else await firstPart();
+          note(`Layout test: ${part} took ${Math.round((performance.now() - started) / 1000)} s`);
+        } catch (error) {
+          failure(`Layout test, ${part}`, error);
+          layoutStatus(`${part} failed: ${error?.name ?? "Error"}. See the log below. "Delete the test files and start over" clears it.`);
+        } finally {
+          layoutBusy = false;
+          $("layout-run").disabled = false;
+          $("layout-delete").disabled = false;
+          $("layout-run").textContent = pendingRun() ? "Run all tests: second part" : "Run all tests";
+          await wakeLock?.release().catch(() => {});
+          wakeLock = null;
+        }
+      };
+
+      $("layout-delete").onclick = async () => {
+        if (layoutBusy) return;
+        try {
+          layoutStatus("Deleting the test files...");
+          if (state.handle) {
+            state.permission = await state.handle.requestPermission({ mode: "readwrite" });
+          }
+          const run = pendingRun();
+          await deleteLayoutFiles();
+          if (run) {
+            run.phase = "stopped before the second part";
+            await saveRuns();
+          }
+          $("layout-run").textContent = "Run all tests";
+          layoutStatus("Deleted the test files.");
+          note("Layout test: deleted the test files");
+        } catch (error) {
+          failure("Deleting the layout test files", error);
+          layoutStatus("Couldn't delete the test files. See the log below.");
+        }
+      };
+
       // Background tabs can lose access, and sync can deliver files at any time.
       document.addEventListener("visibilitychange", async () => {
+        if (layoutBusy) {
+          if (document.visibilityState === "visible") keepAwake();
+          else markHidden();
+          return;
+        }
         if (document.visibilityState !== "visible" || !state.handle) return;
         note("Back in the foreground");
         await refreshPermission();
@@ -445,6 +855,7 @@
         state.visits = [];
         state.files = [];
         state.permission = "n/a";
+        state.layoutRuns = [];
         state.deviceId = crypto.randomUUID();
         await set("deviceId", state.deviceId);
         note("Forgot everything saved in IndexedDB. Files in the folder were left alone.");
@@ -485,8 +896,13 @@
           state.deviceId = (await get("deviceId")) ?? crypto.randomUUID();
           await set("deviceId", state.deviceId);
           state.handle = (await get("handle")) ?? null;
+          state.layoutRuns = (await get("layoutRuns")) ?? [];
         } catch (error) {
           failure("Using IndexedDB", error);
+        }
+        if (pendingRun()) {
+          $("layout-run").textContent = "Run all tests: second part";
+          layoutStatus("The first part is done. Press the button to run the second part.");
         }
         await refreshStorage();
         note(`Loaded. Visit ${state.visits.length} on record. Picker present: ${hasPicker()}`);
