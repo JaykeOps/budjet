@@ -1,0 +1,23 @@
+.popover {
+  min-width: 140px;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+
+.menu {
+  padding: 6px;
+  outline: none;
+}
+
+.item {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+}
+
+.item[data-focused] {
+  background: var(--raised);
+}
