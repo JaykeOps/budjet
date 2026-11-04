@@ -13,6 +13,7 @@ import type {
 } from "../transactions/records";
 import {
   closeAccount,
+  deleteRedeclaredBalance,
   openAccount,
   redeclareBalance,
   renameAccount,
@@ -24,7 +25,7 @@ import {
   adjustments,
   balanceChecks,
 } from "./index";
-import type { BalanceRedeclared } from "./records";
+import type { BalanceRedeclared, RedeclaredBalanceDeleted } from "./records";
 
 function budgetIn(currency: string) {
   const changeLog = createInMemoryChangeLog();
@@ -41,6 +42,23 @@ function budgetIn(currency: string) {
 function deviceAt(changeLog: ChangeLog, deviceId: string, at: Date) {
   return createChangeLogWriter(changeLog, deviceId, {
     now: () => at.getTime(),
+  });
+}
+
+/** A re-declaration written on a device whose clock reads `at`. */
+function redeclareOn(
+  changeLog: ChangeLog,
+  deviceId: string,
+  accountId: string,
+  at: Date,
+  minorUnits: number,
+) {
+  return deviceAt(changeLog, deviceId, at).write<
+    BalanceRedeclared["type"],
+    BalanceRedeclared["payload"]
+  >(accountId, "BalanceRedeclared", {
+    version: 1,
+    balance: money(minorUnits, "USD"),
   });
 }
 
@@ -296,22 +314,6 @@ describe("Accounts", () => {
       return { changeLog, checking, lastChecked };
     }
 
-    function redeclareOn(
-      changeLog: ChangeLog,
-      deviceId: string,
-      accountId: string,
-      at: Date,
-      minorUnits: number,
-    ) {
-      return deviceAt(changeLog, deviceId, at).write<
-        BalanceRedeclared["type"],
-        BalanceRedeclared["payload"]
-      >(accountId, "BalanceRedeclared", {
-        version: 1,
-        balance: money(minorUnits, "USD"),
-      });
-    }
-
     it("doesn't count adding an Account", () => {
       expect(checkingAccount().lastChecked()).toBeUndefined();
     });
@@ -434,6 +436,207 @@ describe("Accounts", () => {
       expect(accountBalance(changeLog.readAll(), checking)).toEqual(
         money(90000, "USD"),
       );
+    });
+  });
+
+  describe("deleting a re-declared balance", () => {
+    function checkingAccount() {
+      const { changeLog, writer } = budgetIn("USD");
+      const checking = openAccount(writer, {
+        name: "Checking",
+        kind: "checking",
+        openingBalance: money(100000, "USD"),
+      });
+      const account = () =>
+        accounts(changeLog.readAll()).find(({ id }) => id === checking);
+      /** A re-declaration on a day in October 2100. */
+      const redeclare = (day: number, minorUnits: number) =>
+        redeclareOn(
+          changeLog,
+          "a",
+          checking,
+          new Date(2100, 9, day, 12),
+          minorUnits,
+        );
+      const openingRecord = () =>
+        changeLog.readAll().find(({ type }) => type === "AccountOpened")?.id ??
+        "";
+      return { changeLog, writer, checking, account, redeclare, openingRecord };
+    }
+
+    /** A deletion written on a device whose clock reads `at`. */
+    function deleteOn(
+      changeLog: ChangeLog,
+      deviceId: string,
+      recordId: string,
+      at: Date,
+    ) {
+      return deviceAt(changeLog, deviceId, at).write<
+        RedeclaredBalanceDeleted["type"],
+        RedeclaredBalanceDeleted["payload"]
+      >(recordId, "RedeclaredBalanceDeleted", { version: 1 });
+    }
+
+    it("takes an Adjustment back out of the Account", () => {
+      const { changeLog, writer, account, redeclare } = checkingAccount();
+      const redeclared = redeclare(18, 90000);
+
+      deleteRedeclaredBalance(writer, redeclared.id);
+
+      expect(adjustments(changeLog.readAll())).toEqual([]);
+      expect(account()?.balance).toEqual(money(100000, "USD"));
+    });
+
+    it("removes a Balance check, moving nothing", () => {
+      const { changeLog, writer, account, redeclare } = checkingAccount();
+      const check = redeclare(18, 100000);
+
+      deleteRedeclaredBalance(writer, check.id);
+
+      expect(balanceChecks(changeLog.readAll())).toEqual([]);
+      expect(account()?.balance).toEqual(money(100000, "USD"));
+    });
+
+    it("measures later Adjustments again from the balance just before them", () => {
+      const { changeLog, writer, checking, account, redeclare } =
+        checkingAccount();
+      const first = redeclare(18, 90000);
+      const second = redeclare(20, 95000);
+
+      deleteRedeclaredBalance(writer, first.id);
+
+      expect(adjustments(changeLog.readAll())).toEqual([
+        {
+          id: second.id,
+          accountId: checking,
+          date: "2100-10-20",
+          amount: money(-5000, "USD"),
+        },
+      ]);
+      expect(account()?.balance).toEqual(money(95000, "USD"));
+    });
+
+    it("turns a later Balance check into an Adjustment when the balance it matched is deleted", () => {
+      const { changeLog, writer, checking, redeclare } = checkingAccount();
+      const first = redeclare(18, 90000);
+      const check = redeclare(20, 90000);
+
+      deleteRedeclaredBalance(writer, first.id);
+
+      expect(balanceChecks(changeLog.readAll())).toEqual([]);
+      expect(adjustments(changeLog.readAll())).toEqual([
+        {
+          id: check.id,
+          accountId: checking,
+          date: "2100-10-20",
+          amount: money(-10000, "USD"),
+        },
+      ]);
+    });
+
+    it("sets last checked back to the re-declaration before it, or to none", () => {
+      const { writer, account, redeclare } = checkingAccount();
+      const first = redeclare(18, 100000);
+      const second = redeclare(20, 90000);
+
+      deleteRedeclaredBalance(writer, second.id);
+      expect(account()?.lastChecked).toBe("2100-10-18");
+
+      deleteRedeclaredBalance(writer, first.id);
+      expect(account()?.lastChecked).toBeUndefined();
+    });
+
+    it.each(["re-declaration first", "deletion first"])(
+      "gives the same result when the %s arrives",
+      (order) => {
+        const { changeLog, checking, account } = checkingAccount();
+        const offline = createInMemoryChangeLog();
+        const at = new Date(2100, 9, 18, 12);
+        const redeclared = redeclareOn(offline, "a", checking, at, 90000);
+        const deletion = deleteOn(offline, "b", redeclared.id, at);
+
+        changeLog.append([order === "deletion first" ? deletion : redeclared]);
+        changeLog.append([order === "deletion first" ? redeclared : deletion]);
+
+        expect(account()?.balance).toEqual(money(100000, "USD"));
+        expect(account()?.lastChecked).toBeUndefined();
+        expect(adjustments(changeLog.readAll())).toEqual([]);
+      },
+    );
+
+    it("still wins when a skewed clock stamps the deletion before the re-declaration", () => {
+      const { changeLog, checking, account } = checkingAccount();
+      const redeclared = redeclareOn(
+        createInMemoryChangeLog(),
+        "fast",
+        checking,
+        new Date(2100, 9, 20, 12),
+        90000,
+      );
+      const deletion = deleteOn(
+        createInMemoryChangeLog(),
+        "slow",
+        redeclared.id,
+        new Date(2100, 9, 18, 12),
+      );
+
+      changeLog.append([redeclared, deletion]);
+
+      expect(changeLog.readAll().at(-1)?.id).toBe(redeclared.id);
+      expect(account()?.balance).toEqual(money(100000, "USD"));
+      expect(account()?.lastChecked).toBeUndefined();
+      expect(adjustments(changeLog.readAll())).toEqual([]);
+    });
+
+    it("works from a device whose clock is behind the re-declaration", () => {
+      const { changeLog, account, redeclare } = checkingAccount();
+      const redeclared = redeclare(20, 90000);
+
+      deleteRedeclaredBalance(
+        deviceAt(changeLog, "slow", new Date(2100, 9, 18, 12)),
+        redeclared.id,
+      );
+
+      expect(account()?.balance).toEqual(money(100000, "USD"));
+    });
+
+    it("can't delete an Opening Balance", () => {
+      const { writer, checking, account, openingRecord } = checkingAccount();
+
+      for (const id of [openingRecord(), checking]) {
+        expect(() => deleteRedeclaredBalance(writer, id)).toThrow(RangeError);
+      }
+      expect(account()?.balance).toEqual(money(100000, "USD"));
+    });
+
+    it("leaves an Opening Balance alone when a deletion names its record anyway", () => {
+      const { changeLog, account, openingRecord } = checkingAccount();
+
+      deleteOn(changeLog, "b", openingRecord(), new Date(2100, 9, 18, 12));
+
+      expect(account()?.balance).toEqual(money(100000, "USD"));
+    });
+
+    it("can't delete the same re-declaration twice", () => {
+      const { writer, redeclare } = checkingAccount();
+      const redeclared = redeclare(18, 90000);
+
+      deleteRedeclaredBalance(writer, redeclared.id);
+
+      expect(() => deleteRedeclaredBalance(writer, redeclared.id)).toThrow(
+        RangeError,
+      );
+    });
+
+    it("can't delete one in a closed Account, so its balance stays zero", () => {
+      const { writer, checking, account, redeclare } = checkingAccount();
+      const redeclared = redeclare(18, 0);
+      closeAccount(writer, checking);
+
+      expect(() => deleteRedeclaredBalance(writer, redeclared.id)).toThrow(
+        "Checking is closed",
+      );
+      expect(account()?.balance).toEqual(money(0, "USD"));
     });
   });
 

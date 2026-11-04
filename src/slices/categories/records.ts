@@ -55,6 +55,16 @@ export type CategoryGroupDeleted = ChangeRecord<
   { version: 1 }
 >;
 
+/**
+ * Whether a Category Group is left out of Spent this Month, so saving doesn't
+ * read as spending. Its subject is the Category Group's id, and the latest
+ * wins. A Category Group with no such record is counted.
+ */
+export type CategoryGroupSpentThisMonthSet = ChangeRecord<
+  "CategoryGroupSpentThisMonthSet",
+  { version: 1; leftOut: boolean }
+>;
+
 export type CategoriesRecord =
   | CategoryGroupCreated
   | CategoryGroupRenamed
@@ -65,7 +75,8 @@ export type CategoriesRecord =
   | CategoryHidden
   | CategoryUnhidden
   | CategoryDeleted
-  | CategoryGroupDeleted;
+  | CategoryGroupDeleted
+  | CategoryGroupSpentThisMonthSet;
 
 const types = new Set<string>([
   "CategoryGroupCreated",
@@ -78,6 +89,7 @@ const types = new Set<string>([
   "CategoryUnhidden",
   "CategoryDeleted",
   "CategoryGroupDeleted",
+  "CategoryGroupSpentThisMonthSet",
 ] satisfies CategoriesRecord["type"][]);
 
 export function isCategoriesRecord(

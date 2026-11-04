@@ -304,6 +304,8 @@ test("a Budget that an older setup left without an Account still asks for one", 
   await page.reload();
 
   const add = page.getByRole("form", { name: "Add your first Account" });
+  await expect(add).toBeVisible();
+  await expect(page.getByRole("navigation")).toHaveCount(0);
   await add.getByLabel("Name").fill("Checking");
   await add.getByLabel(/Opening Balance/).fill("100");
   await add.getByRole("button", { name: "Add Account" }).click();

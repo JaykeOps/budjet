@@ -1,13 +1,14 @@
 import type { ChangeLogWriter, ChangeRecord } from "../../kernel/change-log";
 import { formatMoney, type Money } from "../../kernel/money";
 import { isBudgetCreated } from "../budget-setup/records";
-import { type Account, accounts } from "./queries";
+import { type Account, accounts, adjustments, balanceChecks } from "./queries";
 import type {
   AccountClosed,
   AccountKind,
   AccountOpened,
   AccountRenamed,
   BalanceRedeclared,
+  RedeclaredBalanceDeleted,
 } from "./records";
 
 /** Adds an Account to the Budget and returns its id. */
@@ -58,6 +59,29 @@ export function redeclareBalance(
     "BalanceRedeclared",
     { version: 1, balance },
   );
+}
+
+/**
+ * Deletes an Adjustment or Balance check, given the id of the record that
+ * re-declared the balance. Later Adjustments are measured again from the
+ * balance just before them. An Opening Balance is not a re-declared balance, so
+ * it can't be deleted; nor can one in a closed Account, whose balance stays zero.
+ */
+export function deleteRedeclaredBalance(
+  writer: ChangeLogWriter,
+  recordId: string,
+): void {
+  const records = writer.changeLog.readAll();
+  budgetCurrency(records);
+  const redeclared = [...adjustments(records), ...balanceChecks(records)].find(
+    ({ id }) => id === recordId,
+  );
+  if (!redeclared) throw new RangeError(`No re-declared balance ${recordId}`);
+  openAccountWith(records, redeclared.accountId);
+  writer.write<
+    RedeclaredBalanceDeleted["type"],
+    RedeclaredBalanceDeleted["payload"]
+  >(recordId, "RedeclaredBalanceDeleted", { version: 1 });
 }
 
 /** Gives an Account a new name, open or closed. */

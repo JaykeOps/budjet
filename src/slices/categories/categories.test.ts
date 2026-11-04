@@ -25,6 +25,7 @@ import {
   moveCategoryGroup,
   renameCategory,
   renameCategoryGroup,
+  setCategoryGroupSpentThisMonth,
   unhideCategory,
 } from "./commands";
 import { type CategoryGroup, categoryGroups } from "./index";
@@ -209,6 +210,80 @@ describe("Categories", () => {
 
     expect(orders[0]).toEqual(["Everyday", "Savings", "Bills"]);
     expect(orders[1]).toEqual(orders[0]);
+  });
+});
+
+describe("Leaving a Category Group out of Spent this Month", () => {
+  it("starts a new Category Group counted, whatever its name", () => {
+    const { writer, groups } = setUp();
+
+    createCategoryGroup(writer, { name: "Savings" });
+
+    expect(groups()[0].leftOutOfSpentThisMonth).toBe(false);
+  });
+
+  it("starts the starter set with only its Savings Group left out", () => {
+    const { writer, groups } = setUp();
+
+    addStarterSet(writer);
+
+    expect(
+      groups().map(({ name, leftOutOfSpentThisMonth }) => [
+        name,
+        leftOutOfSpentThisMonth,
+      ]),
+    ).toEqual([
+      ["Bills", false],
+      ["Everyday", false],
+      ["Savings", true],
+    ]);
+  });
+
+  it("can be set and set back, and the latest setting wins", () => {
+    const { writer, groups } = setUp();
+    const id = createCategoryGroup(writer, { name: "Fun" });
+
+    setCategoryGroupSpentThisMonth(writer, id, { leftOut: true });
+    expect(groups()[0].leftOutOfSpentThisMonth).toBe(true);
+
+    setCategoryGroupSpentThisMonth(writer, id, { leftOut: false });
+    expect(groups()[0].leftOutOfSpentThisMonth).toBe(false);
+  });
+
+  it("is refused for a Category Group that doesn't exist", () => {
+    const { writer } = setUp();
+
+    expect(() =>
+      setCategoryGroupSpentThisMonth(writer, "nowhere", { leftOut: true }),
+    ).toThrow(/no such Category Group/);
+  });
+
+  it("keeps the most recent setting when two devices set it, in either order", () => {
+    const settings = [false, true].map((laptopFirst) => {
+      const shared = setUp();
+      const id = createCategoryGroup(shared.writer, { name: "Fun" });
+
+      // The phone's clock runs behind, but it sets this after seeing the
+      // laptop's change, so the phone's is the most recent edit.
+      const laptop = deviceCopy(
+        shared.writer.changeLog,
+        "laptop",
+        2_000_000_000_000,
+      );
+      setCategoryGroupSpentThisMonth(laptop.writer, id, { leftOut: true });
+      const phone = deviceCopy(laptop.changeLog, "phone", 1);
+      setCategoryGroupSpentThisMonth(phone.writer, id, { leftOut: false });
+
+      const merged = createInMemoryChangeLog();
+      const sources = [laptop.changeLog, phone.changeLog];
+      for (const source of laptopFirst ? sources : sources.reverse()) {
+        const seen = new Set(merged.readAll().map(({ id }) => id));
+        merged.append(source.readAll().filter(({ id }) => !seen.has(id)));
+      }
+      return categoryGroups(merged.readAll())[0].leftOutOfSpentThisMonth;
+    });
+
+    expect(settings).toEqual([false, false]);
   });
 });
 

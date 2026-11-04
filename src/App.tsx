@@ -1,4 +1,4 @@
-import { type ComponentProps, useEffect } from "react";
+import { type ComponentProps, type ReactNode, useEffect } from "react";
 import { FirstRun } from "./first-run/FirstRun";
 import type { ChangeLogWriter } from "./kernel/change-log";
 import {
@@ -6,7 +6,9 @@ import {
   useChangeLogWriter,
 } from "./kernel/use-change-log-query";
 import { useMonthInUrl } from "./month-in-url";
+import { NavigationShell } from "./NavigationShell";
 import { requestPersistentStorage } from "./persistent-storage";
+import { usePlace } from "./place-in-url";
 import {
   AccountsScreen,
   OpenAccountForm,
@@ -14,6 +16,7 @@ import {
 } from "./slices/accounts";
 import {
   closeAccount,
+  deleteRedeclaredBalance,
   openAccount,
   redeclareBalance,
   renameAccount,
@@ -48,7 +51,17 @@ export function App({ writer }: { writer: ChangeLogWriter }) {
   );
 }
 
-/** First run until there's a Budget, then the Budget. */
+function Page({ children }: { children: ReactNode }) {
+  return (
+    <main>
+      <h1>budjet</h1>
+      {children}
+      <p>Version {__APP_VERSION__}</p>
+    </main>
+  );
+}
+
+/** First run, which has no navigation, until there's a Budget, then the Budget. */
 function Root() {
   const budget = useBudget();
   const hasBudget = budget !== undefined;
@@ -59,72 +72,88 @@ function Root() {
   }, [hasBudget]);
 
   if (!budget) return <FirstRun />;
-  return (
-    <main>
-      <h1>budjet</h1>
-      <Shell budget={budget} />
-      <p>Version {__APP_VERSION__}</p>
-    </main>
-  );
+  return <Shell budget={budget} />;
 }
 
 /**
- * Shows the Budget. A Budget with no Account yet can only come from an older
- * setup, or a page closed while first run was writing, so it asks for one.
+ * Shows the place the user is at, inside the navigation. A Budget with no
+ * Account yet can only come from an older setup, or a page closed while first
+ * run was writing, so it asks for one, without navigation.
  */
 function Shell({ budget }: { budget: Budget }) {
   const writer = useChangeLogWriter();
   const accounts = useAccounts();
+  const place = usePlace();
 
   if (accounts.length === 0) {
     return (
-      <OpenAccountForm
-        heading="Add your first Account"
-        currency={budget.currency}
-        onOpen={(input) => openAccount(writer, input)}
-      />
+      <Page>
+        <OpenAccountForm
+          heading="Add your first Account"
+          currency={budget.currency}
+          onOpen={(input) => openAccount(writer, input)}
+        />
+      </Page>
     );
   }
   return (
-    <>
-      <BudgetMonth
-        firstMonth={budget.firstMonth}
-        currency={budget.currency}
-        onAssign={(input) => setAssignment(writer, input)}
-        onCopyLastMonth={(month) =>
-          copyLastMonth(writer, { month, skipping: hiddenCategoryIds(writer) })
-        }
-        onMoveMoney={(input) => moveMoney(writer, input)}
-      />
-      <section aria-labelledby="budget-heading">
-        <h2 id="budget-heading">Budget</h2>
-        <p>Kept in {budget.currency}.</p>
-        <CategoryList />
-      </section>
-      <AccountsScreen
-        currency={budget.currency}
-        onOpenAccount={(input) => openAccount(writer, input)}
-        onRedeclareBalance={(accountId, balance) =>
-          redeclareBalance(writer, accountId, { balance })
-        }
-        onRename={(accountId, name) =>
-          renameAccount(writer, accountId, { name })
-        }
-        onClose={(accountId) => closeAccount(writer, accountId)}
-      />
-      <AccountTransactions
-        currency={budget.currency}
-        onRecord={(input) => recordTransaction(writer, input)}
-        onEdit={(id, input) => editTransaction(writer, id, input)}
-        onDelete={(id) => deleteTransaction(writer, id)}
-      />
-      <TransfersScreen
-        currency={budget.currency}
-        onMake={(input) => makeTransfer(writer, input)}
-        onEdit={(id, input) => editTransfer(writer, id, input)}
-        onDelete={(id) => deleteTransfer(writer, id)}
-      />
-    </>
+    <NavigationShell>
+      <Page>
+        {place === "budget" && (
+          <>
+            <BudgetMonth
+              firstMonth={budget.firstMonth}
+              currency={budget.currency}
+              onAssign={(input) => setAssignment(writer, input)}
+              onCopyLastMonth={(month) =>
+                copyLastMonth(writer, {
+                  month,
+                  skipping: hiddenCategoryIds(writer),
+                })
+              }
+              onMoveMoney={(input) => moveMoney(writer, input)}
+            />
+            <section aria-labelledby="budget-heading">
+              <h2 id="budget-heading">Budget</h2>
+              <p>Kept in {budget.currency}.</p>
+              <CategoryList />
+            </section>
+          </>
+        )}
+        {place === "activity" && (
+          <AccountTransactions
+            currency={budget.currency}
+            onRecord={(input) => recordTransaction(writer, input)}
+            onEdit={(id, input) => editTransaction(writer, id, input)}
+            onDelete={(id) => deleteTransaction(writer, id)}
+            onDeleteRedeclaredBalance={(id) =>
+              deleteRedeclaredBalance(writer, id)
+            }
+          />
+        )}
+        {place === "accounts" && (
+          <>
+            <AccountsScreen
+              currency={budget.currency}
+              onOpenAccount={(input) => openAccount(writer, input)}
+              onRedeclareBalance={(accountId, balance) =>
+                redeclareBalance(writer, accountId, { balance })
+              }
+              onRename={(accountId, name) =>
+                renameAccount(writer, accountId, { name })
+              }
+              onClose={(accountId) => closeAccount(writer, accountId)}
+            />
+            <TransfersScreen
+              currency={budget.currency}
+              onMake={(input) => makeTransfer(writer, input)}
+              onEdit={(id, input) => editTransfer(writer, id, input)}
+              onDelete={(id) => deleteTransfer(writer, id)}
+            />
+          </>
+        )}
+      </Page>
+    </NavigationShell>
   );
 }
 
