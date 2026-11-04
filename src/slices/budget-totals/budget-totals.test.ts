@@ -180,6 +180,17 @@ describe("Budget Totals", () => {
     expect(totals.readyToAssign()).toEqual(money(105000, "USD"));
   });
 
+  it("leaves Ready to Assign alone when a re-declared balance equals the current one", () => {
+    const totals = budget();
+    totals.openAccount(100000, "checking");
+    totals.record("2026-10-12", -20000, "groceries");
+    const before = totals.readyToAssign();
+
+    totals.redeclare(80000);
+
+    expect(totals.readyToAssign()).toEqual(before);
+  });
+
   it("calculates a Category's spending and Available in a Month from its Assignment and Transactions", () => {
     const totals = budget();
     totals.openAccount(100000);
