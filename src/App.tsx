@@ -1,4 +1,5 @@
-import type { ComponentProps, ReactNode } from "react";
+import { type ComponentProps, type ReactNode, useEffect } from "react";
+import { FirstRun } from "./first-run/FirstRun";
 import type { ChangeLogWriter } from "./kernel/change-log";
 import {
   ChangeLogWriterProvider,
@@ -6,6 +7,7 @@ import {
 } from "./kernel/use-change-log-query";
 import { useMonthInUrl } from "./month-in-url";
 import { NavigationShell } from "./NavigationShell";
+import { requestPersistentStorage } from "./persistent-storage";
 import { usePlace } from "./place-in-url";
 import {
   AccountsScreen,
@@ -24,10 +26,8 @@ import {
   moveMoney,
   setAssignment,
 } from "./slices/assignments/commands";
-import { BudgetSetupForm, useBudget } from "./slices/budget-setup";
-import { createBudget } from "./slices/budget-setup/commands";
+import { type Budget, useBudget } from "./slices/budget-setup";
 import { CategoryList, categoryGroups } from "./slices/categories";
-import { addStarterSet } from "./slices/categories/commands";
 import { MonthBudget } from "./slices/month-budget-view";
 import { TransactionsScreen } from "./slices/transactions";
 import {
@@ -46,7 +46,7 @@ import { useUrlParameter } from "./url-parameter";
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
     <ChangeLogWriterProvider value={writer}>
-      <Shell />
+      <Root />
     </ChangeLogWriterProvider>
   );
 }
@@ -61,28 +61,30 @@ function Page({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * Walks a new user through setup (the Budget, then its first Account), which
- * has no navigation, then shows the place the user is at, inside it.
- */
-function Shell() {
-  const writer = useChangeLogWriter();
+/** First run, which has no navigation, until there's a Budget, then the Budget. */
+function Root() {
   const budget = useBudget();
+  const hasBudget = budget !== undefined;
+
+  // Asking once there's something to keep, because some browsers show a prompt.
+  useEffect(() => {
+    if (hasBudget) requestPersistentStorage();
+  }, [hasBudget]);
+
+  if (!budget) return <FirstRun />;
+  return <Shell budget={budget} />;
+}
+
+/**
+ * Shows the place the user is at, inside the navigation. A Budget with no
+ * Account yet can only come from an older setup, or a page closed while first
+ * run was writing, so it asks for one, without navigation.
+ */
+function Shell({ budget }: { budget: Budget }) {
+  const writer = useChangeLogWriter();
   const accounts = useAccounts();
   const place = usePlace();
 
-  if (!budget) {
-    return (
-      <Page>
-        <BudgetSetupForm
-          onCreate={({ currency }) => {
-            createBudget(writer, { currency });
-            addStarterSet(writer);
-          }}
-        />
-      </Page>
-    );
-  }
   if (accounts.length === 0) {
     return (
       <Page>
