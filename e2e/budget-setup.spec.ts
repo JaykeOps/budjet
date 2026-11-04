@@ -341,11 +341,11 @@ test("changes made after a reload come from the same device", async ({
   await goTo(page, "Budget");
   await reloadWhenSaved(page);
 
+  await goTo(page, "Accounts");
   const add = page.getByRole("form", { name: "Add an Account" });
   await add.getByLabel("Name").fill("Savings");
   await add.getByLabel(/Opening Balance/).fill("100");
   await add.getByRole("button", { name: "Add Account" }).click();
-  await goTo(page, "Accounts");
   await expect(
     page
       .getByRole("table", { name: "Accounts" })
