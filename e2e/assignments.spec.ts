@@ -107,13 +107,8 @@ test("moving more than a Category's Assignment takes the rest back from what it 
   page,
 }) => {
   await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
-  await page.goto("/");
-  await page.getByLabel("Currency").selectOption("USD");
-  await page.getByRole("button", { name: "Create Budget" }).click();
-  const setup = page.getByRole("form", { name: "Add your first Account" });
-  await setup.getByLabel("Name").fill("Checking");
-  await setup.getByLabel("Opening Balance").fill("1000");
-  await setup.getByRole("button", { name: "Add Account" }).click();
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
 
   const rent = page.getByRole("row", { name: /^Rent/ });
   await page.getByLabel("Assignment for Rent").fill("600");
