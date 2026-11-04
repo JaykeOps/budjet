@@ -36,13 +36,18 @@ export function subtractMoney(a: Money, b: Money): Money {
   return addMoney(a, money(-b.minorUnits, b.currency));
 }
 
-/** For display only: the one place minor units become a decimal number. */
+/**
+ * For display only: the one place minor units become a decimal number. A
+ * negative amount reads with a true minus sign, such as "−$12.00".
+ */
 export function formatMoney(amount: Money, locale?: string): string {
   const format = new Intl.NumberFormat(locale, {
     style: "currency",
     currency: amount.currency,
   });
-  return format.format(amount.minorUnits / 10 ** minorDigits(amount.currency));
+  return format
+    .format(amount.minorUnits / 10 ** minorDigits(amount.currency))
+    .replace("-", "−");
 }
 
 /**
