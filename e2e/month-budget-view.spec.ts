@@ -1,21 +1,16 @@
 import { expect, type Page, test } from "@playwright/test";
+import { createBudget, goTo } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
-async function createBudget(page: Page, openingBalance: string) {
-  await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
-  await page.goto("/");
-  await page.getByLabel("Currency").selectOption("USD");
-  await page.getByRole("button", { name: "Create Budget" }).click();
-  const setup = page.getByRole("form", { name: "Add your first Account" });
-  await setup.getByLabel("Name").fill("Checking");
-  await setup.getByLabel("Opening Balance").fill(openingBalance);
-  await setup.getByRole("button", { name: "Add Account" }).click();
-}
+test.beforeEach(({ page }) =>
+  page.clock.setFixedTime(new Date("2026-10-15T12:00:00")),
+);
 
 test("the Month Budget view opens on the current Month with every Category in its Category Group", async ({
   page,
 }) => {
-  await createBudget(page, "0");
+  await createBudget(page, { firstAccount: { openingBalance: "0" } });
+  await goTo(page, "Budget");
   await page.getByRole("button", { name: "Move Savings up" }).click();
 
   const month = page.getByRole("table", { name: "October 2026" });
@@ -43,7 +38,8 @@ test("the Month Budget view opens on the current Month with every Category in it
 test("Ready to Assign turns into a red warning once more is assigned than there is", async ({
   page,
 }) => {
-  await createBudget(page, "1000");
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
   await expect(readyToAssign).toHaveText(/\$1,000\.00/);
   await expect(readyToAssign).not.toHaveClass(/overassigned/);
@@ -69,7 +65,8 @@ test("Ready to Assign turns into a red warning once more is assigned than there 
 test("a user steps between Months, assigns money in a future Month and stays on it after a reload", async ({
   page,
 }) => {
-  await createBudget(page, "1000");
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
   await expect(page.getByRole("table", { name: "October 2026" })).toBeVisible();
 
@@ -110,7 +107,8 @@ test("a user steps between Months, assigns money in a future Month and stays on 
 test("Months before the Budget was created can't be opened", async ({
   page,
 }) => {
-  await createBudget(page, "0");
+  await createBudget(page, { firstAccount: { openingBalance: "0" } });
+  await goTo(page, "Budget");
   await expect(page.getByRole("table", { name: "October 2026" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Previous Month" }),
@@ -130,11 +128,13 @@ async function recordSpending(
   amount: string,
   category: string,
 ) {
+  await goTo(page, "Activity");
   const record = page.getByRole("form", { name: "Record a Transaction" });
   await record.getByLabel("Date").fill(date);
   await record.getByLabel("Amount").fill(amount);
   await record.getByLabel("Category").selectOption({ label: category });
   await record.getByRole("button", { name: "Record Transaction" }).click();
+  await goTo(page, "Budget");
 }
 
 async function assign(page: Page, category: string, amount: string) {
@@ -146,7 +146,8 @@ async function assign(page: Page, category: string, amount: string) {
 test("an Overspent Category is red in its Month and the next until an Assignment covers it", async ({
   page,
 }) => {
-  await createBudget(page, "1000");
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
   await assign(page, "Groceries", "100");
   await recordSpending(page, "2026-10-12", "150", "Groceries");
 
@@ -189,7 +190,8 @@ test("an Overspent Category is red in its Month and the next until an Assignment
 test("Category Groups show subtotals and collapse and expand", async ({
   page,
 }) => {
-  await createBudget(page, "1000");
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
   await assign(page, "Groceries", "300");
   await assign(page, "Transport", "50.50");
   await recordSpending(page, "2026-10-03", "20", "Groceries");

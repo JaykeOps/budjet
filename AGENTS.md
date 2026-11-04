@@ -31,6 +31,8 @@ nix develop -c dagger call performance
 
 `dagger functions` lists the rest. New CI logic goes in the Dagger module so it runs locally first; the workflow YAML stays a thin `dagger call`. The one exception is the GitHub Pages deploy in `release.yml`, which uses GitHub's own actions for short-lived credentials.
 
+End-to-end specs create a Budget with `createBudget` and reach a place with `goTo`, both from `e2e/helpers.ts`, so navigation changes in one spot. Locators: `getByRole` and `getByLabel` first, `getByText` for content, `data-testid` only where no user-facing locator can work, and no CSS or DOM structure locators. If a control can't be found by name, fix its name.
+
 Hooks and install scripts stay off (ADR 0002): commit with plain `git commit`, and when a dependency fails `pnpm install` because it wants a build script, stop and ask the human whether to acknowledge it as `<pkg>: false` under `allowBuilds` in `pnpm-workspace.yaml`.
 
 ## Commits, branches and PRs
