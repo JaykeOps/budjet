@@ -1,16 +1,12 @@
 import { expect, type Page, test } from "@playwright/test";
+import { createBudget, goTo } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 /** A Budget in USD with Checking holding $1,000 and Savings holding $500. */
-async function createBudget(page: Page) {
+async function createBudgetWithSavings(page: Page) {
   await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
-  await page.goto("/");
-  await page.getByLabel("Currency").selectOption("USD");
-  await page.getByRole("button", { name: "Create Budget" }).click();
-  const setup = page.getByRole("form", { name: "Add your first Account" });
-  await setup.getByLabel("Name").fill("Checking");
-  await setup.getByLabel("Opening Balance").fill("1000");
-  await setup.getByRole("button", { name: "Add Account" }).click();
+  await createBudget(page);
+  await goTo(page, "Accounts");
   const add = page.getByRole("form", { name: "Add an Account" });
   await add.getByLabel("Name").fill("Savings");
   await add.getByLabel("Type").selectOption("savings");
@@ -27,10 +23,12 @@ function balanceOf(page: Page, account: string) {
 test("a user moves money between Accounts and sees both balances change", async ({
   page,
 }) => {
-  await createBudget(page);
+  await createBudgetWithSavings(page);
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
+  await goTo(page, "Budget");
   await expect(readyToAssign).toHaveText(/\$1,500\.00/);
 
+  await goTo(page, "Accounts");
   const make = page.getByRole("form", { name: "Make a Transfer" });
   await make.getByLabel("From").selectOption({ label: "Checking" });
   await make.getByLabel("To").selectOption({ label: "Savings" });
@@ -39,9 +37,12 @@ test("a user moves money between Accounts and sees both balances change", async 
   await make.getByRole("button", { name: "Make Transfer" }).click();
 
   const expectMoved = async () => {
+    await goTo(page, "Accounts");
     await expect(balanceOf(page, "Checking")).toContainText("$800.00");
     await expect(balanceOf(page, "Savings")).toContainText("$700.00");
+    await goTo(page, "Budget");
     await expect(readyToAssign).toHaveText(/\$1,500\.00/);
+    await goTo(page, "Activity");
     await page
       .getByRole("region", { name: "Transactions", exact: true })
       .getByRole("combobox", { name: /^Account/ })
@@ -71,7 +72,7 @@ test("a user moves money between Accounts and sees both balances change", async 
 });
 
 test("a user edits and deletes a Transfer", async ({ page }) => {
-  await createBudget(page);
+  await createBudgetWithSavings(page);
   const make = page.getByRole("form", { name: "Make a Transfer" });
   await make.getByLabel("Amount").fill("200");
   await make.getByRole("button", { name: "Make Transfer" }).click();
@@ -121,7 +122,7 @@ test("a Transfer's More menu works from the keyboard", async ({ page }) => {
 });
 
 test("a Transfer to the same Account is refused", async ({ page }) => {
-  await createBudget(page);
+  await createBudgetWithSavings(page);
 
   const make = page.getByRole("form", { name: "Make a Transfer" });
   await make.getByLabel("To").selectOption({ label: "Checking" });
