@@ -17,7 +17,19 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   reporter: "list",
   use: { baseURL: "http://localhost:4173" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // Specs run on both. A flow that really differs splits into *.phone.spec.ts and *.desktop.spec.ts.
+  projects: [
+    {
+      name: "Desktop Chrome",
+      use: { ...devices["Desktop Chrome"] },
+      testIgnore: /\.phone\.spec\.ts$/,
+    },
+    {
+      name: "Pixel 7",
+      use: { ...devices["Pixel 7"] },
+      testIgnore: /\.desktop\.spec\.ts$/,
+    },
+  ],
   webServer: {
     command: "pnpm preview",
     url: "http://localhost:4173",

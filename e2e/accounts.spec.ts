@@ -77,17 +77,22 @@ test("a user confirms a balance matches the bank, which moves no money and is ke
     .getByRole("row", { name: /Everyday checking/ });
   await expect(row).toContainText("Not checked yet");
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
+  await goTo(page, "Budget");
   await expect(readyToAssign).toHaveText(/\$1,250\.50/);
 
   await page.clock.setFixedTime(new Date("2026-10-18T12:00:00"));
+  await goTo(page, "Accounts");
   const redeclare = page.getByRole("form", { name: "Re-declare a balance" });
   await redeclare.getByLabel("Balance").fill("1250.50");
   await redeclare.getByRole("button", { name: "Re-declare Balance" }).click();
 
   const expectChecked = async () => {
+    await goTo(page, "Accounts");
     await expect(row).toContainText("2026-10-18");
     await expect(row).not.toContainText("Not checked yet");
+    await goTo(page, "Budget");
     await expect(readyToAssign).toHaveText(/\$1,250\.50/);
+    await goTo(page, "Activity");
     const check = page
       .getByRole("table", { name: "Transactions in Everyday checking" })
       .getByRole("row", { name: /Balance checked/ });

@@ -18,6 +18,17 @@ export function useUrlParameter(
   return [value, write];
 }
 
+/** The address bar's query string, so whatever is built from it stays current. */
+export function useUrlSearch(): string {
+  return useSyncExternalStore(subscribe, () => window.location.search);
+}
+
+/** Moves to another address in this app, as a new entry Back returns from. */
+export function pushAddress(address: string): void {
+  window.history.pushState(null, "", address);
+  announceAddressChange();
+}
+
 function subscribe(listener: () => void): () => void {
   window.addEventListener("popstate", listener);
   return () => window.removeEventListener("popstate", listener);
@@ -32,6 +43,10 @@ function writeParameter(
   url.searchParams.set(name, value);
   if (how === "push") window.history.pushState(null, "", url);
   else window.history.replaceState(null, "", url);
-  // pushState and replaceState don't fire popstate; tell subscribers ourselves.
+  announceAddressChange();
+}
+
+/** pushState and replaceState don't fire popstate; tell subscribers ourselves. */
+function announceAddressChange(): void {
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
