@@ -74,6 +74,8 @@ export type DataFolderChangeLog = ChangeLog & {
     handle: FileSystemDirectoryHandle,
   ): Promise<MoveOutcome>;
   inFolder(): boolean;
+  /** Something other than a write found the folder failing. It stays unsaved until a write succeeds. */
+  folderFailed(reason: UnsavedReason): void;
   /**
    * The same, for the folder this Budget was already in, opened without it until
    * the user is back. What the last check read there still counts.
@@ -426,6 +428,10 @@ export async function openDataFolderChangeLog({
       }
     },
     inFolder: () => folder !== undefined,
+    folderFailed(reason) {
+      failure = reason;
+      showSaveState();
+    },
   };
 
   /** Says whether any file couldn't be read this time. */
