@@ -30,7 +30,6 @@ test("the Budget opens on the current Month with every Category in its Category 
 }) => {
   await createBudget(page, { firstAccount: { openingBalance: "0" } });
   await goTo(page, "Budget");
-  await page.getByRole("button", { name: "Move Savings up" }).click();
 
   const expectOutline = () =>
     expect
@@ -41,12 +40,12 @@ test("the Budget opens on the current Month with every Category in its Category 
         "Power",
         "Phone",
         "Internet",
-        "Savings",
-        "Emergency Fund",
         "Everyday",
         "Groceries",
         "Transport",
         "Dining Out",
+        "Savings",
+        "Emergency Fund",
       ]);
   await expect(monthHeading(page, "October 2026")).toBeVisible();
   await expectOutline();
