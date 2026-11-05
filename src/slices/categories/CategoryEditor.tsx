@@ -8,11 +8,13 @@ import {
 } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
 import { formatMoney } from "../../kernel/money";
-import type { Month } from "../../kernel/month";
+import { currentMonth, type Month } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
 import { OpenableSheet } from "../../ui/Sheet";
 import { categoryUsed, useAvailable } from "../budget-totals";
 import styles from "./CategoryEditor.module.css";
+import { MoveOutFlow } from "./MoveOutFlow";
+import { moveOutChoices } from "./move-out";
 import { type Category, type CategoryGroup, categoryGroups } from "./queries";
 import { CategoryMoves, GroupMoves, type Moves, useReorder } from "./Reorder";
 
@@ -24,12 +26,14 @@ export type CategoryChanges = Moves & {
   addGroup: (name: string) => void;
   renameCategory: (categoryId: string, name: string) => void;
   renameGroup: (groupId: string, name: string) => void;
-  hide: (category: Named) => void;
+  /** `other` takes its money or covers it; without one, Ready to Assign does. */
+  hide: (category: Named, other?: string) => void;
   unhide: (category: Named) => void;
   deleteCategory: (category: Named) => void;
   deleteGroup: (group: Named) => void;
   moveThemAndDelete: (group: Named, toGroupId: string) => void;
   setLeftOut: (group: Named, leftOut: boolean) => void;
+  moveOut: (category: Named, month: Month, other?: string) => void;
 };
 
 type Open = { kind: "category" | "group"; id: string };
@@ -383,8 +387,37 @@ function CategoryFate({
       [id],
     ),
   );
+  const month = currentMonth();
+  const holdsMoney = useChangeLogQuery(
+    useCallback(
+      (records: readonly ChangeRecord[]) => {
+        const choices = moveOutChoices(records, id, month);
+        return Boolean(choices?.left.minorUnits || choices?.later.length);
+      },
+      [id, month],
+    ),
+  );
+  const [movingOut, setMovingOut] = useState(false);
   const [refusal, attempt] = useAttempt();
 
+  if (movingOut) {
+    return (
+      <Fate refusal={refusal}>
+        <MoveOutFlow
+          category={category}
+          month={month}
+          hide
+          onApply={(other) =>
+            attempt(() => {
+              changes.hide(category, other);
+              onClose();
+            })
+          }
+          onCancel={() => setMovingOut(false)}
+        />
+      </Fate>
+    );
+  }
   return (
     <Fate refusal={refusal}>
       {hidden && (
@@ -395,13 +428,17 @@ function CategoryFate({
       )}
       <button
         type="button"
-        onClick={() =>
+        onClick={() => {
+          if (!hidden && holdsMoney) {
+            setMovingOut(true);
+            return;
+          }
           attempt(() => {
             if (hidden) changes.unhide(category);
             else changes.hide(category);
             onClose();
-          })
-        }
+          });
+        }}
       >
         {hidden ? "Unhide" : "Hide"} {name}
       </button>

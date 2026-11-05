@@ -223,26 +223,6 @@ test("a used Category explains why it can't be deleted and offers hiding", async
   await expectCategoryOffered(page, "Rent", false);
 });
 
-test("hiding a Category holding money is refused, and says why", async ({
-  page,
-}) => {
-  await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
-  await createBudget(page);
-  await goTo(page, "Budget");
-  await assign(page, "Rent", "50");
-  await startEditing(page);
-
-  await expect(
-    page.getByRole("listitem").filter({ has: nameField(page, "Rent") }),
-  ).toContainText("$50.00");
-
-  const sheet = await openMore(page, "Rent");
-  await button(sheet, "Hide Rent").click();
-  await expect(sheet.getByRole("alert")).toContainText(
-    "Rent still has $50.00 Available",
-  );
-});
-
 test("hidden Categories stay in place, and a Group with nothing visible shows only here", async ({
   page,
 }) => {

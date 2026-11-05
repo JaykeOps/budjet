@@ -58,6 +58,33 @@
   min-width: 0;
 }
 
+.hiddenMoney {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 16px;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+.hiddenMoneyAction {
+  flex: none;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--link);
+  font-weight: 500;
+}
+.hiddenMoneySheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* Same width as use-wide.ts, where rows become a table. */
 @media (min-width: 1180px) {
   .columns {

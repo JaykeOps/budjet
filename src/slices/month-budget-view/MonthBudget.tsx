@@ -16,6 +16,7 @@ import { AssignPanel } from "./AssignPanel";
 import { AssignWalk, CopyLastMonth } from "./AssignWalk";
 import { CategoryLists, CategoryTables } from "./CategoryRows";
 import { CategorySheet, type SheetSteps } from "./CategorySheet";
+import { HiddenMoney } from "./HiddenMoney";
 import styles from "./MonthBudget.module.css";
 import { type MoveInput, MoveMoneyForm } from "./MoveMoneyForm";
 import { ReadyToAssign, SpentThisMonthCard } from "./Summary";
@@ -207,6 +208,12 @@ export function MonthBudget({
             <SpentThisMonthCard month={month} />
           </div>
           <div className={styles.groups}>
+            <HiddenMoney
+              month={month}
+              onMoveOut={(category, other) =>
+                attempt(() => categoryChanges.moveOut(category, month, other))
+              }
+            />
             {wide ? (
               <CategoryTables {...rows} column={column} />
             ) : (

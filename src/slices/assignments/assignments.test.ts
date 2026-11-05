@@ -8,7 +8,12 @@ import { money } from "../../kernel/money";
 import { month } from "../../kernel/month";
 import type { BudgetCreated } from "../budget-setup/records";
 import { available, readyToAssign } from "../budget-totals";
-import { copyLastMonth, moveMoney, setAssignment } from "./commands";
+import {
+  copyLastMonth,
+  moveMoney,
+  restoreAssignment,
+  setAssignment,
+} from "./commands";
 import { assignment, takeBack } from "./index";
 import { type AssignmentSet, assignmentSubject } from "./records";
 
@@ -484,6 +489,65 @@ describe("Assignments", () => {
         .filter(({ type }) => type === "AssignmentSet")
         .map(({ payload }) => (payload as AssignmentSet["payload"]).amount);
       expect(stored.every(({ minorUnits }) => minorUnits >= 0)).toBe(true);
+    });
+  });
+
+  describe("restoring", () => {
+    const rent = { categoryId: "rent", month: october };
+
+    it("writes back an Assignment and a Take-back, and zero for unset ones", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      setAssignment(writer, { ...rent, amount: money(5000, "USD") });
+      setAssignment(writer, { ...rent, amount: money(-1000, "USD") });
+
+      restoreAssignment(writer, {
+        ...rent,
+        assigned: money(5000, "USD"),
+        takenBack: undefined,
+      });
+
+      expect(assignment(changeLog.readAll(), "rent", october)).toEqual(
+        money(5000, "USD"),
+      );
+      expect(takeBack(changeLog.readAll(), "rent", october)).toEqual(
+        money(0, "USD"),
+      );
+    });
+
+    it("writes nothing when nothing differs", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      setAssignment(writer, { ...rent, amount: money(5000, "USD") });
+      const before = changeLog.readAll().length;
+
+      restoreAssignment(writer, {
+        ...rent,
+        assigned: money(5000, "USD"),
+        takenBack: undefined,
+      });
+
+      expect(changeLog.readAll().length).toBe(before);
+    });
+
+    it("gets the same numbers back over an old negative Assignment", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+        assignmentSubject("rent", october),
+        "AssignmentSet",
+        { version: 1, ...rent, amount: money(-2000, "USD") },
+      );
+
+      restoreAssignment(writer, {
+        ...rent,
+        assigned: money(0, "USD"),
+        takenBack: money(500, "USD"),
+      });
+
+      expect(takeBack(changeLog.readAll(), "rent", october)).toEqual(
+        money(500, "USD"),
+      );
+      expect(assignment(changeLog.readAll(), "rent", october)).toEqual(
+        money(0, "USD"),
+      );
     });
   });
 });
