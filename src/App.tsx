@@ -50,10 +50,17 @@ export function App({ writer }: { writer: ChangeLogWriter }) {
   );
 }
 
-function Page({ children }: { children: ReactNode }) {
+/** `titled` is false for a screen with its own top-level heading. */
+function Page({
+  titled = true,
+  children,
+}: {
+  titled?: boolean;
+  children: ReactNode;
+}) {
   return (
     <main>
-      <h1>budjet</h1>
+      {titled && <h1>budjet</h1>}
       {children}
       <p>Version {__APP_VERSION__}</p>
     </main>
@@ -95,7 +102,7 @@ function Shell() {
   }
   return (
     <NavigationShell>
-      <Page>
+      <Page titled={place !== "budget"}>
         {place === "budget" && (
           <>
             <BudgetMonth
@@ -110,8 +117,7 @@ function Shell() {
               }
               onMoveMoney={(input) => moveMoney(writer, input)}
             />
-            <section aria-labelledby="budget-heading">
-              <h2 id="budget-heading">Budget</h2>
+            <section aria-label="Manage Categories">
               <p>Kept in {budget.currency}.</p>
               <CategoryList />
             </section>

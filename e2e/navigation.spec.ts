@@ -75,7 +75,7 @@ test("leaving the Budget and coming back keeps its Month", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
   await createBudget(page);
   await page.getByRole("button", { name: "Next Month" }).click();
-  const november = page.getByRole("table", { name: "November 2026" });
+  const november = page.getByRole("heading", { name: "November 2026" });
   await expect(november).toBeVisible();
 
   await goTo(page, "Activity");

@@ -1,6 +1,8 @@
+import { useCallback } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
 import { addMoney, type Money, money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
+import { useChangeLogQuery } from "../../kernel/use-change-log-query";
 import { assignment } from "../assignments";
 import { budget } from "../budget-setup";
 import { spending } from "../budget-totals";
@@ -62,4 +64,13 @@ export function spentThisMonth(
   }));
 
   return { spent, of: assigned, daily };
+}
+
+export function useSpentThisMonth(of: Month): SpentThisMonth | undefined {
+  return useChangeLogQuery(
+    useCallback(
+      (records: readonly ChangeRecord[]) => spentThisMonth(records, of),
+      [of],
+    ),
+  );
 }
