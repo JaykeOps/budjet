@@ -1,6 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { addFirstAccount, createBudget, goTo, openApp } from "./helpers";
+import {
+  activity,
+  addFirstAccount,
+  createBudget,
+  goTo,
+  openApp,
+} from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 test("setup shows no navigation, and finishing it opens on the Budget", async ({
@@ -24,19 +30,14 @@ test("setup shows no navigation, and finishing it opens on the Budget", async ({
   await expect(
     page.getByRole("heading", { name: "Budget", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("region", { name: "Transactions", exact: true }),
-  ).toBeHidden();
+  await expect(activity(page)).toBeHidden();
 });
 
 test("each place shows only its own screens", async ({ page }) => {
   await createBudget(page);
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
   const accounts = page.getByRole("region", { name: "Accounts", exact: true });
-  const transactions = page.getByRole("region", {
-    name: "Transactions",
-    exact: true,
-  });
+  const transactions = activity(page);
 
   await goTo(page, "Activity");
   await expect(readyToAssign).toBeHidden();
@@ -56,10 +57,7 @@ test("a place survives a reload, and Back returns to the one before", async ({
   page,
 }) => {
   await createBudget(page);
-  const transactions = page.getByRole("region", {
-    name: "Transactions",
-    exact: true,
-  });
+  const transactions = activity(page);
   await goTo(page, "Activity");
 
   await reloadWhenSaved(page);

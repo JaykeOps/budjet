@@ -1,6 +1,11 @@
 import type { ChangeRecord } from "../../kernel/change-log";
-import { type Money, money } from "../../kernel/money";
-import { adjustments, balanceChecks } from "../accounts";
+import type { Money } from "../../kernel/money";
+import {
+  adjustments,
+  balanceChecks,
+  type OpeningBalance,
+  openingBalances,
+} from "../accounts";
 import { currentTransfers } from "../transfers/records";
 import { type CurrentTransaction, currentTransactions } from "./records";
 
@@ -21,92 +26,97 @@ export function accountTransactions(
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
-/** A Transfer as one Account's Transaction list shows it. */
+/** A Transfer as a list shows it, once, whichever Accounts it is listed for. */
 export type TransferEntry = {
   kind: "transfer";
   id: string;
   date: string;
-  /** Negative when the Transfer took money out of this Account, positive when it brought money in. */
+  fromAccountId: string;
+  toAccountId: string;
+  /** Always above zero. */
   amount: Money;
-  /** The Account at the Transfer's other end. */
-  otherAccountId: string;
   memo?: string;
 };
 
-/** A re-declared balance as its Account's Transaction list shows it: the Adjustment it made. */
+/** A re-declared balance as a list shows it: the Adjustment it made. */
 export type AdjustmentEntry = {
   kind: "adjustment";
   /** The id of the record that re-declared the balance. */
   id: string;
+  accountId: string;
   /** The day the balance was re-declared. */
   date: string;
   amount: Money;
+  /** The balance the user re-declared. */
+  balance: Money;
 };
 
-/** A re-declared balance that matched, as its Account's Transaction list shows it. */
+/** A re-declared balance that matched, as a list shows it. */
 export type BalanceCheckEntry = {
   kind: "balance-check";
   /** The id of the record that re-declared the balance. */
   id: string;
+  accountId: string;
   /** The day the balance was re-declared. */
   date: string;
   balance: Money;
 };
 
+/** What an Account held when it was added, as a list shows it. */
+export type OpeningBalanceEntry = { kind: "opening-balance" } & OpeningBalance;
+
 export type TransactionListEntry =
   | ({ kind: "transaction" } & Transaction)
   | TransferEntry
   | AdjustmentEntry
-  | BalanceCheckEntry;
+  | BalanceCheckEntry
+  | OpeningBalanceEntry;
 
 /**
- * What an Account's Transaction list shows: its Transactions, the
- * Transfers in and out of it, its Adjustments and its Balance checks, newest date first. On the same date the most
- * recently recorded comes first; an edit keeps its place. Expects records
- * oldest first, as `readAll` returns them.
+ * Everything that moved money in one Account, or in every Account when none is
+ * named: Transactions, Transfers (each once), Adjustments, Balance checks and
+ * Opening Balances, newest date first. On the same date the most recently
+ * recorded comes first; an edit keeps its place. Expects records oldest first,
+ * as `readAll` returns them.
  */
-export function accountTransactionList(
+export function transactionList(
   records: readonly ChangeRecord[],
-  accountId: string,
+  accountId?: string,
 ): TransactionListEntry[] {
-  // Keyed by subject for Transactions and Transfers, by record for re-declared balances.
+  // Keyed by subject for Transactions and Transfers, by record for what the Accounts slice lists.
   const firstRecorded = new Map<string, number>();
   records.forEach(({ id, subjectId }, index) => {
     if (!firstRecorded.has(subjectId)) firstRecorded.set(subjectId, index);
     firstRecorded.set(id, index);
   });
+  const inAccount = (entry: { accountId: string }) =>
+    accountId === undefined || entry.accountId === accountId;
   const transfers: TransferEntry[] = [];
   for (const [id, transfer] of currentTransfers(records)) {
-    const out = transfer.fromAccountId === accountId;
-    if (!out && transfer.toAccountId !== accountId) continue;
-    const { minorUnits, currency } = transfer.amount;
-    transfers.push({
-      kind: "transfer",
-      id,
-      date: transfer.date,
-      amount: money(out ? -minorUnits : minorUnits, currency),
-      otherAccountId: out ? transfer.toAccountId : transfer.fromAccountId,
-      ...(transfer.memo && { memo: transfer.memo }),
-    });
+    if (
+      accountId !== undefined &&
+      transfer.fromAccountId !== accountId &&
+      transfer.toAccountId !== accountId
+    ) {
+      continue;
+    }
+    transfers.push({ kind: "transfer", id, ...transfer });
   }
   const recorded = (id: string) => firstRecorded.get(id) ?? 0;
   const entries: TransactionListEntry[] = [
-    ...accountTransactions(records, accountId).map(
-      (transaction) => ({ kind: "transaction", ...transaction }) as const,
-    ),
+    ...currentTransactions(records)
+      .filter(inAccount)
+      .map((transaction) => ({ kind: "transaction", ...transaction }) as const),
     ...transfers,
     ...adjustments(records)
-      .filter((adjustment) => adjustment.accountId === accountId)
-      .map(
-        ({ id, date, amount }) =>
-          ({ kind: "adjustment", id, date, amount }) as const,
-      ),
+      .filter(inAccount)
+      .map((adjustment) => ({ kind: "adjustment", ...adjustment }) as const),
     ...balanceChecks(records)
-      .filter((check) => check.accountId === accountId)
-      .map(
-        ({ id, date, balance }) =>
-          ({ kind: "balance-check", id, date, balance }) as const,
-      ),
+      .filter(inAccount)
+      .map((check) => ({ kind: "balance-check", ...check }) as const),
+    ...openingBalances(records)
+      .filter(inAccount)
+      .map((opening) => ({ kind: "opening-balance", ...opening }) as const),
   ];
   return entries.sort((a, b) =>
     a.date !== b.date

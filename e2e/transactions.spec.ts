@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { createBudget, goTo } from "./helpers";
+import { createBudget, goTo, show } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 test.beforeEach(({ page }) =>
@@ -48,15 +48,19 @@ test("a user records spending and income and sees Available, Ready to Assign and
     ).toContainText("$2,954.50");
 
     await goTo(page, "Activity");
-    const transactions = page.getByRole("table", {
-      name: "Transactions in Checking",
-    });
-    await expect(transactions.getByRole("row")).toHaveCount(3);
-    await expect(transactions.getByRole("row").nth(1)).toContainText(
-      /Corner Shop.*Groceries.*Milk and bread.*−\$45\.50/,
+    const rows = page
+      .getByRole("table", { name: "History of All Accounts" })
+      .getByRole("row");
+    await expect(rows).toHaveCount(4);
+    await expect(rows.nth(0)).toContainText(
+      "$3,000.00 in, $45.50 out, ended at $2,954.50",
     );
-    await expect(transactions.getByRole("row").nth(2)).toContainText(
-      /Employer.*Ready to Assign.*\$2,000\.00/,
+    await expect(rows.nth(1)).toContainText(
+      /Corner Shop.*Groceries, Checking.*−\$45\.50/,
+    );
+    await expect(rows.nth(2)).toContainText(/Opening Balance.*\+\$1,000\.00/);
+    await expect(rows.nth(3)).toContainText(
+      /Employer.*Ready to Assign, Checking.*\+\$2,000\.00/,
     );
   };
   await expectRecorded();
@@ -103,13 +107,14 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
   await record.getByLabel("Payee").fill("Employer");
   await record.getByRole("button", { name: "Record Transaction" }).click();
   const transactions = page.getByRole("table", {
-    name: "Transactions in Checking",
+    name: "History of All Accounts",
   });
 
   await transactions
     .getByRole("row", { name: /Corner Shop/ })
-    .getByRole("button", { name: "Edit" })
+    .getByRole("button", { name: /^More/ })
     .click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
   const edit = page.getByRole("form", { name: "Edit Transaction" });
   await expect(edit.getByLabel("Date")).toHaveValue("2026-10-15");
   await expect(edit.getByLabel("Amount")).toHaveValue("45.50");
@@ -120,8 +125,9 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
   await expect(edit).toHaveCount(0);
   await transactions
     .getByRole("row", { name: /Employer/ })
-    .getByRole("button", { name: "Delete" })
+    .getByRole("button", { name: /^More/ })
     .click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
 
   const expectChanged = async () => {
     await goTo(page, "Budget");
@@ -140,7 +146,7 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
         .getByRole("row", { name: /Checking/ }),
     ).toContainText("$940.00");
     await goTo(page, "Activity");
-    await expect(transactions.getByRole("row")).toHaveCount(2);
+    await expect(transactions.getByRole("row")).toHaveCount(3);
     await expect(transactions.getByRole("row").nth(1)).toContainText(
       /Corner Store.*Groceries.*−\$60\.00/,
     );
@@ -152,7 +158,7 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
   await expectChanged();
 });
 
-test("the selected Account stays selected after a reload and Back returns to the one before", async ({
+test("what's showing stays after a reload and Back returns to what showed before", async ({
   page,
 }) => {
   await createBudget(page);
@@ -162,29 +168,49 @@ test("the selected Account stays selected after a reload and Back returns to the
   await add.getByLabel("Opening Balance").fill("500");
   await add.getByRole("button", { name: "Add Account" }).click();
   await goTo(page, "Activity");
-  const account = page
-    .getByRole("region", { name: "Transactions", exact: true })
-    .getByRole("combobox", { name: /^Account/ });
-  await expect(account.getByRole("option")).toHaveCount(2);
-  await expect(
-    page.getByRole("table", { name: "Transactions in Checking" }),
-  ).toBeVisible();
+  const all = page.getByRole("table", { name: "History of All Accounts" });
+  const savings = page.getByRole("table", { name: "History of Savings" });
+  await expect(all).toBeVisible();
 
-  await account.selectOption({ label: "Savings" });
-  await expect(
-    page.getByRole("table", { name: "Transactions in Savings" }),
-  ).toBeVisible();
+  await show(page, { account: "Savings" }, "Show 1 entry");
+  await expect(savings).toBeVisible();
   await expect(page).toHaveURL(/account=/);
 
   await reloadWhenSaved(page);
-  await expect(
-    page.getByRole("table", { name: "Transactions in Savings" }),
-  ).toBeVisible();
+  await expect(savings).toBeVisible();
 
   await page.goBack();
+  await expect(all).toBeVisible();
+});
+
+test("a Transaction is recorded in the Account chosen, starting on the one showing", async ({
+  page,
+}) => {
+  await createBudget(page);
+  await goTo(page, "Accounts");
+  const add = page.getByRole("form", { name: "Add an Account" });
+  await add.getByLabel("Name").fill("Savings");
+  await add.getByLabel("Opening Balance").fill("500");
+  await add.getByRole("button", { name: "Add Account" }).click();
+  await goTo(page, "Activity");
+  const record = page.getByRole("form", { name: "Record a Transaction" });
+  await expect(record.getByLabel("Account")).toHaveValue(/.+/);
+  await record.getByLabel("Account").selectOption({ label: "Savings" });
+  await record.getByLabel("Money").selectOption("in");
+  await record.getByLabel("Amount").fill("20");
+  await record.getByLabel("Payee").fill("Interest");
+  await record.getByRole("button", { name: "Record Transaction" }).click();
   await expect(
-    page.getByRole("table", { name: "Transactions in Checking" }),
-  ).toBeVisible();
+    page
+      .getByRole("table", { name: "History of All Accounts" })
+      .getByRole("row", { name: /Interest/ }),
+  ).toContainText("Ready to Assign, Savings");
+
+  await show(page, { account: "Savings" });
+
+  await expect(
+    record.getByLabel("Account").locator("option:checked"),
+  ).toHaveText("Savings");
 });
 
 test("Payees used before are suggested", async ({ page }) => {
@@ -197,7 +223,7 @@ test("Payees used before are suggested", async ({ page }) => {
   await record.getByRole("button", { name: "Record Transaction" }).click();
   await expect(
     page
-      .getByRole("table", { name: "Transactions in Checking" })
+      .getByRole("table", { name: "History of All Accounts" })
       .getByRole("row", { name: /Employer/ }),
   ).toBeVisible();
 
@@ -217,30 +243,21 @@ test("an Account with thousands of Transactions renders only the rows in view", 
   await reloadWhenSaved(page);
   await goTo(page, "Activity");
 
-  const transactions = page.getByRole("table", {
-    name: "Transactions in Checking",
-  });
-  await expect(transactions).toHaveAttribute("aria-rowcount", "3001");
-  await expect(
-    transactions.getByRole("row", { name: /Payee 2999/ }),
-  ).toBeVisible();
-  expect(await transactions.getByRole("row").count()).toBeLessThan(100);
+  const history = page.getByRole("table", { name: "History of All Accounts" });
+  // The Month's heading, the Opening Balance and the Transactions.
+  await expect(history).toHaveAttribute("aria-rowcount", "3002");
+  await expect(history.getByRole("row", { name: /Payee 2999/ })).toBeVisible();
+  expect(await history.getByRole("row").count()).toBeLessThan(100);
 
-  await transactions.evaluate((table) => {
-    const scroller = table.parentElement as HTMLElement;
-    scroller.scrollTop = scroller.scrollHeight;
-  });
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 
-  await expect(
-    transactions.getByRole("row", { name: /Payee 0 / }),
-  ).toBeVisible();
-  expect(await transactions.getByRole("row").count()).toBeLessThan(100);
+  await expect(history.getByRole("row", { name: /Payee 0 / })).toBeVisible();
+  expect(await history.getByRole("row").count()).toBeLessThan(100);
 });
 
 /**
- * Writes Transactions in Checking straight into browser storage, one a day
- * going back from the Budget's Month, as if they had been recorded over the
- * years. "Payee 0" is the oldest.
+ * Writes Transactions in Checking straight into browser storage, all in the
+ * Budget's Month, so that nothing is folded away. "Payee 0" is the oldest.
  */
 async function seedTransactions(page: Page, count: number) {
   await page.evaluate(async (count) => {
@@ -266,7 +283,6 @@ async function seedTransactions(page: Page, count: number) {
       .transaction("records", "readwrite")
       .objectStore("records");
     for (let index = 0; index < count; index++) {
-      const date = new Date(Date.UTC(2026, 9, 1 - count + index));
       const record = {
         id: crypto.randomUUID(),
         subjectId: crypto.randomUUID(),
@@ -276,7 +292,7 @@ async function seedTransactions(page: Page, count: number) {
         payload: {
           version: 1,
           accountId: account.subjectId,
-          date: date.toISOString().slice(0, 10),
+          date: "2026-10-01",
           amount: { minorUnits: 100, currency: "USD" },
           payee: `Payee ${index}`,
         },

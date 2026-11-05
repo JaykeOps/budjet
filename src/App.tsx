@@ -1,12 +1,13 @@
 import type { ComponentProps, ReactNode } from "react";
 import type { ChangeLogWriter } from "./kernel/change-log";
+import { parseMonth } from "./kernel/month";
 import {
   ChangeLogWriterProvider,
   useChangeLogWriter,
 } from "./kernel/use-change-log-query";
 import { useMonthInUrl } from "./month-in-url";
 import { NavigationShell } from "./NavigationShell";
-import { usePlace } from "./place-in-url";
+import { placeAddress, usePlace } from "./place-in-url";
 import {
   AccountsScreen,
   OpenAccountForm,
@@ -40,7 +41,7 @@ import {
   editTransfer,
   makeTransfer,
 } from "./slices/transfers/commands";
-import { useUrlParameter } from "./url-parameter";
+import { pushAddress, useUrlParameter } from "./url-parameter";
 
 export function App({ writer }: { writer: ChangeLogWriter }) {
   return (
@@ -151,18 +152,21 @@ function Shell() {
   );
 }
 
-/** The Transactions screen for the Account in the address bar (`?account=<id>`). */
+/** The Transactions screen for what the address bar says it's showing (`?account=<id>&statement=YYYY-MM`). */
 function AccountTransactions(
-  props: Omit<
-    ComponentProps<typeof TransactionsScreen>,
-    "selectedAccountId" | "onSelectAccount"
-  >,
+  props: Omit<ComponentProps<typeof TransactionsScreen>, "showing" | "onShow">,
 ) {
-  const [accountId, setAccountId] = useUrlParameter("account");
+  const [accountId] = useUrlParameter("account");
+  const [statementMonth] = useUrlParameter("statement");
   return (
     <TransactionsScreen
-      selectedAccountId={accountId ?? undefined}
-      onSelectAccount={(id) => setAccountId(id, "push")}
+      showing={{
+        accountId: accountId ?? undefined,
+        month: parseMonth(statementMonth),
+      }}
+      onShow={({ accountId, month }) =>
+        pushAddress(placeAddress("activity", accountId, month))
+      }
       {...props}
     />
   );

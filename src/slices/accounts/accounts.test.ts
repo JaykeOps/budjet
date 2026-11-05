@@ -277,6 +277,7 @@ describe("Accounts", () => {
         accountId: checking,
         date: "2100-10-20",
         amount: money(1000, "USD"),
+        balance: money(100000, "USD"),
       },
     ]);
     expect(accounts(changeLog.readAll())[0].lastChecked).toBe("2100-10-20");

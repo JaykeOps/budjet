@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { createBudget, goTo } from "./helpers";
+import { createBudget, goTo, show } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 async function createBudgetWithFirstAccount(page: Page) {
@@ -94,9 +94,9 @@ test("a user confirms a balance matches the bank, which moves no money and is ke
     await expect(readyToAssign).toHaveText(/\$1,250\.50/);
     await goTo(page, "Activity");
     const check = page
-      .getByRole("table", { name: "Transactions in Everyday checking" })
+      .getByRole("table", { name: "History of All Accounts" })
       .getByRole("row", { name: /Balance checked/ });
-    await expect(check).toContainText("2026-10-18");
+    await expect(check).toContainText("Oct 18");
     await expect(check).toContainText("Matched your bank at $1,250.50");
     await expect(check).not.toContainText("Ready to Assign");
   };
@@ -137,9 +137,11 @@ test("a user re-declares a balance, Transfers an Account to $0, closes it and re
   await goTo(page, "Activity");
   // The Account's history explains the new balance, and it can't be edited.
   const adjustment = page
-    .getByRole("table", { name: "Transactions in Everyday checking" })
-    .getByRole("row", { name: /Balance adjustment/ });
-  await expect(adjustment).toContainText(/Ready to Assign.*\$49\.50/);
+    .getByRole("table", { name: "History of All Accounts" })
+    .getByRole("row", { name: /^Adjustment/ });
+  await expect(adjustment).toContainText(
+    /You updated the balance to \$1,300\.00.*\+\$49\.50/,
+  );
   await expect(adjustment.getByRole("button")).toHaveCount(0);
 
   await goTo(page, "Accounts");
@@ -178,21 +180,16 @@ test("a user re-declares a balance, Transfers an Account to $0, closes it and re
     await expect(readyToAssign).toHaveText(/\$4,300\.00/);
     await goTo(page, "Activity");
     // Its history stays, but it takes no new Transactions or Transfers.
-    const transactions = page.getByRole("region", {
-      name: "Transactions",
-      exact: true,
-    });
-    await transactions
-      .getByRole("combobox", { name: /^Account/ })
-      .selectOption({ label: "Rainy day (closed)" });
+    await show(page, { account: "Rainy day (closed)" });
     await expect(
       page
-        .getByRole("table", { name: "Transactions in Rainy day" })
+        .getByRole("table", { name: "History of Rainy day" })
         .getByRole("row")
         .nth(1),
-    ).toContainText(/Transfer to Bills.*−\$3,000\.00/);
+    ).toContainText(/To Bills.*Transfer.*−\$3,000\.00/);
+    await expect(page.getByText(/^Closed\. Its history stays/)).toBeVisible();
     await expect(
-      transactions.getByRole("form", { name: "Record a Transaction" }),
+      page.getByRole("form", { name: "Record a Transaction" }),
     ).toBeHidden();
     await expect(page.getByRole("region", { name: "Transfers" })).toBeHidden();
   };

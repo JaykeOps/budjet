@@ -21,7 +21,7 @@ import {
   editTransaction,
   recordTransaction,
 } from "./commands";
-import { accountTransactionList, accountTransactions, payees } from "./index";
+import { accountTransactions, payees, transactionList } from "./index";
 import type { TransactionDeleted, TransactionEdited } from "./records";
 
 /** A Budget in USD with one Account ("checking") and one Category ("groceries"). */
@@ -57,8 +57,11 @@ function budget() {
     writer,
     changeLog,
     transactions: () => accountTransactions(changeLog.readAll(), "checking"),
+    /** Checking's list, without the Opening Balance every list ends with. */
     transactionList: () =>
-      accountTransactionList(changeLog.readAll(), "checking"),
+      transactionList(changeLog.readAll(), "checking").filter(
+        ({ kind }) => kind !== "opening-balance",
+      ),
     payees: () => payees(changeLog.readAll()),
   };
 }
@@ -423,7 +426,7 @@ describe("Transactions", () => {
     ]);
   });
 
-  it("lists an Account's Transfers among its Transactions, signed for that Account", () => {
+  it("lists an Account's Transfers among its Transactions", () => {
     const { writer, transactionList } = budget();
     const transfer = (
       id: string,
@@ -464,8 +467,9 @@ describe("Transactions", () => {
         kind: "transfer",
         id: "from-savings",
         date: "2026-10-20",
+        fromAccountId: "savings",
+        toAccountId: "checking",
         amount: money(5000, "USD"),
-        otherAccountId: "savings",
       },
       {
         kind: "transaction",
@@ -479,8 +483,9 @@ describe("Transactions", () => {
         kind: "transfer",
         id: "to-savings",
         date: "2026-10-12",
-        amount: money(-20000, "USD"),
-        otherAccountId: "savings",
+        fromAccountId: "checking",
+        toAccountId: "savings",
+        amount: money(20000, "USD"),
         memo: "Rainy day",
       },
     ]);
@@ -508,8 +513,10 @@ describe("Transactions", () => {
       {
         kind: "adjustment",
         id: redeclared.id,
+        accountId: "checking",
         date: "2100-01-14",
         amount: money(-450, "USD"),
+        balance: money(95000, "USD"),
       },
     ]);
   });
@@ -528,6 +535,7 @@ describe("Transactions", () => {
       {
         kind: "balance-check",
         id: checked.id,
+        accountId: "checking",
         date: "2100-01-14",
         balance: money(100000, "USD"),
       },
