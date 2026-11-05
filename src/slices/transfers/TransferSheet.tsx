@@ -160,7 +160,10 @@ function TransferForm({
             {formatMoney(balanceAfter(to, amount.minorUnits, editing))}.
           </p>
         )}
-        <p>Ready to Assign stays as it is.</p>
+        <p>
+          A Transfer moves money between your Accounts. Your Categories and
+          Ready to Assign don't change.
+        </p>
       </div>
       {error && <p role="alert">{error}</p>}
       <button type="submit" disabled={!amount || !to}>

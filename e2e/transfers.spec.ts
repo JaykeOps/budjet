@@ -19,7 +19,7 @@ async function createBudgetWithSavings(page: Page) {
   await addAccount(page, { name: "Savings", kind: "Savings", holds: "500" });
 }
 
-test("the Transfer sheet shows both balances after and that Ready to Assign stays", async ({
+test("the Transfer sheet shows both balances after and that Categories and Ready to Assign stay", async ({
   page,
 }) => {
   await createBudgetWithSavings(page);
@@ -32,7 +32,7 @@ test("the Transfer sheet shows both balances after and that Ready to Assign stay
   );
   await expect(sheet.getByLabel("Date")).toHaveValue("2026-10-15");
   await expect(
-    sheet.getByText("Ready to Assign stays as it is."),
+    sheet.getByText("Your Categories and Ready to Assign don't change."),
   ).toBeVisible();
   await expect(sheet.getByRole("button", { name: /^Transfer/ })).toBeDisabled();
 
