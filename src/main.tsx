@@ -7,6 +7,7 @@ import { chooseFolder, hasFolderPicker } from "./first-run/browser";
 import { browserFolder, returningFolder } from "./kernel/browser-folder";
 import { createChangeLogWriter, type UnsavedReason } from "./kernel/change-log";
 import { openDataFolderChangeLog } from "./kernel/data-folder-change-log";
+import { scheduleFolderChecks } from "./kernel/folder-checks";
 import { reconnect, tryFolderOnReturn } from "./kernel/folder-on-return";
 import {
   openIndexedDbChangeLog,
@@ -31,18 +32,21 @@ await upgradeDatabase({
 
 // Every record is read from browser storage before the first render, so a
 // returning user opens straight into their Budget.
-const [{ changeLog, keepInFolder, folderConnection, returning }, deviceId] =
-  await Promise.all([
-    hasFolderPicker()
-      ? openFolderStorage()
-      : {
-          changeLog: await openIndexedDbChangeLog(),
-          keepInFolder: undefined,
-          folderConnection: undefined,
-          returning: undefined,
-        },
-    openIndexedDbDeviceId(),
-  ]);
+const [
+  { changeLog, keepInFolder, folderConnection, returning, checkFolder },
+  deviceId,
+] = await Promise.all([
+  hasFolderPicker()
+    ? openFolderStorage()
+    : {
+        changeLog: await openIndexedDbChangeLog(),
+        keepInFolder: undefined,
+        folderConnection: undefined,
+        returning: undefined,
+        checkFolder: undefined,
+      },
+  openIndexedDbDeviceId(),
+]);
 const writer = createChangeLogWriter(changeLog, deviceId);
 const reactRoot = createRoot(root);
 
@@ -56,6 +60,8 @@ function showApp() {
       />
     </StrictMode>,
   );
+  // Only now: a returning user is back in their folder by the time the app shows.
+  if (checkFolder) scheduleFolderChecks(checkFolder);
 }
 
 if (returning) {
@@ -106,7 +112,10 @@ async function openFolderStorage() {
       const folder = current;
       await reconnect(reason, {
         folder: returningFolder(folder),
-        retry: () => changeLog.keepInFolder(browserFolder(folder)),
+        retry: () => {
+          changeLog.returnToFolder(browserFolder(folder));
+          void changeLog.checkFolder("full");
+        },
         chooseFolder: () => chooseFolder(keepInFolder),
       });
     },
@@ -115,9 +124,15 @@ async function openFolderStorage() {
     handle && budget(changeLog.readAll())
       ? {
           folder: returningFolder(handle),
-          keepInIt: () => changeLog.keepInFolder(browserFolder(handle)),
+          keepInIt: () => changeLog.returnToFolder(browserFolder(handle)),
           keepInChosen: keepInFolder,
         }
       : undefined;
-  return { changeLog, keepInFolder, folderConnection, returning };
+  return {
+    changeLog,
+    keepInFolder,
+    folderConnection,
+    returning,
+    checkFolder: changeLog.checkFolder,
+  };
 }

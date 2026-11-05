@@ -139,7 +139,7 @@ describe("reconnecting while the Budget is open", () => {
       chooseFolder,
       options: {
         folder: returning,
-        retry: () => changeLog.keepInFolder(folder),
+        retry: () => changeLog.returnToFolder(folder),
         chooseFolder,
       },
     };

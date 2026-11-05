@@ -1,40 +1,31 @@
 import { expect, type Page, test } from "@playwright/test";
-import { createBudget, goTo } from "./helpers";
+import { addAccount, createBudget } from "./helpers";
 
 function rail(page: Page) {
   return page.getByRole("navigation", { name: "Places" });
-}
-
-async function addAccount(page: Page, name: string, openingBalance: string) {
-  const add = page.getByRole("form", { name: "Add an Account" });
-  await add.getByLabel("Name").fill(name);
-  await add.getByLabel("Opening Balance").fill(openingBalance);
-  await add.getByRole("button", { name: "Add Account" }).click();
 }
 
 test("the rail has Record, Budget, All Accounts with the total, each open Account with its balance, and + Add Account", async ({
   page,
 }) => {
   await createBudget(page);
-  await goTo(page, "Accounts");
-  await addAccount(page, "Savings", "500");
+  await addAccount(page, { name: "Savings", holds: "500" });
 
   const links = rail(page).getByRole("link");
-  await expect(links).toHaveCount(6);
+  await expect(links).toHaveCount(5);
   await expect(links.nth(0)).toHaveAccessibleName("Record");
   await expect(links.nth(1)).toHaveAccessibleName("Budget");
   await expect(links.nth(2)).toHaveAccessibleName("All Accounts $1,500.00");
   await expect(links.nth(3)).toHaveAccessibleName("Checking $1,000.00");
   await expect(links.nth(4)).toHaveAccessibleName("Savings $500.00");
-  await expect(links.nth(5)).toHaveAccessibleName("+ Add Account");
+  await expect(
+    rail(page).getByRole("button", { name: "+ Add Account" }),
+  ).toBeVisible();
 });
 
-test("an Account in the rail opens that Account's history", async ({
-  page,
-}) => {
+test("an Account in the rail opens that Account's page", async ({ page }) => {
   await createBudget(page);
-  await goTo(page, "Accounts");
-  await addAccount(page, "Savings", "500");
+  await addAccount(page, { name: "Savings", holds: "500" });
 
   const savings = rail(page).getByRole("link", { name: /^Savings/ });
   await savings.click();
@@ -52,13 +43,14 @@ test("closed Accounts fold away behind a Closed toggle that shows how many", asy
   page,
 }) => {
   await createBudget(page);
-  await goTo(page, "Accounts");
   const toggle = rail(page).getByRole("button", { name: /^Closed/ });
   await expect(toggle).toBeHidden();
 
-  await addAccount(page, "Old", "0");
+  await addAccount(page, { name: "Old" });
   const old = rail(page).getByRole("link", { name: /^Old/ });
   await expect(old).toBeVisible();
+  await page.getByRole("button", { name: /^More for Old/ }).click();
+  await page.getByRole("menuitem", { name: "Close Account" }).click();
   await page.getByRole("button", { name: "Close Old" }).click();
 
   await expect(old).toBeHidden();

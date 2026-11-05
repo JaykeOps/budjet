@@ -106,3 +106,23 @@ export async function lapseFolderAccessNow(page: Page): Promise<void> {
     };
   });
 }
+
+/** Puts a file in the `Crownkeep` subfolder the way a sync service would. */
+export async function deliverFile(
+  page: Page,
+  fileName: string,
+  text: string,
+): Promise<void> {
+  await page.evaluate(
+    async ({ folder, fileName, text }) => {
+      const root = await navigator.storage.getDirectory();
+      const picked = await root.getDirectoryHandle(folder);
+      const subfolder = await picked.getDirectoryHandle("Crownkeep");
+      const file = await subfolder.getFileHandle(fileName, { create: true });
+      const writable = await file.createWritable();
+      await writable.write(text);
+      await writable.close();
+    },
+    { folder: PICKED_FOLDER, fileName, text },
+  );
+}
