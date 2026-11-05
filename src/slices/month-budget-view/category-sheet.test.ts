@@ -29,6 +29,7 @@ function category(
     groupId: "group",
     groupName: "Group",
     lastMonth: usd(lastMonth),
+    nothingAssigned: false,
     row: categoryRow({
       carriedForward: usd(carriedForward),
       takenBack: usd(takenBack),

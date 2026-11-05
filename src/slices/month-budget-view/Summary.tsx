@@ -26,8 +26,13 @@ function readyToAssignLine(amount: Money, assigned: boolean): string {
     : "This is the money in your Accounts. Give each dollar a job.";
 }
 
+/** The line under Ready to Assign, saying what to do about it. */
+export function useReadyToAssignLine(amount: Money): string {
+  return readyToAssignLine(amount, useChangeLogQuery(anythingAssigned));
+}
+
 /** The Graphite card, the same in both schemes and at any amount. */
-export function ReadyToAssign() {
+export function ReadyToAssign({ onAssign }: { onAssign: () => void }) {
   const labelId = useId();
   const amount = useReadyToAssign();
   const assigned = useChangeLogQuery(anythingAssigned);
@@ -41,13 +46,22 @@ export function ReadyToAssign() {
           The money in your Accounts that doesn't have a job yet.
         </Hint>
       </p>
-      <div role="status" aria-labelledby={labelId}>
-        <strong className={styles.readyToAssignAmount}>
-          {formatMoney(amount)}
-        </strong>
-        <p className={styles.readyToAssignLine}>
-          {readyToAssignLine(amount, assigned)}
-        </p>
+      <div className={styles.readyToAssignFoot}>
+        <div role="status" aria-labelledby={labelId}>
+          <strong className={styles.readyToAssignAmount}>
+            {formatMoney(amount)}
+          </strong>
+          <p className={styles.readyToAssignLine}>
+            {readyToAssignLine(amount, assigned)}
+          </p>
+        </div>
+        <button
+          type="button"
+          className={styles.readyToAssignButton}
+          onClick={onAssign}
+        >
+          Assign
+        </button>
       </div>
     </div>
   );
