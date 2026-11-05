@@ -12,6 +12,8 @@ export type InMemoryFolder = Folder & {
   oneTabAtATime: OneTabAtATime;
   /** Makes each later append fail with this error's name, until cleared. */
   failWith(errorName: string | undefined): void;
+  /** Makes each later append to this one file fail with this error's name, until cleared. */
+  failAppending(fileName: string, errorName: string | undefined): void;
   appends(): number;
   /** Puts a file in place the way a sync service does. */
   deliver(fileName: string, text: string, lastModified?: number): void;
@@ -28,6 +30,7 @@ export function createInMemoryFolder(): InMemoryFolder {
   let failure: string | undefined;
   let appends = 0;
   const unreadable = new Map<string, string>();
+  const unwritable = new Map<string, string>();
   const modified = new Map<string, number>();
   let reads: string[] = [];
   let stamps: string[] = [];
@@ -43,11 +46,16 @@ export function createInMemoryFolder(): InMemoryFolder {
     failWith(errorName) {
       failure = errorName;
     },
+    failAppending(fileName, errorName) {
+      if (errorName) unwritable.set(fileName, errorName);
+      else unwritable.delete(fileName);
+    },
     appends: () => appends,
     async append(fileName, text) {
       const before = files.get(fileName) ?? "";
       await new Promise((resolve) => setTimeout(resolve));
-      if (failure) throw new DOMException("In-memory failure", failure);
+      const error = failure ?? unwritable.get(fileName);
+      if (error) throw new DOMException("In-memory failure", error);
       files.set(fileName, before + text);
       modified.set(fileName, Date.now());
       appends++;

@@ -168,12 +168,15 @@ export async function openDataFolderChangeLog({
   let writing = false;
   let writeAgain = false;
   let failure: UnsavedReason | undefined;
+  /** A sync service had a file, so its records wait for the next check, without a banner. */
+  let fileSkipped = false;
 
   const showSaveState = () => {
     const local = localCopy.saveState();
     if (local.status === "unsaved") saveState.set(local);
     else if (failure) saveState.set({ status: "unsaved", reason: failure });
-    else if (writing || local.status === "saving") saveState.set(SAVING);
+    else if (writing || fileSkipped || local.status === "saving")
+      saveState.set(SAVING);
     else saveState.set(SAVED);
   };
   localCopy.subscribeToSaveState(showSaveState);
@@ -185,8 +188,15 @@ export async function openDataFolderChangeLog({
    */
   async function writeUnwritten(to: Folder) {
     const records = await readUnwrittenRecords(database);
+    fileSkipped = false;
     for (const [fileName, inFile] of byFile(records)) {
-      await to.append(fileName, inFile.map(toLine).join(""));
+      try {
+        await to.append(fileName, inFile.map(toLine).join(""));
+      } catch (error) {
+        if (!isSyncServiceHolding(error)) throw error;
+        fileSkipped = true;
+        continue;
+      }
       await markWritten(
         database,
         inFile.map(({ id }) => id),
@@ -308,6 +318,7 @@ export async function openDataFolderChangeLog({
     },
     async checkFolder(scope, keepGoing = () => true) {
       if (!folder) return false;
+      if (fileSkipped) startWriting();
       const before = stamps;
       const changes = await readChanges(folder, scope, stamps, keepGoing);
       // The folder changed during the check, so what it found belongs to the old one.
@@ -385,6 +396,7 @@ export async function openDataFolderChangeLog({
       folder = chosen;
       stamps = found.stamps;
       failure = undefined;
+      fileSkipped = false;
       localCopy.replaceAll(found.records, stamps);
       showSaveState();
       return "replaced";
@@ -401,6 +413,7 @@ export async function openDataFolderChangeLog({
       folder = chosen;
       stamps = {};
       failure = undefined;
+      fileSkipped = false;
       localCopy.replaceAll([], stamps);
       showSaveState();
     },
@@ -508,6 +521,10 @@ async function removeAll(folder: Folder, fileNames: readonly string[]) {
   for (const fileName of fileNames) {
     await folder.remove(fileName).catch(() => {});
   }
+}
+
+function isSyncServiceHolding(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "NotReadableError";
 }
 
 function unsavedReason(error: unknown): UnsavedReason {
