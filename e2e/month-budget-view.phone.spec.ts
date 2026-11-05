@@ -77,7 +77,8 @@ test("each Category Group shows its Available subtotal, which can be negative", 
     category: "Groceries",
   });
 
-  await expect(page.getByRole("region", { name: "Everyday" })).toContainText(
+  const october = page.getByRole("region", { name: "October 2026" });
+  await expect(october.getByRole("region", { name: "Everyday" })).toContainText(
     /Available.*\$330\.50/,
   );
   await record(page, {
@@ -85,7 +86,7 @@ test("each Category Group shows its Available subtotal, which can be negative", 
     amount: "400",
     category: "Rent",
   });
-  await expect(page.getByRole("region", { name: "Bills" })).toContainText(
+  await expect(october.getByRole("region", { name: "Bills" })).toContainText(
     /Available.*−\$400\.00/,
   );
 });

@@ -348,13 +348,13 @@
   table-layout: fixed;
 }
 .assignedColumn {
-  width: 124px;
+  width: 112px;
 }
 .spendingColumn {
-  width: 180px;
+  width: 168px;
 }
 .availableColumn {
-  width: 124px;
+  width: 116px;
 }
 .table th,
 .table td {
