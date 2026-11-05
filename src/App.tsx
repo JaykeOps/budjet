@@ -17,6 +17,7 @@ import { useMonthInUrl } from "./month-in-url";
 import { NavigationShell } from "./NavigationShell";
 import { requestPersistentStorage } from "./persistent-storage";
 import { placeAddress, usePlace } from "./place-in-url";
+import { useRecordingRow } from "./RecordingRow";
 import { RecordMenu } from "./RecordMenu";
 import {
   AddAccountSheet,
@@ -39,7 +40,6 @@ import { TransactionsScreen } from "./slices/transactions";
 import {
   deleteTransaction,
   editTransaction,
-  recordTransaction,
 } from "./slices/transactions/commands";
 import { deleteTransfer, editTransfer } from "./slices/transfers/commands";
 import { Toasts, useToast } from "./ui/Toast";
@@ -125,6 +125,7 @@ function Shell({
   const place = usePlace();
   const toast = useToast();
   const [addingAccount, setAddingAccount] = useState(false);
+  const recording = useRecordingRow(budget.currency);
 
   if (accounts.length === 0) {
     return (
@@ -140,6 +141,8 @@ function Shell({
   return (
     <NavigationShell
       onAddAccount={() => setAddingAccount(true)}
+      onRecord={() => recording.start()}
+      recordButton={recording.recordButton}
       plus={<RecordMenu currency={budget.currency} />}
     >
       <Page titled={place === "activity"} folderConnection={folderConnection}>
@@ -166,7 +169,7 @@ function Shell({
         {place === "activity" && (
           <AccountTransactions
             currency={budget.currency}
-            onRecord={(input) => recordTransaction(writer, input)}
+            recordRow={recording.row}
             onEdit={(id, input) => editTransaction(writer, id, input)}
             onDelete={(id) => deleteTransaction(writer, id)}
             onDeleteRedeclaredBalance={(id) =>
@@ -180,6 +183,8 @@ function Shell({
           <AccountsPlace
             currency={budget.currency}
             onAddAccount={() => setAddingAccount(true)}
+            recordRow={recording.row}
+            onTransferInRow={recording.start}
           />
         )}
       </Page>

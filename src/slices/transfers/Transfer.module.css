@@ -16,3 +16,13 @@
 .note p {
   margin: 0;
 }
+
+.rowField {
+  display: flex;
+  min-width: 0;
+}
+.rowField input,
+.rowField select {
+  width: 100%;
+  min-width: 0;
+}

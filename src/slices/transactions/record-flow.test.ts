@@ -14,11 +14,14 @@ import type {
 import { recordTransaction } from "./commands";
 import { knownPayees } from "./queries";
 import {
+  afterThis,
   categoryChoices,
   type Draft,
   dayBefore,
   draftAmount,
   matchingPayees,
+  missingField,
+  nextDraft,
   withDirection,
   withPayee,
 } from "./record-flow";
@@ -277,5 +280,75 @@ describe("dayBefore", () => {
   it("crosses a Month and a year", () => {
     expect(dayBefore("2026-10-15")).toBe("2026-10-14");
     expect(dayBefore("2026-01-01")).toBe("2025-12-31");
+  });
+});
+
+describe("the row on desktop", () => {
+  const draft: Draft = {
+    direction: "out",
+    typed: "18.50",
+    categoryId: "groceries",
+    payee: "Corner Shop",
+    date: "2026-10-03",
+    accountId: "savings",
+  };
+
+  it("clears for the next one, keeping the date and Account", () => {
+    expect(nextDraft({ ...draft, direction: "in" })).toEqual({
+      direction: "out",
+      typed: "",
+      payee: "",
+      date: "2026-10-03",
+      accountId: "savings",
+    });
+  });
+
+  it("names the first field still missing, in the order the row has them", () => {
+    expect(missingField(draft, "USD")).toBeUndefined();
+    expect(missingField({ ...draft, typed: "0" }, "USD")).toBe("amount");
+    const { categoryId: _, ...withoutCategory } = draft;
+    expect(missingField(withoutCategory, "USD")).toBe("category");
+    expect(missingField({ ...withoutCategory, typed: "" }, "USD")).toBe(
+      "category",
+    );
+  });
+
+  it("needs no Category for money in, which goes to Ready to Assign", () => {
+    const { categoryId: _, ...withoutCategory } = draft;
+    expect(
+      missingField({ ...withoutCategory, direction: "in" }, "USD"),
+    ).toBeUndefined();
+  });
+
+  const choices = {
+    readyToAssign: money(5000, "USD"),
+    groups: [
+      {
+        id: "everyday",
+        name: "Everyday",
+        categories: [
+          { id: "groceries", name: "Groceries", available: money(2000, "USD") },
+        ],
+      },
+    ],
+  };
+
+  it("says what the chosen Category has after this", () => {
+    expect(afterThis(draft, "USD", choices)).toEqual({
+      name: "Groceries",
+      after: money(150, "USD"),
+    });
+    expect(afterThis({ ...draft, typed: "" }, "USD", choices)).toEqual({
+      name: "Groceries",
+      after: money(2000, "USD"),
+    });
+  });
+
+  it("says what Ready to Assign has after money in, and nothing until money out has a Category", () => {
+    const { categoryId: _, ...withoutCategory } = draft;
+    expect(
+      afterThis({ ...withoutCategory, direction: "in" }, "USD", choices),
+    ).toEqual({ name: "Ready to Assign", after: money(6850, "USD") });
+    expect(afterThis(withoutCategory, "USD", choices)).toBeUndefined();
   });
 });

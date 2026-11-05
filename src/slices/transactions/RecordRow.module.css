@@ -1,0 +1,170 @@
+.row {
+  position: sticky;
+  top: 12px;
+  z-index: 4;
+  display: flex;
+  flex-flow: column nowrap;
+  align-items: stretch;
+  gap: 10px;
+  margin-block: 0 16px;
+  padding: 14px;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+
+/* Recording is by keyboard, so a phone records from (+) instead. */
+@media (max-width: 719.98px) {
+  .row {
+    display: none;
+  }
+}
+
+.head,
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.back {
+  padding: 0;
+  box-shadow: none;
+  color: var(--link);
+  font-size: 13px;
+}
+
+.kinds {
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--raised);
+}
+
+.kind {
+  box-shadow: none;
+  color: var(--muted);
+}
+.kind[aria-pressed="true"] {
+  background: var(--card);
+  box-shadow: var(--depth-card);
+  color: var(--text);
+}
+
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.field input,
+.field select {
+  width: 100%;
+  min-width: 0;
+}
+
+.amount {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text);
+  font-size: 16px;
+}
+.amount[data-direction="in"] {
+  color: var(--available);
+}
+
+.sign {
+  flex: none;
+  width: 20px;
+  padding: 0;
+  box-shadow: none;
+  color: inherit;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.line {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.line strong {
+  color: var(--text);
+}
+.line strong[data-overspent="true"] {
+  color: var(--on-overspent-tint);
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.key {
+  font: inherit;
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+.option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.optionName {
+  min-width: 0;
+}
+
+.numbers {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pill {
+  padding: 2px 10px;
+  border-radius: var(--radius-control);
+  background: var(--available-tint);
+  color: var(--on-available-tint);
+  font-weight: 600;
+}
+.pill[data-state="zero"] {
+  background: var(--raised);
+  color: var(--muted);
+}
+.pill[data-state="overspent"] {
+  background: var(--overspent-tint);
+  color: var(--on-overspent-tint);
+}

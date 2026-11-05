@@ -1,4 +1,4 @@
-import { type MouseEvent, type ReactNode, useState } from "react";
+import { type MouseEvent, type ReactNode, type Ref, useState } from "react";
 import { formatMoney } from "./kernel/money";
 import { useChangeLogQuery } from "./kernel/use-change-log-query";
 import styles from "./NavigationShell.module.css";
@@ -10,16 +10,18 @@ import { pushAddress, useUrlParameter, useUrlSearch } from "./url-parameter";
  * The page's real navigation, around whatever place is showing: a floating tab
  * bar on a phone and a left rail on desktop. Which one shows is decided by
  * width alone, so both lead to the same places.
- *
- * Recording on desktop isn't rebuilt yet, so Record stands in by opening
- * Activity, where the Record a Transaction form is.
  */
 export function NavigationShell({
   onAddAccount,
+  onRecord,
+  recordButton,
   plus,
   children,
 }: {
   onAddAccount: () => void;
+  /** The rail's Record. */
+  onRecord: () => void;
+  recordButton: Ref<HTMLButtonElement>;
   /** The tab bar's (+). */
   plus: ReactNode;
   children: ReactNode;
@@ -31,7 +33,12 @@ export function NavigationShell({
   const here = { place, accountId: accountId ?? undefined };
   return (
     <div className={styles.shell}>
-      <Rail here={here} onAddAccount={onAddAccount} />
+      <Rail
+        here={here}
+        onAddAccount={onAddAccount}
+        onRecord={onRecord}
+        recordButton={recordButton}
+      />
       {children}
       <TabBar here={here} plus={plus} />
     </div>
@@ -43,9 +50,13 @@ type Here = { place: Place; accountId?: string };
 function Rail({
   here,
   onAddAccount,
+  onRecord,
+  recordButton,
 }: {
   here: Here;
   onAddAccount: () => void;
+  onRecord: () => void;
+  recordButton: Ref<HTMLButtonElement>;
 }) {
   const accounts = useAccounts();
   const total = useChangeLogQuery(accountsTotal);
@@ -57,13 +68,19 @@ function Rail({
 
   return (
     <nav className={styles.rail} aria-label="Places">
-      <PlaceLink
+      <button
+        ref={recordButton}
+        type="button"
         className={styles.record}
-        to={placeAddress("activity", here.accountId)}
+        aria-keyshortcuts="Alt+N"
+        onClick={onRecord}
       >
         <PlusIcon />
         Record
-      </PlaceLink>
+        <kbd aria-hidden className={styles.shortcut}>
+          Alt N
+        </kbd>
+      </button>
       <PlaceLink
         className={styles.railItem}
         to={placeAddress("budget")}

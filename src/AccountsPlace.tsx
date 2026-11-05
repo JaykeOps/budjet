@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { type Currency, formatMoney, type Money } from "./kernel/money";
 import { useChangeLogWriter } from "./kernel/use-change-log-query";
 import { placeAddress } from "./place-in-url";
+import { isDesktop } from "./RecordingRow";
 import {
   type Account,
   AccountPage,
@@ -20,13 +21,10 @@ import {
   editTransaction,
 } from "./slices/transactions/commands";
 import { type TransferDraft, TransferSheet } from "./slices/transfers";
-import {
-  deleteTransfer,
-  editTransfer,
-  makeTransfer,
-} from "./slices/transfers/commands";
+import { deleteTransfer, editTransfer } from "./slices/transfers/commands";
 import { useToast } from "./ui/Toast";
 import { pushAddress, useUrlParameter } from "./url-parameter";
+import { useRecordCommands } from "./use-record-commands";
 
 function go(address: string) {
   pushAddress(address);
@@ -42,16 +40,25 @@ function go(address: string) {
 export function AccountsPlace({
   currency,
   onAddAccount,
+  recordRow,
+  onTransferInRow,
 }: {
   currency: Currency;
   onAddAccount: () => void;
+  /** The row that records on desktop, if it's open. */
+  recordRow: ReactNode;
+  onTransferInRow: (draft: TransferDraft) => void;
 }) {
   const writer = useChangeLogWriter();
   const toast = useToast();
+  const commands = useRecordCommands();
   const accounts = useAccounts();
   const [accountId] = useUrlParameter("account");
   const [transfer, setTransfer] = useState<TransferDraft>();
   const account = accounts.find(({ id }) => id === accountId);
+  /** A phone moves money in a sheet, and desktop in the row above the history. */
+  const startTransfer = (draft: TransferDraft) =>
+    isDesktop() ? onTransferInRow(draft) : setTransfer(draft);
 
   const check = {
     onMatches({ id, name, balance }: Account) {
@@ -76,22 +83,25 @@ export function AccountsPlace({
         <AccountPage
           account={account}
           history={
-            <AccountHistory
-              account={account}
-              currency={currency}
-              onEdit={(id, input) => editTransaction(writer, id, input)}
-              onDelete={(id) => deleteTransaction(writer, id)}
-              onDeleteRedeclaredBalance={(id) =>
-                deleteRedeclaredBalance(writer, id)
-              }
-              onEditTransfer={(id, input) => editTransfer(writer, id, input)}
-              onDeleteTransfer={(id) => deleteTransfer(writer, id)}
-            />
+            <>
+              {!account.closed && recordRow}
+              <AccountHistory
+                account={account}
+                currency={currency}
+                onEdit={(id, input) => editTransaction(writer, id, input)}
+                onDelete={(id) => deleteTransaction(writer, id)}
+                onDeleteRedeclaredBalance={(id) =>
+                  deleteRedeclaredBalance(writer, id)
+                }
+                onEditTransfer={(id, input) => editTransfer(writer, id, input)}
+                onDeleteTransfer={(id) => deleteTransfer(writer, id)}
+              />
+            </>
           }
           onBack={() => go(placeAddress("accounts"))}
-          onTransfer={({ id }) => setTransfer({ fromAccountId: id })}
+          onTransfer={({ id }) => startTransfer({ fromAccountId: id })}
           onTransferOut={({ id, balance }) =>
-            setTransfer(
+            startTransfer(
               balance.minorUnits > 0
                 ? { fromAccountId: id, amount: balance }
                 : {
@@ -126,13 +136,7 @@ export function AccountsPlace({
         onClose={() => setTransfer(undefined)}
         currency={currency}
         draft={transfer ?? {}}
-        onSubmit={(input) => {
-          const id = makeTransfer(writer, input);
-          toast({
-            text: "Transfer made",
-            onUndo: () => deleteTransfer(writer, id),
-          });
-        }}
+        onSubmit={commands.transfer}
       />
     </>
   );
