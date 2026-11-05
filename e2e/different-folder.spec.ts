@@ -8,7 +8,14 @@ import {
   pickFolderNext,
   removeFolder,
 } from "./folder";
-import { budgetRow, createBudget, goTo, openApp, record } from "./helpers";
+import {
+  budgetRow,
+  createBudget,
+  expectCurrency,
+  goTo,
+  openApp,
+  record,
+} from "./helpers";
 import { folderWritesFinished } from "./reload";
 
 const OTHER_FOLDER = "their-folder";
@@ -124,7 +131,7 @@ test("the lost screen opens the same Budget where it was moved", async ({
   await button(page, "Choose a folder").click();
 
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in USD")).toBeVisible();
+  await expectCurrency(page, "USD");
   await expect(button(page, "Reconnect")).toHaveCount(0);
 });
 
@@ -148,11 +155,11 @@ test("all saved, a different Budget shows progress, then replaces the Local Copy
   await pickFolderNext(page, OTHER_FOLDER);
   await button(page, "Choose a folder").click();
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
 
   await page.reload();
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
 });
 
 test("Reconnect with unsaved changes refuses a different Budget until they're discarded", async ({
@@ -168,7 +175,7 @@ test("Reconnect with unsaved changes refuses a different Budget until they're di
 
   await button(page, "Discard my changes and open it").click();
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
   await expect(budgetRow(page, "Groceries")).toHaveCount(0);
   const files = await filesInFolder(page, OTHER_FOLDER);
   expect(files.map(({ text }) => text).join("")).not.toContain("-1234");
@@ -243,7 +250,7 @@ test("a background check finding a different Budget stops, naming the folder, an
   await button(page, "Choose a folder").click();
   await button(page, "Put my Budget here").click();
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in USD")).toBeVisible();
+  await expectCurrency(page, "USD");
   await folderWritesFinished(page);
   const written = (await filesInFolder(page, "clean"))
     .map(({ text }) => text)

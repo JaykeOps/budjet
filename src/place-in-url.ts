@@ -15,7 +15,7 @@ export function usePlace(): Place {
 /**
  * The address of a place, optionally on one Account and, for Activity, one
  * Month, from the address the user is at now. The Budget's Month stays, so
- * leaving the Budget doesn't lose it.
+ * leaving the Budget doesn't lose it. Edit mode doesn't: going anywhere ends it.
  */
 export function placeAddress(
   place: Place,
@@ -23,6 +23,7 @@ export function placeAddress(
   statementMonth?: string,
 ): string {
   const url = new URL(window.location.href);
+  url.searchParams.delete("edit");
   if (place === "budget") url.searchParams.delete("place");
   else url.searchParams.set("place", place);
   if (accountId) url.searchParams.set("account", accountId);

@@ -6,7 +6,14 @@ import {
   filesInFolder,
   putAnotherBudgetInFolder,
 } from "./folder";
-import { addAccount, createBudget, goTo, hasRail, openApp } from "./helpers";
+import {
+  addAccount,
+  createBudget,
+  expectCurrency,
+  goTo,
+  hasRail,
+  openApp,
+} from "./helpers";
 import { folderWritesFinished, reloadWhenSaved } from "./reload";
 
 const button = (page: Page, name: string) =>
@@ -56,7 +63,7 @@ test("first run asks for a folder, and a new Budget lives there and survives a r
   await reloadWhenSaved(page);
 
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
 
   const files = await filesInFolder(page);
   expect(files).toHaveLength(1);

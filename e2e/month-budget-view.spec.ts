@@ -7,6 +7,7 @@ import {
   createBudget,
   expectAssigned,
   goTo,
+  hideCategory,
   record,
 } from "./helpers";
 import { reloadWhenSaved } from "./reload";
@@ -29,7 +30,6 @@ test("the Budget opens on the current Month with every Category in its Category 
 }) => {
   await createBudget(page, { firstAccount: { openingBalance: "0" } });
   await goTo(page, "Budget");
-  await page.getByRole("button", { name: "Move Savings up" }).click();
 
   const expectOutline = () =>
     expect
@@ -40,12 +40,12 @@ test("the Budget opens on the current Month with every Category in its Category 
         "Power",
         "Phone",
         "Internet",
-        "Savings",
-        "Emergency Fund",
         "Everyday",
         "Groceries",
         "Transport",
         "Dining Out",
+        "Savings",
+        "Emergency Fund",
       ]);
   await expect(monthHeading(page, "October 2026")).toBeVisible();
   await expectOutline();
@@ -290,7 +290,7 @@ test("a hidden Category's Group doesn't show once nothing in it does", async ({
 }) => {
   await createBudget(page, { firstAccount: { openingBalance: "1000" } });
   await goTo(page, "Budget");
-  await page.getByRole("button", { name: "Hide Emergency Fund" }).click();
+  await hideCategory(page, "Emergency Fund");
 
   await expect.poll(() => budgetOutline(page)).not.toContain("Savings");
 });

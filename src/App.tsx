@@ -5,6 +5,7 @@ import {
   useState,
 } from "react";
 import { AccountsPlace } from "./AccountsPlace";
+import { useCategoryChanges } from "./category-changes";
 import { FolderBanner, type FolderConnection } from "./FolderBanner";
 import { FirstRun } from "./first-run/FirstRun";
 import type { ChangeLogWriter } from "./kernel/change-log";
@@ -30,7 +31,7 @@ import {
   setAssignment,
 } from "./slices/assignments/commands";
 import { type Budget, useBudget } from "./slices/budget-setup";
-import { CategoryList, categoryGroups } from "./slices/categories";
+import { categoryGroups } from "./slices/categories";
 import { MoveIntoFolderOffer } from "./slices/data-folder";
 import { MonthBudget } from "./slices/month-budget-view";
 import { TransactionsScreen } from "./slices/transactions";
@@ -164,24 +165,18 @@ function Shell({
       <Page titled={place === "activity"} folderConnection={folderConnection}>
         {folderOffer && <MoveIntoFolderOffer {...folderOffer} />}
         {place === "budget" && (
-          <>
-            <BudgetMonth
-              firstMonth={budget.firstMonth}
-              currency={budget.currency}
-              onAssign={(input) => setAssignment(writer, input)}
-              onCopyLastMonth={(month, unticked) =>
-                copyLastMonth(writer, {
-                  month,
-                  skipping: [...hiddenCategoryIds(writer), ...unticked],
-                })
-              }
-              onMoveMoney={(input) => moveMoney(writer, input)}
-            />
-            <section aria-label="Manage Categories">
-              <p>Kept in {budget.currency}.</p>
-              <CategoryList />
-            </section>
-          </>
+          <BudgetMonth
+            firstMonth={budget.firstMonth}
+            currency={budget.currency}
+            onAssign={(input) => setAssignment(writer, input)}
+            onCopyLastMonth={(month, unticked) =>
+              copyLastMonth(writer, {
+                month,
+                skipping: [...hiddenCategoryIds(writer), ...unticked],
+              })
+            }
+            onMoveMoney={(input) => moveMoney(writer, input)}
+          />
         )}
         {place === "activity" && (
           <AccountTransactions
@@ -241,17 +236,25 @@ function hiddenCategoryIds(writer: ChangeLogWriter): string[] {
     .map(({ id }) => id);
 }
 
-/** The Month Budget view for the Month in the address bar. */
+/** The Month Budget view for the Month in the address bar, and whether Edit is on (`?edit=on`). */
 function BudgetMonth({
   firstMonth,
   ...props
-}: Omit<ComponentProps<typeof MonthBudget>, "month" | "onMonthChange">) {
+}: Omit<
+  ComponentProps<typeof MonthBudget>,
+  "month" | "onMonthChange" | "editing" | "onEditingChange" | "categoryChanges"
+>) {
   const [month, setMonth] = useMonthInUrl(firstMonth);
+  const [edit, setEdit] = useUrlParameter("edit");
+  const categoryChanges = useCategoryChanges();
   return (
     <MonthBudget
       month={month}
       firstMonth={firstMonth}
       onMonthChange={setMonth}
+      editing={edit === "on"}
+      onEditingChange={(on) => setEdit(on ? "on" : "off", "push")}
+      categoryChanges={categoryChanges}
       {...props}
     />
   );
