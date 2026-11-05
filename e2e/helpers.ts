@@ -366,6 +366,25 @@ export async function assign(
   await closeSheet(sheet);
 }
 
+/**
+ * Opens Copy last Month's preview: the header's button on desktop, the Assign
+ * walk's opening offer on a phone. Returns the sheet holding it.
+ */
+export async function openCopyPreview(page: Page): Promise<Locator> {
+  const open = hasAssignedColumn(page)
+    ? page.getByRole("button", { name: "Copy last Month" })
+    : page.getByRole("button", { name: "Assign", exact: true });
+  await open.click();
+  return page.getByRole("dialog", { name: /^(Copy|Assign) / });
+}
+
+/** Copies everything Copy last Month offers and leaves the sheet. */
+export async function copyLastMonth(page: Page): Promise<void> {
+  const sheet = await openCopyPreview(page);
+  await sheet.getByRole("button", { name: /^Copy \d+ Assignments?$/ }).click();
+  await closeSheet(sheet);
+}
+
 /** Checks a Category's Assignment in the Month showing, written like "$1,100.00". */
 export async function expectAssigned(
   page: Page,

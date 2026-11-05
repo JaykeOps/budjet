@@ -116,13 +116,52 @@ export async function deliverFile(
   await page.evaluate(
     async ({ folder, fileName, text }) => {
       const root = await navigator.storage.getDirectory();
-      const picked = await root.getDirectoryHandle(folder);
-      const subfolder = await picked.getDirectoryHandle("Crownkeep");
+      const picked = await root.getDirectoryHandle(folder, { create: true });
+      const subfolder = await picked.getDirectoryHandle("Crownkeep", {
+        create: true,
+      });
       const file = await subfolder.getFileHandle(fileName, { create: true });
       const writable = await file.createWritable();
       await writable.write(text);
       await writable.close();
     },
     { folder: PICKED_FOLDER, fileName, text },
+  );
+}
+
+/**
+ * Makes reading stop for good on this page after one whole file. Checking a file
+ * and reading it each open it once, so the third opening never finishes.
+ */
+export async function holdReadingAfterOneFile(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const getFile = FileSystemFileHandle.prototype.getFile;
+    let opened = 0;
+    FileSystemFileHandle.prototype.getFile = function () {
+      opened++;
+      return opened > 2 ? new Promise(() => {}) : getFile.call(this);
+    };
+  });
+}
+
+/** Empties the Local Copy, leaving the remembered folder. */
+export async function clearLocalCopy(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const opening = indexedDB.open("budjet");
+        opening.onerror = () => reject(opening.error);
+        opening.onsuccess = () => {
+          const transaction = opening.result.transaction(
+            "records",
+            "readwrite",
+          );
+          transaction.objectStore("records").clear();
+          transaction.oncomplete = () => {
+            opening.result.close();
+            resolve();
+          };
+        };
+      }),
   );
 }

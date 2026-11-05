@@ -24,6 +24,8 @@ export type SheetCategory = {
   row: CategoryRow;
   /** Its Assignment in the Month before. */
   lastMonth: Money;
+  /** Whether no Assignment has been set this Month, not even one of zero. */
+  nothingAssigned: boolean;
 };
 
 export type SheetBudget = {
@@ -49,6 +51,7 @@ export function useSheetBudget(of: Month, currency: Currency): SheetBudget {
                 groupName: group.name,
                 row: categoryRowIn(records, id, of, currency),
                 lastMonth: assignment(records, id, previousMonth(of)) ?? zero,
+                nothingAssigned: assignment(records, id, of) === undefined,
               })),
           ),
         };

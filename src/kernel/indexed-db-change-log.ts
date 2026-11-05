@@ -14,7 +14,7 @@ import {
   SAVED,
   SAVING,
 } from "./change-log";
-import type { FileStamps } from "./folder-checks";
+import type { FileStamp, FileStamps } from "./folder-checks";
 
 const DATABASE = "budjet";
 const RECORDS = "records";
@@ -24,6 +24,8 @@ const DEVICE = "device";
 const DEVICE_ID = "id";
 const FOLDER_HANDLE = "folder";
 const FILE_STAMPS = "file-stamps";
+/** Each file a full read has got through, apart from the records until it finishes. */
+const FILES_READ = "files-read";
 
 export async function openIndexedDbChangeLog({
   indexedDB = globalThis.indexedDB,
@@ -57,7 +59,15 @@ export type LocalCopy = ChangeLog & {
    * over once its records are stored.
    */
   mergeFromFolder(records: readonly ChangeRecord[], stamps: FileStamps): void;
+  /**
+   * Adds everything a full read found, all in one transaction with forgetting
+   * the files it kept, so a Budget only ever arrives whole.
+   */
+  finishFullRead(records: readonly ChangeRecord[], stamps: FileStamps): void;
 };
+
+/** A file a full read got through. With no stamp, it wasn't whole, so it's read again. */
+export type FileRead = { stamp?: FileStamp; records: ChangeRecord[] };
 
 /**
  * The records in browser storage, served from memory. Appended records are also
@@ -79,12 +89,14 @@ export async function openLocalCopy(
     records: readonly ChangeRecord[],
     hold: boolean,
     stamps?: FileStamps,
+    finishingFullRead = false,
   ) {
     const transaction = database.transaction(
-      [RECORDS, UNWRITTEN, DEVICE],
+      [RECORDS, UNWRITTEN, DEVICE, FILES_READ],
       "readwrite",
     );
     if (stamps) transaction.objectStore(DEVICE).put(stamps, FILE_STAMPS);
+    if (finishingFullRead) transaction.objectStore(FILES_READ).clear();
     for (const record of records) {
       const payload = toPayload(record);
       transaction.objectStore(RECORDS).put(payload, record.id);
@@ -122,6 +134,11 @@ export async function openLocalCopy(
       put(added, false, stamps);
       if (added.length > 0) inMemory.append(added);
     },
+    finishFullRead(arriving, stamps) {
+      const added = recordsToMerge(inMemory.readAll(), arriving);
+      put(added, false, stamps, true);
+      if (added.length > 0) inMemory.append(added);
+    },
     readAll: inMemory.readAll,
     subscribe: inMemory.subscribe,
     saveState: saveState.get,
@@ -138,6 +155,51 @@ export function readFileStamps(database: IDBDatabase): Promise<FileStamps> {
       .get(FILE_STAMPS);
     reading.onsuccess = () => resolve(reading.result ?? {});
     reading.onerror = () => reject(reading.error);
+  });
+}
+
+/** The files a full read has got through so far, in any tab or earlier visit. */
+export function readFilesRead(
+  database: IDBDatabase,
+): Promise<Map<string, FileRead>> {
+  return new Promise((resolve, reject) => {
+    const files = new Map<string, FileRead>();
+    const reading = database.transaction(FILES_READ).objectStore(FILES_READ);
+    const cursor = reading.openCursor();
+    cursor.onsuccess = () => {
+      if (!cursor.result) return resolve(files);
+      const { stamp, payload } = cursor.result.value;
+      files.set(String(cursor.result.key), {
+        stamp,
+        records: JSON.parse(payload),
+      });
+      cursor.result.continue();
+    };
+    cursor.onerror = () => reject(cursor.error);
+  });
+}
+
+export function keepFileRead(
+  database: IDBDatabase,
+  fileName: string,
+  { stamp, records }: FileRead,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(FILES_READ, "readwrite");
+    transaction
+      .objectStore(FILES_READ)
+      .put({ stamp, payload: JSON.stringify(records) }, fileName);
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+export function forgetFilesRead(database: IDBDatabase): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(FILES_READ, "readwrite");
+    transaction.objectStore(FILES_READ).clear();
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = () => reject(transaction.error);
   });
 }
 
@@ -238,7 +300,7 @@ export function openDatabase(
   onBlocked?: () => void,
 ): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE, 3);
+    const request = indexedDB.open(DATABASE, 4);
     request.onupgradeneeded = ({ oldVersion }) => {
       // Each step builds on what earlier versions made, so saved records stay.
       if (oldVersion < 1) {
@@ -247,6 +309,7 @@ export function openDatabase(
       }
       if (oldVersion < 2) request.result.createObjectStore(DEVICE);
       if (oldVersion < 3) request.result.createObjectStore(UNWRITTEN);
+      if (oldVersion < 4) request.result.createObjectStore(FILES_READ);
     };
     request.onblocked = () => onBlocked?.();
     request.onsuccess = () => {
