@@ -350,14 +350,14 @@ function Choice({
   return (
     <button
       type="button"
-      aria-label={title}
       aria-describedby={detailId}
       aria-pressed={pressed}
       className={styles.choice}
       onClick={onClick}
     >
       <b>{title}</b>
-      <span id={detailId} className={styles.note}>
+      {/* Read as the description, so the name is the title the user sees first. */}
+      <span id={detailId} aria-hidden="true" className={styles.note}>
         {detail}
       </span>
     </button>
