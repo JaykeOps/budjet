@@ -5,6 +5,8 @@ import {
   deleteCategoryGroupWithUndo,
   deleteCategoryWithUndo,
   hideCategoryWithUndo,
+  moveCategoryGroupWithUndo,
+  moveCategoryWithUndo,
   moveThemAndDeleteWithUndo,
   renameCategoryGroupWithUndo,
   renameCategoryWithUndo,
@@ -18,7 +20,11 @@ import {
 } from "./kernel/change-log";
 import { createBudget } from "./slices/budget-setup/commands";
 import { categoryGroups } from "./slices/categories";
-import { addStarterSet, deleteCategory } from "./slices/categories/commands";
+import {
+  addStarterSet,
+  deleteCategory,
+  deleteCategoryGroup,
+} from "./slices/categories/commands";
 
 let writer: ChangeLogWriter;
 
@@ -202,5 +208,53 @@ describe("Move them and delete", () => {
     expect(undo).toThrow();
 
     expect(outline()).toEqual(before);
+  });
+});
+
+describe("undoing a move", () => {
+  it("puts a Category back in its Category Group and place", () => {
+    const undo = moveCategoryWithUndo(writer, category("Rent").id, {
+      groupId: group("Everyday").id,
+      toIndex: 1,
+    });
+    expect(outline()).toEqual([
+      ["Bills", ["Power", "Phone", "Internet"]],
+      ["Everyday", ["Groceries", "Rent", "Transport", "Dining Out"]],
+      ["Savings", ["Emergency Fund"]],
+    ]);
+
+    undo();
+
+    expect(outline()).toEqual(starter);
+  });
+
+  it("puts a Category Group back in its place", () => {
+    const undo = moveCategoryGroupWithUndo(writer, group("Savings").id, {
+      toIndex: 0,
+    });
+    expect(outline().map(([name]) => name)).toEqual([
+      "Savings",
+      "Bills",
+      "Everyday",
+    ]);
+
+    undo();
+
+    expect(outline()).toEqual(starter);
+  });
+
+  it("refuses when another device deleted the Category Group it came from", () => {
+    const { id } = category("Emergency Fund");
+    const undo = moveCategoryWithUndo(writer, id, {
+      groupId: group("Bills").id,
+      toIndex: 0,
+    });
+    deleteCategoryGroup(writer, group("Savings").id);
+
+    expect(undo).toThrow();
+    expect(outline()[0]).toEqual([
+      "Bills",
+      ["Emergency Fund", "Rent", "Power", "Phone", "Internet"],
+    ]);
   });
 });

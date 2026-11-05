@@ -7,7 +7,12 @@ import { useMemo } from "react";
 import type { ChangeLogWriter } from "./kernel/change-log";
 import { currentMonth } from "./kernel/month";
 import { useChangeLogWriter } from "./kernel/use-change-log-query";
-import { type CategoryChanges, categoryGroups } from "./slices/categories";
+import {
+  type CategoryChanges,
+  categoryGroups,
+  categoryPlace,
+  groupPlace,
+} from "./slices/categories";
 import {
   createCategory,
   createCategoryGroup,
@@ -178,6 +183,29 @@ export function moveThemAndDeleteWithUndo(
   };
 }
 
+/** Undoing puts it back where it was, as new records. */
+export function moveCategoryWithUndo(
+  writer: ChangeLogWriter,
+  categoryId: string,
+  to: { groupId: string; toIndex: number },
+): Undo {
+  const { group, index } = categoryNow(writer, categoryId);
+  moveCategory(writer, categoryId, to);
+  return () =>
+    moveCategory(writer, categoryId, { groupId: group.id, toIndex: index });
+}
+
+/** Undoing puts it back where it was, as new records. */
+export function moveCategoryGroupWithUndo(
+  writer: ChangeLogWriter,
+  groupId: string,
+  to: { toIndex: number },
+): Undo {
+  const { index } = groupNow(writer, groupId);
+  moveCategoryGroup(writer, groupId, to);
+  return () => moveCategoryGroup(writer, groupId, { toIndex: index });
+}
+
 /** Undoing writes the previous setting as a new record. */
 export function setSpentThisMonthWithUndo(
   writer: ChangeLogWriter,
@@ -249,6 +277,21 @@ export function useCategoryChanges(): CategoryChanges {
         toast({
           text: `Deleted ${name}`,
           onUndo: moveThemAndDeleteWithUndo(writer, id, toGroupId),
+        });
+      },
+      // Saying where it landed doubles as what a screen reader announces.
+      moveCategory({ id, name }, to) {
+        const onUndo = moveCategoryWithUndo(writer, id, to);
+        toast({
+          text: `${name}, ${categoryPlace(groupsNow(writer), id)}`,
+          onUndo,
+        });
+      },
+      moveGroup({ id, name }, toIndex) {
+        const onUndo = moveCategoryGroupWithUndo(writer, id, { toIndex });
+        toast({
+          text: `${name}, ${groupPlace(groupsNow(writer), id)}`,
+          onUndo,
         });
       },
       setLeftOut({ id, name }, leftOut) {

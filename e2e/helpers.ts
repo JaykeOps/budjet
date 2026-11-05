@@ -497,6 +497,40 @@ export async function openMore(page: Page, name: string): Promise<Locator> {
   return sheet;
 }
 
+/** The drag handle of a Category or Category Group in the editable list. */
+export function handleOf(page: Page, name: string): Locator {
+  return page.getByRole("button", { name: `Move ${name}.` });
+}
+
+/** Each Category Group's name and its Categories' names, in order, in the editable list. */
+export function editorOutline(page: Page): Promise<string[]> {
+  return page
+    .locator("section[aria-label]")
+    .evaluateAll((groups) =>
+      groups.flatMap((group) =>
+        [...group.querySelectorAll("input")]
+          .map((field) => field.value)
+          .filter((name) => name.length > 0),
+      ),
+    );
+}
+
+/** Drags with a mouse from a handle to over something else, in steps as a hand would. */
+export async function dragTo(
+  page: Page,
+  handle: Locator,
+  target: Locator,
+): Promise<void> {
+  await handle.hover();
+  await page.mouse.down();
+  const box = await target.boundingBox();
+  if (!box) throw new Error("Nowhere to drag to");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, {
+    steps: 8,
+  });
+  await page.mouse.up();
+}
+
 /** Hides a Category from the Budget, which ends up back on the Budget. */
 export async function hideCategory(page: Page, name: string): Promise<void> {
   await startEditing(page);

@@ -180,3 +180,68 @@
 .danger {
   color: var(--overspent);
 }
+
+.handle {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: grab;
+  user-select: none;
+  /* Without this a phone scrolls instead of dragging. */
+  touch-action: none;
+}
+.list[data-reordering="true"] {
+  cursor: grabbing;
+  user-select: none;
+}
+.list[data-reordering="true"] .handle {
+  cursor: grabbing;
+}
+.row[data-dragging="true"] {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+.group[data-dragging="true"] {
+  box-shadow:
+    0 0 0 2px var(--primary),
+    var(--depth-card);
+}
+
+.moves {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-block-end: 12px;
+}
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.where {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.step {
+  flex: none;
+  min-height: 44px;
+}
+.step[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 14px;
+}

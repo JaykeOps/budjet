@@ -3,6 +3,7 @@ import { useChangeLogQuery } from "../../kernel/use-change-log-query";
 import { type Category, type CategoryGroup, categoryGroups } from "./queries";
 
 export { type CategoryChanges, CategoryEditor } from "./CategoryEditor";
+export { categoryPlace, groupPlace } from "./reorder";
 export { type Category, type CategoryGroup, categoryGroups };
 
 export function useCategoryGroups(): CategoryGroup[] {

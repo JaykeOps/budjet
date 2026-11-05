@@ -4,6 +4,7 @@ import {
   assign,
   budgetOutline,
   createBudget,
+  editorOutline,
   expectCategoryOffered,
   finishEditing,
   goTo,
@@ -19,19 +20,6 @@ const button = (scope: Page | Locator, name: string) =>
 
 const nameField = (page: Page, name: string) =>
   page.getByRole("textbox", { name: `Name of ${name}`, exact: true });
-
-/** Each Category Group's name and its Categories' names, in order, in the editable list. */
-function editorOutline(page: Page) {
-  return page
-    .locator("section[aria-label]")
-    .evaluateAll((groups) =>
-      groups.flatMap((group) =>
-        [...group.querySelectorAll("input")]
-          .map((field) => field.value)
-          .filter((name) => name.length > 0),
-      ),
-    );
-}
 
 const starter = [
   "Bills",
