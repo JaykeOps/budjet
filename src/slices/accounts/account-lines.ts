@@ -6,9 +6,11 @@ export const KIND_LABELS: Record<AccountKind, string> = {
   cash: "Cash",
 };
 
-/** When the balance was last checked, such as "Checked Oct 18". */
+/** When the balance was last checked, such as "Checked Oct 18", or a nudge to start. */
 export function checkedLine(lastChecked: string | undefined): string {
-  if (!lastChecked) return "Not checked yet";
+  if (!lastChecked) {
+    return "Not checked yet. Now and then, see that this matches your bank.";
+  }
   const day = new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",

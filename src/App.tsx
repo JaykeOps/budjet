@@ -7,6 +7,7 @@ import {
 import { AccountsPlace } from "./AccountsPlace";
 import { useCategoryChanges } from "./category-changes";
 import { FolderBanner, type FolderConnection } from "./FolderBanner";
+import { useFirstCategoryChanges } from "./first-categories";
 import { FirstRun } from "./first-run/FirstRun";
 import type { ChangeLogWriter } from "./kernel/change-log";
 import { parseMonth } from "./kernel/month";
@@ -18,7 +19,7 @@ import { useMonthInUrl } from "./month-in-url";
 import { NavigationShell } from "./NavigationShell";
 import { requestPersistentStorage } from "./persistent-storage";
 import { placeAddress, usePlace } from "./place-in-url";
-import { RecordMenu } from "./RecordMenu";
+import { RecordingSheet, RecordMenu } from "./RecordMenu";
 import {
   AddAccountSheet,
   OpenAccountForm,
@@ -182,6 +183,7 @@ function Shell({
           <AccountTransactions
             currency={budget.currency}
             onRecord={(input) => recordTransaction(writer, input)}
+            onAddAccount={() => setAddingAccount(true)}
             {...historyChanges}
           />
         )}
@@ -210,21 +212,35 @@ function Shell({
 
 /** The Transactions screen for what the address bar says it's showing (`?account=<id>&statement=YYYY-MM`). */
 function AccountTransactions(
-  props: Omit<ComponentProps<typeof TransactionsScreen>, "showing" | "onShow">,
+  props: Omit<
+    ComponentProps<typeof TransactionsScreen>,
+    "showing" | "onShow" | "onRecordFirst"
+  >,
 ) {
   const [accountId] = useUrlParameter("account");
   const [statementMonth] = useUrlParameter("statement");
+  const [recording, setRecording] = useState<{ into?: string }>();
   return (
-    <TransactionsScreen
-      showing={{
-        accountId: accountId ?? undefined,
-        month: parseMonth(statementMonth),
-      }}
-      onShow={({ accountId, month }) =>
-        pushAddress(placeAddress("activity", accountId, month))
-      }
-      {...props}
-    />
+    <>
+      <TransactionsScreen
+        showing={{
+          accountId: accountId ?? undefined,
+          month: parseMonth(statementMonth),
+        }}
+        onShow={({ accountId, month }) =>
+          pushAddress(placeAddress("activity", accountId, month))
+        }
+        onRecordFirst={(into) => setRecording({ into })}
+        {...props}
+      />
+      {recording && (
+        <RecordingSheet
+          currency={props.currency}
+          defaultAccountId={recording.into}
+          onClose={() => setRecording(undefined)}
+        />
+      )}
+    </>
   );
 }
 
@@ -242,11 +258,17 @@ function BudgetMonth({
   ...props
 }: Omit<
   ComponentProps<typeof MonthBudget>,
-  "month" | "onMonthChange" | "editing" | "onEditingChange" | "categoryChanges"
+  | "month"
+  | "onMonthChange"
+  | "editing"
+  | "onEditingChange"
+  | "categoryChanges"
+  | "firstCategoryChanges"
 >) {
   const [month, setMonth] = useMonthInUrl(firstMonth);
   const [edit, setEdit] = useUrlParameter("edit");
   const categoryChanges = useCategoryChanges();
+  const firstCategoryChanges = useFirstCategoryChanges();
   return (
     <MonthBudget
       month={month}
@@ -255,6 +277,7 @@ function BudgetMonth({
       editing={edit === "on"}
       onEditingChange={(on) => setEdit(on ? "on" : "off", "push")}
       categoryChanges={categoryChanges}
+      firstCategoryChanges={firstCategoryChanges}
       {...props}
     />
   );

@@ -24,7 +24,9 @@ test("the Accounts tab has the total, then a card per Account leading with the c
   ).toBeVisible();
   await expect(card(page, "Everyday")).toContainText("$1,000.00");
   await expect(card(page, "Wallet")).toContainText("$50.25");
-  await expect(card(page, "Wallet")).toContainText("Not checked yet");
+  await expect(card(page, "Wallet")).toContainText(
+    "Not checked yet. Now and then, see that this matches your bank.",
+  );
 
   await page.clock.setFixedTime(new Date("2026-10-18T12:00:00"));
   await card(page, "Wallet")

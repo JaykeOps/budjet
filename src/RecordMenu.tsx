@@ -77,19 +77,10 @@ export function RecordMenu({ currency }: { currency: Currency }) {
         </Popover>
       </MenuTrigger>
       {opening === "transaction" && (
-        <RecordTransactionSheet
+        <RecordingSheet
           currency={currency}
           defaultAccountId={here?.id}
           onClose={() => setOpening(undefined)}
-          onRecord={(input) => {
-            const id = recordTransaction(writer, input);
-            const sign = input.amount.minorUnits > 0 ? "+" : "";
-            const payee = input.payee?.trim();
-            toast({
-              text: `Recorded ${sign}${formatMoney(input.amount)}${payee ? ` at ${payee}` : ""}`,
-              onUndo: () => deleteTransaction(writer, id),
-            });
-          }}
         />
       )}
       <TransferSheet
@@ -107,5 +98,35 @@ export function RecordMenu({ currency }: { currency: Currency }) {
         }}
       />
     </>
+  );
+}
+
+/** Records a Transaction and says what it did in a toast. */
+export function RecordingSheet({
+  currency,
+  defaultAccountId,
+  onClose,
+}: {
+  currency: Currency;
+  defaultAccountId?: string;
+  onClose: () => void;
+}) {
+  const writer = useChangeLogWriter();
+  const toast = useToast();
+  return (
+    <RecordTransactionSheet
+      currency={currency}
+      defaultAccountId={defaultAccountId}
+      onClose={onClose}
+      onRecord={(input) => {
+        const id = recordTransaction(writer, input);
+        const sign = input.amount.minorUnits > 0 ? "+" : "";
+        const payee = input.payee?.trim();
+        toast({
+          text: `Recorded ${sign}${formatMoney(input.amount)}${payee ? ` at ${payee}` : ""}`,
+          onUndo: () => deleteTransaction(writer, id),
+        });
+      }}
+    />
   );
 }

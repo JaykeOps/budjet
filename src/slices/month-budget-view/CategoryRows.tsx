@@ -25,6 +25,8 @@ export type RowsProps = {
   onError: (message: string | undefined) => void;
   onOpenCategory: (categoryId: string) => void;
   onAssignGroup: (group: CategoryGroup) => void;
+  /** The Category a newcomer starts at, highlighted until anything is assigned. */
+  coachedCategoryId?: string;
 };
 
 /** A phone's rows: one card per Category Group. */
@@ -75,11 +77,22 @@ function GroupList({
 
 type RowProps = RowsProps & { category: Category };
 
-function ListRow({ category, month, currency, onOpenCategory }: RowProps) {
+function ListRow({
+  category,
+  month,
+  currency,
+  onOpenCategory,
+  coachedCategoryId,
+}: RowProps) {
   const nameId = useId();
   const row = useCategoryRow(category.id, month, currency);
   return (
-    <li className={styles.row} data-state={row.state} aria-labelledby={nameId}>
+    <li
+      className={styles.row}
+      data-state={row.state}
+      data-coached={category.id === coachedCategoryId || undefined}
+      aria-labelledby={nameId}
+    >
       <Tile name={category.name} />
       <div className={styles.rowBody}>
         <div className={styles.rowTop}>
@@ -203,10 +216,15 @@ function TableRow({
   onAssign,
   onError,
   onOpenCategory,
+  coachedCategoryId,
 }: RowProps) {
   const row = useCategoryRow(category.id, month, currency);
   return (
-    <tr className={styles.tableRow} data-state={row.state}>
+    <tr
+      className={styles.tableRow}
+      data-state={row.state}
+      data-coached={category.id === coachedCategoryId || undefined}
+    >
       <th scope="row">
         <span className={styles.tableName}>
           <Tile name={category.name} />

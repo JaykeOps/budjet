@@ -364,6 +364,15 @@
 .row + .row {
   border-top: 1px solid var(--edge);
 }
+.row[data-coached],
+.tableRow[data-coached] {
+  --meter-track: var(--card);
+  background: var(--raised);
+}
+[data-coached] .tile,
+[data-coached] .pill[data-state="zero"] {
+  background: var(--card);
+}
 .row[data-state="overspent"],
 .tableRow[data-state="overspent"] {
   background: color-mix(in srgb, var(--overspent-tint) 60%, transparent);
@@ -488,4 +497,28 @@
 }
 .standIn form {
   margin: 0;
+}
+
+/* ---------- Empty and first screens ---------- */
+
+.coach {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--raised);
+  font-size: 13px;
+}
+.addCategory {
+  display: flex;
+  flex-flow: column nowrap;
+  align-items: stretch;
+  gap: 12px;
+  margin: 0;
+}
+.addCategoryField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
 }

@@ -10,6 +10,7 @@ function card(of: number, daily: [string, number][]): SpentThisMonth {
     spent: usd(daily.reduce((sum, [, dollars]) => sum + dollars, 0)),
     of: usd(of),
     daily: daily.map(([date, dollars]) => ({ date, spending: usd(dollars) })),
+    recorded: daily.length > 0,
   };
 }
 

@@ -6,13 +6,19 @@ import {
   nextMonth,
   previousMonth,
 } from "../../kernel/month";
-import { type CategoryChanges, CategoryEditor } from "../categories";
+import { useChangeLogQuery } from "../../kernel/use-change-log-query";
+import {
+  type CategoryChanges,
+  CategoryEditor,
+  useCategoryGroups,
+} from "../categories";
 import { AssignWalk, CopyLastMonth } from "./AssignWalk";
 import { CategoryLists, CategoryTables } from "./CategoryRows";
 import { CategorySheet, type SheetSteps } from "./CategorySheet";
 import styles from "./MonthBudget.module.css";
 import { type MoveInput, MoveMoneyForm } from "./MoveMoneyForm";
-import { ReadyToAssign, SpentThisMonthCard } from "./Summary";
+import { type FirstCategoryChanges, NoCategories } from "./NoCategories";
+import { anythingAssigned, ReadyToAssign, SpentThisMonthCard } from "./Summary";
 import { useWide } from "./use-wide";
 import { useVisibleCategoryGroups } from "./visible-categories";
 
@@ -26,7 +32,8 @@ export type MoveMoneyInput = MoveInput & { month: Month };
  * where the Month is kept and what assigning does; an error it throws is shown
  * on the screen. There is no stepping back past `firstMonth`. While `editing`,
  * the Category editor replaces the rows: only the list on a phone, and beside
- * Ready to Assign on desktop.
+ * Ready to Assign on desktop. With no Categories, an empty state replaces the
+ * rows; until anything is assigned, a note says where to start.
  */
 export function MonthBudget({
   month,
@@ -39,6 +46,7 @@ export function MonthBudget({
   editing,
   onEditingChange,
   categoryChanges,
+  firstCategoryChanges,
 }: {
   month: Month;
   firstMonth: Month;
@@ -51,11 +59,15 @@ export function MonthBudget({
   editing: boolean;
   onEditingChange: (editing: boolean) => void;
   categoryChanges: CategoryChanges;
+  firstCategoryChanges: FirstCategoryChanges;
 }) {
   const monthId = useId();
   const groups = useVisibleCategoryGroups().filter(
     ({ categories }) => categories.length > 0,
   );
+  const everyGroup = useCategoryGroups();
+  const assigned = useChangeLogQuery(anythingAssigned);
+  const coached = assigned ? undefined : groups[0]?.categories[0];
   const wide = useWide();
   const [error, setError] = useState<string>();
   const [steps, setSteps] = useState<SheetSteps>();
@@ -154,7 +166,24 @@ export function MonthBudget({
             <SpentThisMonthCard month={month} />
           </div>
           <div className={styles.groups}>
+            {everyGroup.every(({ categories }) => categories.length === 0) && (
+              <NoCategories
+                offerStarterSet={everyGroup.length === 0}
+                changes={firstCategoryChanges}
+                onAdded={() => onEditingChange(true)}
+                onError={setError}
+              />
+            )}
+            {coached && (
+              <p className={styles.coach}>
+                Start at the top with what's due soonest.{" "}
+                {wide
+                  ? `Type what ${coached.name} needs in its Assigned column.`
+                  : `Tap ${coached.name} and give it what it needs.`}
+              </p>
+            )}
             <Rows
+              coachedCategoryId={coached?.id}
               groups={groups}
               month={month}
               currency={currency}

@@ -4,6 +4,7 @@ export {
   MonthBudget,
   type MoveMoneyInput,
 } from "./MonthBudget";
+export type { FirstCategoryChanges } from "./NoCategories";
 export {
   type DailySpending,
   type SpentThisMonth,

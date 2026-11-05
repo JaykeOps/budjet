@@ -5,6 +5,7 @@ import {
   parseMoney,
   typedMoney,
 } from "../../kernel/money";
+import { EmptyState } from "../../ui/EmptyState";
 import type { MenuAction } from "../../ui/Menu";
 import { type Account, useAccounts } from "../accounts";
 import { type CategoryGroup, useCategoryGroups } from "../categories";
@@ -39,17 +40,23 @@ type HistoryActions = {
  * it is showing, with a form to record a Transaction and a way to change each
  * row, unless a closed Account is involved. The app shell keeps what's showing
  * and decides what recording, editing and deleting do; an error it throws is
- * shown on the form.
+ * shown on the form. Below the rows, an empty state says what to do next when
+ * there's no open Account or nothing but Opening Balances.
  */
 export function TransactionsScreen({
   showing,
   onShow,
   onRecord,
+  onRecordFirst,
+  onAddAccount,
   ...actions
 }: HistoryActions & {
   showing: Showing;
   onShow: (showing: Showing) => void;
   onRecord: (input: TransactionInput) => void;
+  /** The empty state's way to start recording, into the Account showing if any. */
+  onRecordFirst: (accountId?: string) => void;
+  onAddAccount: () => void;
 }) {
   const { currency } = actions;
   const headingId = useId();
@@ -63,6 +70,9 @@ export function TransactionsScreen({
   const rows = useRowChanges(actions);
 
   const recordInto = account ?? openAccounts.at(0);
+  const onlyOpeningBalances = all.every(({ entries }) =>
+    entries.every(({ kind }) => kind === "opening-balance"),
+  );
   return (
     <section aria-labelledby={headingId}>
       <h2 id={headingId}>
@@ -116,6 +126,37 @@ export function TransactionsScreen({
           actionsFor={rows.actionsFor}
           onOpen={rows.open}
         />
+      )}
+      {!account && openAccounts.length === 0 ? (
+        <EmptyState
+          plain
+          actions={
+            <button type="button" data-primary onClick={onAddAccount}>
+              Add an Account
+            </button>
+          }
+        >
+          Nothing here yet. Add an Account, and everything that moves through it
+          shows up here.
+        </EmptyState>
+      ) : (
+        !account?.closed &&
+        onlyOpeningBalances && (
+          <EmptyState
+            plain
+            actions={
+              <button
+                type="button"
+                data-primary
+                onClick={() => onRecordFirst(account?.id)}
+              >
+                Record a Transaction
+              </button>
+            }
+          >
+            Nothing recorded yet. Record what you spend, and it shows up here.
+          </EmptyState>
+        )
       )}
       {rows.sheets}
     </section>
