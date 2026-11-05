@@ -488,6 +488,18 @@ describe("Accounts", () => {
       expect(account()?.balance).toEqual(money(100000, "USD"));
     });
 
+    it("takes back a re-declaration by the id redeclaring returned", () => {
+      const { changeLog, writer, checking, account } = checkingAccount();
+
+      const id = redeclareBalance(writer, checking, {
+        balance: money(90000, "USD"),
+      });
+      deleteRedeclaredBalance(writer, id);
+
+      expect(adjustments(changeLog.readAll())).toEqual([]);
+      expect(account()?.balance).toEqual(money(100000, "USD"));
+    });
+
     it("removes a Balance check, moving nothing", () => {
       const { changeLog, writer, account, redeclare } = checkingAccount();
       const check = redeclare(18, 100000);

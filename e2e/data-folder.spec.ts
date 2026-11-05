@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { cancelNextFolderPicker, deliverFile, filesInFolder } from "./folder";
-import { createBudget, goTo, openApp } from "./helpers";
+import { addAccount, createBudget, goTo, hasRail, openApp } from "./helpers";
 import { folderWritesFinished, reloadWhenSaved } from "./reload";
 
 const button = (page: Page, name: string) =>
@@ -11,18 +11,6 @@ async function recordIdsInFolder(page: Page): Promise<string[]> {
     text.split("\n").filter(Boolean),
   );
   return lines.map((line) => JSON.parse(line).id);
-}
-
-async function addAccount(page: Page, name: string) {
-  const form = page.getByRole("form", { name: "Add an Account" });
-  await form.getByLabel("Name").fill(name);
-  await form.getByLabel(/Opening Balance/).fill("1");
-  await form.getByRole("button", { name: "Add Account" }).click();
-  await expect(
-    page
-      .getByRole("table", { name: "Accounts" })
-      .getByRole("row", { name: new RegExp(name) }),
-  ).toBeVisible();
 }
 
 test("first run asks for a folder, and a new Budget lives there and survives a reload", async ({
@@ -79,21 +67,20 @@ test("two tabs writing at once keep every record in the folder", async ({
   context,
 }) => {
   await createBudget(page);
-  await goTo(page, "Accounts");
   await folderWritesFinished(page);
   const other = await context.newPage();
   await other.goto("/");
-  await goTo(other, "Accounts");
 
   const addAccounts = async (tab: Page, prefix: string) => {
-    for (let i = 0; i < 8; i++) await addAccount(tab, `${prefix} ${i}`);
+    for (let i = 0; i < 8; i++) {
+      await addAccount(tab, { name: `${prefix} ${i}`, holds: "1" });
+    }
   };
   await Promise.all([addAccounts(page, "One"), addAccounts(other, "Other")]);
   await folderWritesFinished(page);
 
   await other.close();
   await reloadWhenSaved(page);
-  await goTo(page, "Accounts");
   const ids = await recordIdsInFolder(page);
   expect(new Set(ids).size).toBe(ids.length);
   const localIds = await page.evaluate(
@@ -122,7 +109,6 @@ test("another device's changes appear on opening and on regaining focus", async 
 }) => {
   await page.clock.install();
   await createBudget(page);
-  await goTo(page, "Accounts");
   await folderWritesFinished(page);
 
   const accountOpened = (await filesInFolder(page))
@@ -137,14 +123,20 @@ test("another device's changes appear on opening and on regaining focus", async 
       deviceId: "laptop",
       payload: { ...accountOpened.payload, name },
     })}\n`;
+  // In the rail on desktop, on the Accounts tab on a phone.
   const accountRow = (name: string) =>
     page
-      .getByRole("table", { name: "Accounts" })
-      .getByRole("row", { name: new RegExp(name) });
+      .getByRole("navigation", { name: "Places" })
+      .getByRole("link", { name: new RegExp(`^${name}\\b`) })
+      .or(
+        page
+          .getByRole("region", { name: "Accounts", exact: true })
+          .getByRole("region", { name }),
+      );
 
   await deliverFile(page, "any name at all", fromLaptop("Laptop savings"));
   await page.reload();
-  await goTo(page, "Accounts");
+  if (!hasRail(page)) await goTo(page, "Accounts");
   await expect(accountRow("Laptop savings")).toBeVisible();
 
   await deliverFile(page, "another name", fromLaptop("Laptop holiday"));
