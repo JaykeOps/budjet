@@ -299,10 +299,48 @@
   list-style: none;
 }
 .row {
+  position: relative;
   display: flex;
   gap: 12px;
   padding: 12px 16px;
 }
+.rowOpen,
+.tableOpen {
+  padding: 0;
+  box-shadow: none;
+  font-size: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+/* Over the row's bar, which is positioned too. */
+.rowOpen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.row .overspentNote > button,
+.row .hintButton {
+  position: relative;
+  z-index: 2;
+}
+.tableOpen:hover {
+  text-decoration: underline;
+}
+.coverIt {
+  padding: 4px 12px;
+  font-size: 13px;
+}
+.assignGroup {
+  min-height: 24px;
+  padding: 2px 0;
+  box-shadow: none;
+  color: var(--link);
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .row + .row {
   border-top: 1px solid var(--edge);
 }
@@ -323,17 +361,8 @@
   justify-content: space-between;
   gap: 12px;
 }
-.standInAssign {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
 .assignmentForm {
   margin: 0;
-}
-.standInAssign .assignmentForm {
-  width: 112px;
 }
 
 /* ---------- Category Groups on desktop ---------- */
@@ -387,6 +416,12 @@
   border: 0;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+.groupRow th {
+  font-weight: 400;
+}
+.groupRow th .assignGroup {
+  margin-top: 2px;
 }
 .groupRow td {
   color: var(--muted);

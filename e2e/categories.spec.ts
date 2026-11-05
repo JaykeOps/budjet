@@ -1,5 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
-import { budgetOutline, budgetRow, createBudget, goTo } from "./helpers";
+import {
+  assign,
+  budgetOutline,
+  budgetRow,
+  createBudget,
+  goTo,
+} from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 /** Each Category Group's name followed by its Categories' names, in order. */
@@ -77,10 +83,7 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
   const picker = page
     .getByRole("form", { name: "Record a Transaction" })
     .getByLabel("Category");
-  const assignRent = async (amount: string) => {
-    await page.getByLabel("Assignment for Rent").fill(amount);
-    await page.getByLabel("Assignment for Rent").press("Enter");
-  };
+  const assignRent = (amount: string) => assign(page, "Rent", amount);
 
   // Hiding is refused while Rent still has money Available.
   await assignRent("50");

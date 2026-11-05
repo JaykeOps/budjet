@@ -15,6 +15,11 @@ function aBrowser(folder: InMemoryFolder = createInMemoryFolder()) {
         folder,
         oneTabAtATime: folder.oneTabAtATime,
       }),
+    openTabWithoutItsFolder: () =>
+      openDataFolderChangeLog({
+        indexedDB,
+        oneTabAtATime: folder.oneTabAtATime,
+      }),
   };
 }
 
@@ -199,6 +204,28 @@ describe("writing to the Data Folder", () => {
     const reopened = await openTab();
     await settled(reopened);
 
+    expect(lines(folder.files.get("phone-2026-10.jsonl"))).toEqual([
+      record("a"),
+    ]);
+  });
+
+  it("waits for the folder on return, then writes what was held", async () => {
+    const { folder, openTab, openTabWithoutItsFolder } = aBrowser();
+    folder.failWith("NotAllowedError");
+    const changeLog = await openTab();
+    changeLog.append([record("a")]);
+    expect(await settled(changeLog)).toEqual({
+      status: "unsaved",
+      reason: "access-lapsed",
+    });
+    folder.failWith(undefined);
+
+    const returned = await openTabWithoutItsFolder();
+    expect(await settled(returned)).toEqual({ status: "saved" });
+    expect(folder.appends()).toBe(0);
+
+    returned.returnToFolder(folder);
+    await settled(returned);
     expect(lines(folder.files.get("phone-2026-10.jsonl"))).toEqual([
       record("a"),
     ]);
@@ -454,6 +481,21 @@ describe("checking the Data Folder for other devices' changes", () => {
     expect(await changeLog.checkFolder("full")).toBe(true);
     expect(folder.reads()).toEqual(["two.jsonl"]);
     expect(ids(changeLog).sort()).toEqual(["one", "two"]);
+  });
+
+  it("doesn't read unchanged files again on returning to the folder", async () => {
+    const { folder, openTab, openTabWithoutItsFolder } = aBrowser();
+    deliver(folder, "laptop.jsonl", [record("a")]);
+    await (await openTab()).checkFolder("full");
+    folder.clearReads();
+
+    const returned = await openTabWithoutItsFolder();
+    returned.returnToFolder(folder);
+    await settled(returned);
+    await returned.checkFolder("full");
+
+    expect(folder.reads()).toEqual([]);
+    expect(ids(returned)).toEqual(["a"]);
   });
 
   it("reads everything again from a newly chosen folder", async () => {

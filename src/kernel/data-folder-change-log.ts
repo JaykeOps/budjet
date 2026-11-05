@@ -44,8 +44,13 @@ export type OneTabAtATime = <Result>(
 ) => Promise<Result>;
 
 export type DataFolderChangeLog = ChangeLog & {
-  /** Writes from now on go to this folder, along with any held records. */
+  /** Writes from now on go to this newly chosen folder, along with any held records. */
   keepInFolder(folder: Folder): void;
+  /**
+   * The same, for the folder this Budget was already in, opened without it until
+   * the user is back. What the last check read there still counts.
+   */
+  returnToFolder(folder: Folder): void;
   /**
    * Merges what the folder holds that this Change Log doesn't. It stops between
    * files once `keepGoing` says so, and says whether it got through the folder.
@@ -138,6 +143,10 @@ export async function openDataFolderChangeLog({
       folder = chosen;
       stamps = {};
       localCopy.mergeFromFolder([], stamps);
+      startWriting();
+    },
+    returnToFolder(remembered) {
+      folder = remembered;
       startWriting();
     },
     async checkFolder(scope, keepGoing = () => true) {

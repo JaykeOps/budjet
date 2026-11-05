@@ -136,13 +136,71 @@ export async function record(
   await goTo(page, "Budget");
 }
 
+/** Whether this device has the desktop table, which is typed into directly. */
+function hasAssignedColumn(page: Page): boolean {
+  return (page.viewportSize()?.width ?? 0) >= 1180;
+}
+
+/** The Category sheet, however it was opened. */
+export function categorySheet(page: Page): Locator {
+  return page.getByRole("dialog", { name: /^(Categories|Assign )/ });
+}
+
+/** Opens the Category sheet at a Category, by its name in its row. */
+export async function openCategory(
+  page: Page,
+  category: string,
+): Promise<Locator> {
+  await budgetRow(page, category)
+    .getByRole("button", { name: category, exact: true })
+    .click();
+  return categorySheet(page);
+}
+
+/** Leaves the sheet, unless saving on the last Category has already closed it. */
+async function closeSheet(sheet: Locator): Promise<void> {
+  const close = sheet.getByRole("button", { name: "Close" });
+  if (await close.isVisible()) await close.click();
+}
+
 /** Gives a Category an Assignment in the Month showing. */
 export async function assign(
   page: Page,
   category: string,
   amount: string,
 ): Promise<void> {
-  const field = page.getByLabel(`Assignment for ${category}`);
+  if (hasAssignedColumn(page)) {
+    const field = page.getByLabel(`Assignment for ${category}`);
+    await field.fill(amount);
+    await field.press("Enter");
+    return;
+  }
+  const sheet = await openCategory(page, category);
+  // An Overspent Category can open on Another Category.
+  await sheet
+    .getByRole("button", { name: "Ready to Assign", exact: true })
+    .click();
+  const field = sheet.getByRole("textbox", { name: /^Assigned in / });
   await field.fill(amount);
   await field.press("Enter");
+  await closeSheet(sheet);
+}
+
+/** Checks a Category's Assignment in the Month showing, written like "$1,100.00". */
+export async function expectAssigned(
+  page: Page,
+  category: string,
+  amount: string,
+): Promise<void> {
+  if (hasAssignedColumn(page)) {
+    await expect(page.getByLabel(`Assignment for ${category}`)).toHaveValue(
+      amount.replace(/[$,]/g, ""),
+    );
+    return;
+  }
+  const sheet = await openCategory(page, category);
+  await expect(sheet).toContainText(
+    new RegExp(`Assigned in \\w+\\s*\\+ ${amount.replace(/[$.]/g, "\\$&")}`),
+  );
+  await closeSheet(sheet);
 }

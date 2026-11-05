@@ -48,6 +48,15 @@ export function monthName(of: Month, locale?: string): string {
   }).format(new Date(Date.UTC(year, monthNumber - 1, 1)));
 }
 
+/** A Month with no year, as in "Its October Assignment". */
+export function monthNameAlone(of: Month, locale?: string): string {
+  const [year, monthNumber] = parts(of);
+  return new Intl.DateTimeFormat(locale, {
+    month: "long",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, monthNumber - 1, 1)));
+}
+
 export function nextMonth(of: Month): Month {
   const [year, monthNumber] = parts(of);
   return monthNumber === 12 ? month(year + 1, 1) : month(year, monthNumber + 1);

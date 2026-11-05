@@ -1,4 +1,4 @@
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, type ReactNode, useId, useState } from "react";
 import {
   type Currency,
   formatMoney,
@@ -23,6 +23,8 @@ export type RowsProps = {
   currency: Currency;
   onAssign: (categoryId: string, amount: Money) => void;
   onError: (message: string | undefined) => void;
+  onOpenCategory: (categoryId: string) => void;
+  onAssignGroup: (group: CategoryGroup) => void;
 };
 
 /** A phone's rows: one card per Category Group. */
@@ -51,6 +53,7 @@ function GroupList({
         <h3 id={headingId} className={styles.groupName}>
           {group.name}
         </h3>
+        <AssignGroup group={group} onAssignGroup={props.onAssignGroup} />
         <span className={styles.groupAvailable}>
           Available <Hint term="Available">{availableHint}</Hint>{" "}
           <span>{available && formatMoney(available)}</span>
@@ -72,7 +75,7 @@ function GroupList({
 
 type RowProps = RowsProps & { category: Category };
 
-function ListRow({ category, month, currency, onAssign, onError }: RowProps) {
+function ListRow({ category, month, currency, onOpenCategory }: RowProps) {
   const nameId = useId();
   const row = useCategoryRow(category.id, month, currency);
   return (
@@ -80,31 +83,34 @@ function ListRow({ category, month, currency, onAssign, onError }: RowProps) {
       <Tile name={category.name} />
       <div className={styles.rowBody}>
         <div className={styles.rowTop}>
-          <span id={nameId} className={styles.name}>
+          {/* Stretched over the whole row, so tapping anywhere on it opens the sheet. */}
+          <button
+            id={nameId}
+            type="button"
+            className={styles.rowOpen}
+            onClick={() => onOpenCategory(category.id)}
+          >
             {category.name}
-          </span>
+          </button>
           <Pill row={row} />
         </div>
         <Meter name={category.name} row={row} />
         {row.state === "overspent" ? (
-          <OverspentNote name={category.name} row={row} />
+          <OverspentNote name={category.name} row={row}>
+            <button
+              type="button"
+              className={styles.coverIt}
+              onClick={() => onOpenCategory(category.id)}
+            >
+              Cover it
+            </button>
+          </OverspentNote>
         ) : (
           <p className={styles.small}>{row.note}</p>
         )}
         {row.takenBack.minorUnits !== 0 && (
           <p className={styles.small}>{row.carried}</p>
         )}
-        {/* Stands in until the Category sheet (#105) brings assigning to a phone. */}
-        <div className={styles.standInAssign}>
-          <span className={styles.small}>Assigned</span>
-          <AssignmentField
-            category={category}
-            assigned={row.assigned}
-            currency={currency}
-            onAssign={onAssign}
-            onError={onError}
-          />
-        </div>
       </div>
     </li>
   );
@@ -170,6 +176,7 @@ function GroupTable({
               <h3 id={headingId} className={styles.groupName}>
                 {group.name}
               </h3>
+              <AssignGroup group={group} onAssignGroup={props.onAssignGroup} />
             </th>
             <td>{assigned && formatMoney(assigned)}</td>
             <td>{spent && formatMoney(spent)}</td>
@@ -189,7 +196,14 @@ function GroupTable({
   );
 }
 
-function TableRow({ category, month, currency, onAssign, onError }: RowProps) {
+function TableRow({
+  category,
+  month,
+  currency,
+  onAssign,
+  onError,
+  onOpenCategory,
+}: RowProps) {
   const row = useCategoryRow(category.id, month, currency);
   return (
     <tr className={styles.tableRow} data-state={row.state}>
@@ -197,7 +211,13 @@ function TableRow({ category, month, currency, onAssign, onError }: RowProps) {
         <span className={styles.tableName}>
           <Tile name={category.name} />
           <span>
-            <span className={styles.name}>{category.name}</span>
+            <button
+              type="button"
+              className={styles.tableOpen}
+              onClick={() => onOpenCategory(category.id)}
+            >
+              {category.name}
+            </button>
             {row.carried && (
               <span className={styles.carried}>{row.carried}</span>
             )}
@@ -226,6 +246,21 @@ function TableRow({ category, month, currency, onAssign, onError }: RowProps) {
         <Pill row={row} />
       </td>
     </tr>
+  );
+}
+
+function AssignGroup({
+  group,
+  onAssignGroup,
+}: Pick<RowsProps, "onAssignGroup"> & { group: CategoryGroup }) {
+  return (
+    <button
+      type="button"
+      className={styles.assignGroup}
+      onClick={() => onAssignGroup(group)}
+    >
+      Assign {group.name}
+    </button>
   );
 }
 
@@ -264,10 +299,19 @@ function Meter({ name, row }: { name: string; row: CategoryRow }) {
   );
 }
 
-function OverspentNote({ name, row }: { name: string; row: CategoryRow }) {
+function OverspentNote({
+  name,
+  row,
+  children,
+}: {
+  name: string;
+  row: CategoryRow;
+  children?: ReactNode;
+}) {
   return (
     <span className={styles.overspentNote}>
       {row.note} <Hint term="Overspent">{overspentHint(name, row)}</Hint>
+      {children}
     </span>
   );
 }
