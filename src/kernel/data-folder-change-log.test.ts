@@ -631,6 +631,20 @@ describe("checking the Data Folder for other devices' changes", () => {
     expect((await openTab()).readAll()).toHaveLength(3);
   });
 
+  it("takes a failure found outside a write as unsaved, until a write succeeds", async () => {
+    const { openTab, folder } = aBrowser();
+    const changeLog = await openTab();
+
+    changeLog.folderFailed("folder-gone");
+    expect(changeLog.saveState()).toEqual({
+      status: "unsaved",
+      reason: "folder-gone",
+    });
+
+    changeLog.returnToFolder(folder);
+    await vi.waitFor(() => expect(changeLog.saveState()).toEqual(SAVED));
+  });
+
   it("skips a file it can't write for NotReadableError, writes the rest, and retries it on the next check", async () => {
     const { folder, openTab } = aBrowser();
     const changeLog = await openTab();

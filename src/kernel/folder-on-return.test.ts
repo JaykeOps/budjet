@@ -9,6 +9,7 @@ import {
   askToOpen,
   type ReturningFolder,
   reconnect,
+  timeBoxed,
   tryFolderOnReturn,
 } from "./folder-on-return";
 import { createInMemoryFolder, type InMemoryFolder } from "./in-memory-folder";
@@ -54,6 +55,80 @@ describe("returning to a remembered folder", () => {
     const folder = aFolder({ failures: ["NotReadableError"] });
 
     expect(await tryFolderOnReturn(folder)).toBe("open");
+  });
+});
+
+describe("a folder that takes its time answering", () => {
+  /** A folder whose `reach` answers only when told, with a time box that's up when told. */
+  function aSlowFolder() {
+    let answer: (failure?: string) => void = () => {};
+    let timeIsUp: () => void = () => {};
+    const onLateFailure = vi.fn();
+    const folder = timeBoxed(
+      {
+        ...aFolder(),
+        reach: () =>
+          new Promise<void>((resolve, reject) => {
+            answer = (failure) =>
+              failure
+                ? reject(new DOMException("Can't reach it", failure))
+                : resolve();
+          }),
+      },
+      onLateFailure,
+      () => new Promise((resolve) => (timeIsUp = resolve)),
+    );
+    return {
+      folder,
+      onLateFailure,
+      answer: (failure?: string) => answer(failure),
+      timeIsUp: () => timeIsUp(),
+    };
+  }
+
+  it("opens the Budget once the time is up, without an answer", async () => {
+    const { folder, timeIsUp } = aSlowFolder();
+
+    const onReturn = tryFolderOnReturn(folder);
+    timeIsUp();
+
+    expect(await onReturn).toBe("open");
+  });
+
+  it("keeps We can't find your folder for an answer in time", async () => {
+    const { folder, answer, onLateFailure } = aSlowFolder();
+
+    const onReturn = tryFolderOnReturn(folder);
+    answer("NotFoundError");
+
+    expect(await onReturn).toBe("lost");
+    expect(onLateFailure).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["NotFoundError", "folder-gone"],
+    ["NotAllowedError", "access-lapsed"],
+  ])("reports a late %s as %s", async (failure, reason) => {
+    const { folder, answer, timeIsUp, onLateFailure } = aSlowFolder();
+    const onReturn = tryFolderOnReturn(folder);
+    timeIsUp();
+    await onReturn;
+
+    answer(failure);
+
+    await vi.waitFor(() => expect(onLateFailure).toHaveBeenCalledWith(reason));
+  });
+
+  it("says nothing of a late answer that's fine", async () => {
+    const { folder, answer, timeIsUp, onLateFailure } = aSlowFolder();
+    const onReturn = tryFolderOnReturn(folder);
+    timeIsUp();
+    await onReturn;
+
+    answer();
+    await new Promise((resolve) => setTimeout(resolve));
+
+    expect(onLateFailure).not.toHaveBeenCalled();
   });
 });
 

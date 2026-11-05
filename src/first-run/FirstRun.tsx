@@ -186,14 +186,15 @@ export function Title({
 export function GettingYourBudget({
   progress,
 }: {
-  progress: FullReadProgress;
+  /** Absent until the folder has said what it holds. */
+  progress?: FullReadProgress;
 }) {
   return (
     <main className={styles.page}>
       <p className={styles.brand}>Crownkeep</p>
       <Title>Getting your Budget from your folder</Title>
       <p className={styles.lead} role="status">
-        {progress.read} of {progress.of}
+        {progress && `${progress.read} of ${progress.of}`}
       </p>
     </main>
   );

@@ -89,6 +89,47 @@ test("a lost folder is found by trying it, and choosing it again opens the Budge
   await expectCurrency(page, "USD");
 });
 
+test("a folder that doesn't answer doesn't hold the Budget back", async ({
+  page,
+}) => {
+  await createBudget(page);
+  await goTo(page, "Budget");
+  await folderWritesFinished(page);
+  await page.addInitScript(() => {
+    const entries = () => new Promise(() => {});
+    FileSystemDirectoryHandle.prototype.keys = () =>
+      ({ next: entries }) as never;
+  });
+  await page.reload();
+
+  await expect(places(page)).toBeVisible();
+  await expectCurrency(page, "USD");
+});
+
+test("a folder found gone after the Budget showed takes the banner", async ({
+  page,
+}) => {
+  await createBudget(page);
+  await goTo(page, "Budget");
+  await folderWritesFinished(page);
+  await page.addInitScript(() => {
+    const entries = () =>
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new DOMException("Gone", "NotFoundError")),
+          2000,
+        ),
+      );
+    FileSystemDirectoryHandle.prototype.keys = () =>
+      ({ next: entries }) as never;
+  });
+  await page.reload();
+
+  await expect(places(page)).toBeVisible();
+  await expect(page.getByText("Not saved to your folder yet")).toBeVisible();
+  await expect(button(page, "Reconnect")).toBeVisible();
+});
+
 for (const colorScheme of ["light", "dark"] as const) {
   test(`coming back to a folder has no serious accessibility violations in ${colorScheme}`, async ({
     page,

@@ -14,7 +14,11 @@ import {
   openDataFolderChangeLog,
 } from "./kernel/data-folder-change-log";
 import { scheduleFolderChecks } from "./kernel/folder-checks";
-import { reconnect, tryFolderOnReturn } from "./kernel/folder-on-return";
+import {
+  reconnect,
+  timeBoxed,
+  tryFolderOnReturn,
+} from "./kernel/folder-on-return";
 import {
   openIndexedDbChangeLog,
   openIndexedDbDeviceId,
@@ -112,6 +116,11 @@ if (returning) {
   const { folder, handle, readFolder, underway, choose, showTwoBudgets } =
     unread;
   const openFrom = async (from: FileSystemDirectoryHandle) => {
+    reactRoot.render(
+      <StrictMode>
+        <GettingYourBudget />
+      </StrictMode>,
+    );
     const opened = await readFolder(from, (progress) =>
       reactRoot.render(
         <StrictMode>
@@ -158,6 +167,9 @@ async function openFolderStorage() {
   });
   const handle = await rememberedFolderHandle();
   let current = handle;
+  // A folder that's slow to answer never holds the Budget back.
+  const comingBackTo = (from: FileSystemDirectoryHandle) =>
+    timeBoxed(returningFolder(from), changeLog.folderFailed);
   // Other tabs hold the old Budget in memory, so they start over.
   const budgetChanged = new BroadcastChannel("crownkeep-budget-changed");
   budgetChanged.onmessage = () => location.reload();
@@ -216,7 +228,7 @@ async function openFolderStorage() {
       if (!current) return;
       const folder = current;
       await reconnect(reason, {
-        folder: returningFolder(folder),
+        folder: comingBackTo(folder),
         retry: () => {
           changeLog.returnToFolder(browserFolder(folder));
           void changeLog.checkFolder("full");
@@ -249,7 +261,7 @@ async function openFolderStorage() {
     returning:
       handle && hasBudget
         ? {
-            folder: returningFolder(handle),
+            folder: comingBackTo(handle),
             keepInIt: () => changeLog.returnToFolder(browserFolder(handle)),
             choose,
           }
@@ -257,7 +269,7 @@ async function openFolderStorage() {
     unread:
       handle && !hasBudget
         ? {
-            folder: returningFolder(handle),
+            folder: comingBackTo(handle),
             handle,
             readFolder,
             underway: changeLog.fullReadUnderway,
