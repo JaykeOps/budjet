@@ -17,6 +17,52 @@ import {
 } from "react-aria-components";
 import styles from "./ComboBox.module.css";
 
+// [DEBUG-a4f2] temporary timeline
+function dbg(kind: string, data: Record<string, unknown> = {}) {
+  const w = window as unknown as { __diag?: string[] };
+  w.__diag ??= [];
+  const active = document.activeElement as HTMLElement | null;
+  w.__diag.push(
+    `${performance.now().toFixed(1)} ${kind} ${JSON.stringify(data)} active=${active?.getAttribute?.("aria-label") ?? active?.getAttribute?.("placeholder") ?? active?.tagName}`,
+  );
+}
+function snap(state: {
+  inputValue: string;
+  isOpen: boolean;
+  isFocused: boolean;
+  selectedKey: unknown;
+  collection: { size: number; getFirstKey(): unknown; getItem(k: never): unknown };
+  selectionManager: { focusedKey: unknown; isFocused: boolean };
+}) {
+  const fk = state.selectionManager.focusedKey;
+  return {
+    input: state.inputValue,
+    fk,
+    fkIn: fk == null ? null : !!state.collection.getItem(fk as never),
+    open: state.isOpen,
+    focused: state.isFocused,
+    sel: state.selectedKey,
+    size: state.collection.size,
+    first: state.collection.getFirstKey(),
+  };
+}
+if (typeof window !== "undefined") {
+  for (const type of ["focusin", "focusout", "input", "keydown", "submit"]) {
+    document.addEventListener(
+      type,
+      (e) => {
+        const t = e.target as HTMLElement & { value?: string };
+        dbg(`dom:${type}`, {
+          target: t.getAttribute?.("placeholder") ?? t.getAttribute?.("aria-label") ?? t.tagName,
+          value: t.value,
+          key: (e as KeyboardEvent).key,
+        });
+      },
+      true,
+    );
+  }
+}
+
 export type ComboBoxOption = {
   id: string;
   /** What typing matches, and what the field reads once it's chosen. */
@@ -62,6 +108,7 @@ export function ComboBox({
       className={styles.field}
       selectedKey={selectedId}
       onSelectionChange={(key) => {
+        dbg("onSelectionChange", { key, tabbing: tabbing.current, label });
         onSelect(key === null ? null : String(key));
         if (key !== null && !tabbing.current) onPicked?.();
       }}
@@ -119,6 +166,7 @@ function ComboBoxInput({
   tabbing: RefObject<boolean>;
 }) {
   const state = useContext(ComboBoxStateContext);
+  if (options && state) dbg("render", snap(state as never));
   return (
     <Input
       ref={inputRef}
@@ -126,6 +174,8 @@ function ComboBoxInput({
       placeholder={placeholder}
       onKeyDownCapture={(event) => {
         tabbing.current = event.key === "Tab";
+        if (options && state && event.key === "Enter")
+          dbg("ENTER", { ...snap(state as never), live: state.selectionManager.focusedKey });
         if (event.key !== "Enter" || !options || !state) return;
         if (state.isOpen && state.selectionManager.focusedKey !== null) return;
         const typed = state.inputValue.trim().toLowerCase();
@@ -148,12 +198,14 @@ function FirstOptionReady() {
   const typed = state?.inputValue;
   // biome-ignore lint/correctness/useExhaustiveDependencies: what's typed is what it runs on.
   useEffect(() => {
+    if (state) dbg("FOR effect", snap(state as never));
     if (!state?.isFocused || !state.isOpen || !typed) return;
     if (typed === state.selectedItem?.textValue) return;
     // After the state's own effect, which clears this whenever typing changes.
-    queueMicrotask(() =>
-      state.selectionManager.setFocusedKey(state.collection.getFirstKey()),
-    );
+    queueMicrotask(() => {
+      dbg("FOR microtask", { before: state.selectionManager.focusedKey, sets: state.collection.getFirstKey(), ...snap(state as never) });
+      state.selectionManager.setFocusedKey(state.collection.getFirstKey());
+    });
   }, [typed]);
   return null;
 }

@@ -113,6 +113,8 @@ export function RecordRow({
   }
 
   function submitTransaction() {
+    (window as unknown as { __diag?: string[]; __last?: unknown }).__last = draft;
+    (window as unknown as { __diag?: string[] }).__diag?.push(`${performance.now().toFixed(1)} SUBMIT ${JSON.stringify(draft)}`);
     const missing = missingField(draft, currency);
     if (missing === "category") return categoryField.current?.focus();
     const amount = draftAmount(draft, currency);

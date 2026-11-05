@@ -307,6 +307,9 @@ export async function enterTransaction(
 ): Promise<void> {
   if (hasRail(page)) {
     const row = await openRecordRow(page);
+    await page.evaluate(() => {
+      (window as unknown as { __diag: string[] }).__diag = [];
+    });
     const amountField = row.getByLabel("Amount");
     if (date) await row.getByLabel("Date").fill(date);
     await amountField.fill(amount);
@@ -328,6 +331,19 @@ export async function enterTransaction(
     if (account) await chooseAccount(row.getByLabel("Account"), account);
     await amountField.press("Enter");
     await expect(amountField).toHaveValue("");
+    // [DEBUG-a4f2]
+    if (money === "in" && category && category !== "Ready to Assign") {
+      const { log, last } = await page.evaluate(() => {
+        const w = window as unknown as { __diag: string[]; __last?: { categoryId?: string } };
+        return { log: w.__diag, last: w.__last };
+      });
+      const wrong = !last?.categoryId;
+      console.log(`[DEBUG-a4f2] ${wrong ? "WRONG" : "ok"} category=${category} last=${JSON.stringify(last)}`);
+      if (wrong || process.env.DIAG_ALL) {
+        for (const line of log) console.log(`[DEBUG-a4f2] ${line}`);
+        if (wrong) throw new Error("[DEBUG-a4f2] money in went to Ready to Assign");
+      }
+    }
     return;
   }
   const first = await startRecording(page);
