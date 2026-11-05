@@ -1,5 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
+import { violationsInEachTheme } from "./axe";
 import {
   clearLocalCopy,
   deliverFile,
@@ -92,9 +92,7 @@ test("a full read blocks with a count and no partial Budget, and leaving resumes
   await expect(page.getByRole("status")).toHaveText("1 of 2");
   await expect(page.getByRole("button")).toHaveCount(0);
   await expect(page.getByRole("navigation")).toHaveCount(0);
-  expect(
-    (await new AxeBuilder({ page }).analyze()).violations.map(({ id }) => id),
-  ).toEqual([]);
+  expect(await violationsInEachTheme(page)).toEqual({ light: [], dark: [] });
 
   await page.reload();
 
