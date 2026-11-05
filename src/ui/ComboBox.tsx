@@ -101,9 +101,10 @@ export function ComboBox({
 }
 
 /**
- * With its list closed, Enter would submit the form with the field's old
- * choice, whatever's typed. When what's typed isn't that choice, Enter chooses
- * the first match, or stays here if nothing matches, and never submits.
+ * With no option highlighted, Enter would keep the field's old choice, whatever's
+ * typed: submitting the form if the list is closed, and putting the old choice
+ * back if it's open. When what's typed isn't that choice, Enter chooses the first
+ * match, or stays here if nothing matches.
  */
 function ComboBoxInput({
   inputRef,
@@ -125,7 +126,8 @@ function ComboBoxInput({
       placeholder={placeholder}
       onKeyDownCapture={(event) => {
         tabbing.current = event.key === "Tab";
-        if (event.key !== "Enter" || !options || !state || state.isOpen) return;
+        if (event.key !== "Enter" || !options || !state) return;
+        if (state.isOpen && state.selectionManager.focusedKey !== null) return;
         const typed = state.inputValue.trim().toLowerCase();
         const chosen = state.selectedItem?.textValue ?? "";
         if (!typed || typed === chosen.toLowerCase()) return;
