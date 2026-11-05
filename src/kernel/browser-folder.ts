@@ -1,11 +1,13 @@
 import type { Folder } from "./data-folder-change-log";
 import type { ReturningFolder } from "./folder-on-return";
 
+const SUBFOLDER = "Crownkeep";
+
 /** A chosen Data Folder as the browser reaches it. Everything goes in its `Crownkeep` subfolder (docs/adr/0009). */
 export function browserFolder(handle: FileSystemDirectoryHandle): Folder {
   return {
     async append(fileName, text) {
-      const subfolder = await handle.getDirectoryHandle("Crownkeep", {
+      const subfolder = await handle.getDirectoryHandle(SUBFOLDER, {
         create: true,
       });
       const file = await subfolder.getFileHandle(fileName, { create: true });
@@ -36,11 +38,17 @@ export function browserFolder(handle: FileSystemDirectoryHandle): Folder {
     async read(fileName) {
       return (await fileIn(handle, fileName)).text();
     },
+    async remove(fileName) {
+      const subfolder = await handle.getDirectoryHandle(SUBFOLDER);
+      await subfolder.removeEntry(fileName);
+      // Refused while other files remain, which is what's wanted.
+      await handle.removeEntry(SUBFOLDER).catch(() => {});
+    },
   };
 }
 
 async function fileIn(handle: FileSystemDirectoryHandle, fileName: string) {
-  const subfolder = await handle.getDirectoryHandle("Crownkeep");
+  const subfolder = await handle.getDirectoryHandle(SUBFOLDER);
   return (await subfolder.getFileHandle(fileName)).getFile();
 }
 
@@ -50,7 +58,7 @@ async function fileIn(handle: FileSystemDirectoryHandle, fileName: string) {
  */
 async function crownkeepSubfolder(handle: FileSystemDirectoryHandle) {
   try {
-    return await handle.getDirectoryHandle("Crownkeep");
+    return await handle.getDirectoryHandle(SUBFOLDER);
   } catch (error) {
     if (!(error instanceof DOMException) || error.name !== "NotFoundError") {
       throw error;
