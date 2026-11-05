@@ -1,4 +1,11 @@
-import { type ReactNode, type Ref, useContext, useEffect, useRef } from "react";
+import {
+  type ReactNode,
+  type Ref,
+  type RefObject,
+  useContext,
+  useEffect,
+  useRef,
+} from "react";
 import {
   ComboBox as AriaComboBox,
   ComboBoxStateContext,
@@ -69,13 +76,11 @@ export function ComboBox({
         : { menuTrigger: "focus" as const, defaultItems: options })}
     >
       <Label className={styles.label}>{label}</Label>
-      <Input
-        ref={inputRef}
-        className={styles.input}
+      <ComboBoxInput
+        inputRef={inputRef}
         placeholder={placeholder}
-        onKeyDownCapture={(event) => {
-          tabbing.current = event.key === "Tab";
-        }}
+        options={free ? undefined : options}
+        tabbing={tabbing}
       />
       <Popover className={styles.popover} placement="bottom start">
         {!free && <FirstOptionReady />}
@@ -92,6 +97,46 @@ export function ComboBox({
         </ListBox>
       </Popover>
     </AriaComboBox>
+  );
+}
+
+/**
+ * With its list closed, Enter would submit the form with the field's old
+ * choice, whatever's typed. When what's typed isn't that choice, Enter chooses
+ * the first match, or stays here if nothing matches, and never submits.
+ */
+function ComboBoxInput({
+  inputRef,
+  placeholder,
+  options,
+  tabbing,
+}: {
+  inputRef?: Ref<HTMLInputElement>;
+  placeholder?: string;
+  /** What it chooses from, unless it keeps whatever's typed. */
+  options?: readonly ComboBoxOption[];
+  tabbing: RefObject<boolean>;
+}) {
+  const state = useContext(ComboBoxStateContext);
+  return (
+    <Input
+      ref={inputRef}
+      className={styles.input}
+      placeholder={placeholder}
+      onKeyDownCapture={(event) => {
+        tabbing.current = event.key === "Tab";
+        if (event.key !== "Enter" || !options || !state || state.isOpen) return;
+        const typed = state.inputValue.trim().toLowerCase();
+        const chosen = state.selectedItem?.textValue ?? "";
+        if (!typed || typed === chosen.toLowerCase()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const match = options.find(({ name }) =>
+          name.toLowerCase().includes(typed),
+        );
+        if (match) state.setSelectedKey(match.id);
+      }}
+    />
   );
 }
 

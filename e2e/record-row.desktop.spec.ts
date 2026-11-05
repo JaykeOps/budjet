@@ -282,6 +282,26 @@ test("Enter with something missing moves to that field and keeps what's typed", 
   await expect(toast(page)).toBeEmpty();
 });
 
+test("money in with a Category that matches nothing stays there and records nothing", async ({
+  page,
+}) => {
+  await createBudget(page);
+  await page.keyboard.press("Alt+n");
+  await amount(page).fill("40");
+  await amount(page).press("+");
+  await expect(category(page)).toHaveValue("Ready to Assign");
+
+  await category(page).focus();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("Rentt");
+  await page.keyboard.press("Enter");
+
+  await expect(category(page)).toBeFocused();
+  await expect(category(page)).toHaveValue("Rentt");
+  await expect(amount(page)).toHaveValue("40");
+  await expect(toast(page)).toBeEmpty();
+});
+
 test("a known Payee is suggested and fills in its last Category", async ({
   page,
 }) => {
