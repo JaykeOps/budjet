@@ -38,6 +38,7 @@ test("first run asks for a folder, and a new Budget lives there and survives a r
   await expect(question).toBeVisible();
 
   await button(page, "Choose a folder").click();
+  await button(page, "Start a new Budget").click();
   await page.getByLabel("Currency").selectOption("SEK");
   await button(page, "Next").click();
   await button(page, "Start blank").click();
