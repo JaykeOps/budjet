@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { budgetRow, createBudget, goTo, show } from "./helpers";
+import { assign, budgetRow, createBudget, goTo, show } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 test.beforeEach(({ page }) =>
@@ -11,9 +11,7 @@ test("a user records spending and income and sees Available, Ready to Assign and
 }) => {
   await createBudget(page);
   await goTo(page, "Budget");
-  const groceriesAssignment = page.getByLabel("Assignment for Groceries");
-  await groceriesAssignment.fill("400");
-  await groceriesAssignment.press("Enter");
+  await assign(page, "Groceries", "400");
 
   await goTo(page, "Activity");
   const record = page.getByRole("form", { name: "Record a Transaction" });
@@ -90,9 +88,7 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
 }) => {
   await createBudget(page);
   await goTo(page, "Budget");
-  const groceriesAssignment = page.getByLabel("Assignment for Groceries");
-  await groceriesAssignment.fill("400");
-  await groceriesAssignment.press("Enter");
+  await assign(page, "Groceries", "400");
   await goTo(page, "Activity");
   const record = page.getByRole("form", { name: "Record a Transaction" });
   await record.getByLabel("Amount").fill("45.50");

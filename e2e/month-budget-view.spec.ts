@@ -5,6 +5,7 @@ import {
   budgetOutline,
   budgetRow,
   createBudget,
+  expectAssigned,
   goTo,
   record,
 } from "./helpers";
@@ -106,9 +107,8 @@ test("a user steps between Months, assigns money in a future Month and stays on 
 
   await reloadWhenSaved(page);
 
-  const rent = page.getByLabel("Assignment for Rent");
   await expect(monthHeading(page, "December 2026")).toBeVisible();
-  await expect(rent).toHaveValue("150.00");
+  await expectAssigned(page, "Rent", "$150.00");
   await expect(readyToAssign).toHaveText(/\$850\.00/);
 
   await page.goBack();
@@ -116,7 +116,7 @@ test("a user steps between Months, assigns money in a future Month and stays on 
 
   await page.getByRole("button", { name: "Previous Month" }).click();
   await expect(monthHeading(page, "October 2026")).toBeVisible();
-  await expect(rent).toHaveValue("0.00");
+  await expectAssigned(page, "Rent", "$0.00");
   await expect(readyToAssign).toHaveText(/\$850\.00/);
 });
 
