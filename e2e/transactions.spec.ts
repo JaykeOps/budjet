@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { createBudget, goTo } from "./helpers";
+import { budgetRow, createBudget, goTo } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 test.beforeEach(({ page }) =>
@@ -32,9 +32,7 @@ test("a user records spending and income and sees Available, Ready to Assign and
 
   const expectRecorded = async () => {
     await goTo(page, "Budget");
-    const groceries = page
-      .getByRole("table", { name: "October 2026" })
-      .getByRole("row", { name: /Groceries/ });
+    const groceries = budgetRow(page, "Groceries");
     await expect(groceries).toContainText("$45.50");
     await expect(groceries).toContainText("$354.50");
     await expect(
@@ -125,11 +123,7 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
 
   const expectChanged = async () => {
     await goTo(page, "Budget");
-    await expect(
-      page
-        .getByRole("table", { name: "October 2026" })
-        .getByRole("row", { name: /Groceries/ }),
-    ).toContainText("$340.00");
+    await expect(budgetRow(page, "Groceries")).toContainText("$340.00");
     await expect(
       page.getByRole("status", { name: "Ready to Assign" }),
     ).toHaveText(/\$600\.00/);
