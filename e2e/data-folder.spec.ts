@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { cancelNextFolderPicker, filesInFolder } from "./folder";
-import { createBudget, goTo, openApp } from "./helpers";
+import { addAccount, createBudget, goTo, openApp } from "./helpers";
 import { folderWritesFinished, reloadWhenSaved } from "./reload";
 
 const button = (page: Page, name: string) =>
@@ -11,18 +11,6 @@ async function recordIdsInFolder(page: Page): Promise<string[]> {
     text.split("\n").filter(Boolean),
   );
   return lines.map((line) => JSON.parse(line).id);
-}
-
-async function addAccount(page: Page, name: string) {
-  const form = page.getByRole("form", { name: "Add an Account" });
-  await form.getByLabel("Name").fill(name);
-  await form.getByLabel(/Opening Balance/).fill("1");
-  await form.getByRole("button", { name: "Add Account" }).click();
-  await expect(
-    page
-      .getByRole("table", { name: "Accounts" })
-      .getByRole("row", { name: new RegExp(name) }),
-  ).toBeVisible();
 }
 
 test("first run asks for a folder, and a new Budget lives there and survives a reload", async ({
@@ -79,21 +67,20 @@ test("two tabs writing at once keep every record in the folder", async ({
   context,
 }) => {
   await createBudget(page);
-  await goTo(page, "Accounts");
   await folderWritesFinished(page);
   const other = await context.newPage();
   await other.goto("/");
-  await goTo(other, "Accounts");
 
   const addAccounts = async (tab: Page, prefix: string) => {
-    for (let i = 0; i < 8; i++) await addAccount(tab, `${prefix} ${i}`);
+    for (let i = 0; i < 8; i++) {
+      await addAccount(tab, { name: `${prefix} ${i}`, holds: "1" });
+    }
   };
   await Promise.all([addAccounts(page, "One"), addAccounts(other, "Other")]);
   await folderWritesFinished(page);
 
   await other.close();
   await reloadWhenSaved(page);
-  await goTo(page, "Accounts");
   const ids = await recordIdsInFolder(page);
   expect(new Set(ids).size).toBe(ids.length);
   const localIds = await page.evaluate(
