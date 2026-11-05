@@ -141,7 +141,7 @@ export function TransferRowLine({
 }) {
   const from = accounts.find(({ id }) => id === draft.fromAccountId);
   const to = accounts.find(({ id }) => id === draft.toAccountId);
-  if (!to || !from) return <>There's no other Account to move money to yet.</>;
+  if (!to || !from) return <>There's no other Account to transfer to yet.</>;
   const moved = parseMoney(draft.typed, currency)?.minorUnits ?? 0;
   const after = (balance: number, change: number) =>
     formatMoney(money(balance + change, currency));

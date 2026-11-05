@@ -162,7 +162,7 @@ function TransferForm({
         />
       </label>
       <div className={styles.note} aria-live="polite">
-        {!to && <p>There's no other Account to move money to yet.</p>}
+        {!to && <p>There's no other Account to transfer to yet.</p>}
         {amount && from && to && (
           <p>
             {from.name} goes to{" "}
