@@ -145,10 +145,10 @@ function Shell({
               firstMonth={budget.firstMonth}
               currency={budget.currency}
               onAssign={(input) => setAssignment(writer, input)}
-              onCopyLastMonth={(month) =>
+              onCopyLastMonth={(month, unticked) =>
                 copyLastMonth(writer, {
                   month,
-                  skipping: hiddenCategoryIds(writer),
+                  skipping: [...hiddenCategoryIds(writer), ...unticked],
                 })
               }
               onMoveMoney={(input) => moveMoney(writer, input)}
