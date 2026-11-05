@@ -9,6 +9,8 @@ import {
   adjustments,
   type BalanceCheck,
   balanceChecks,
+  type OpeningBalance,
+  openingBalances,
 } from "./queries";
 
 export { AccountsScreen } from "./AccountsScreen";
@@ -23,6 +25,8 @@ export {
   adjustments,
   type BalanceCheck,
   balanceChecks,
+  type OpeningBalance,
+  openingBalances,
 };
 
 export function useAccounts(): Account[] {

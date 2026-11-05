@@ -1,13 +1,8 @@
 import { useCallback } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
-import {
-  accountTransactionList,
-  accountTransactions,
-  payees,
-  type Transaction,
-  type TransactionListEntry,
-} from "./queries";
+import { accountTransactions, payees, type Transaction } from "./queries";
+import { type Statement, statements } from "./statements";
 
 /** An Account's Transactions, newest first. */
 export function useAccountTransactions(accountId: string): Transaction[] {
@@ -20,14 +15,11 @@ export function useAccountTransactions(accountId: string): Transaction[] {
   );
 }
 
-/** What an Account's Transaction list shows: its Transactions and Transfers, newest first. */
-export function useAccountTransactionList(
-  accountId: string,
-): TransactionListEntry[] {
+/** The Statements of one Account, or of every Account when none is named. */
+export function useStatements(accountId?: string): Statement[] {
   return useChangeLogQuery(
     useCallback(
-      (records: readonly ChangeRecord[]) =>
-        accountTransactionList(records, accountId),
+      (records: readonly ChangeRecord[]) => statements(records, accountId),
       [accountId],
     ),
   );

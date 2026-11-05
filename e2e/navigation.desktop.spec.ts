@@ -29,7 +29,7 @@ test("the rail has Record, Budget, All Accounts with the total, each open Accoun
   await expect(links.nth(5)).toHaveAccessibleName("+ Add Account");
 });
 
-test("an Account in the rail opens that Account's Transactions", async ({
+test("an Account in the rail opens that Account's history", async ({
   page,
 }) => {
   await createBudget(page);
@@ -40,7 +40,7 @@ test("an Account in the rail opens that Account's Transactions", async ({
   await savings.click();
 
   await expect(
-    page.getByRole("table", { name: "Transactions in Savings" }),
+    page.getByRole("table", { name: "History of Savings" }),
   ).toBeVisible();
   await expect(savings).toHaveAttribute("aria-current", "page");
   await expect(
@@ -69,7 +69,7 @@ test("closed Accounts fold away behind a Closed toggle that shows how many", asy
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await old.click();
   await expect(
-    page.getByRole("table", { name: "Transactions in Old" }),
+    page.getByRole("table", { name: "History of Old" }),
   ).toBeVisible();
 
   await toggle.click();
@@ -95,15 +95,16 @@ test("Activity on a phone and All Accounts on desktop are the same place", async
   await page.setViewportSize({ width: 412, height: 839 });
   const places = rail(page);
   await places.getByRole("link", { name: "Activity" }).click();
-  await expect(
-    page.getByRole("region", { name: "Transactions", exact: true }),
-  ).toBeVisible();
+  const history = page.getByRole("table", { name: "History of All Accounts" });
+  await expect(page.getByRole("region", { name: "Activity" })).toBeVisible();
+  await expect(history).toBeVisible();
 
   await page.setViewportSize({ width: 1280, height: 720 });
 
   await expect(
-    page.getByRole("region", { name: "Transactions", exact: true }),
+    page.getByRole("region", { name: "All Accounts" }),
   ).toBeVisible();
+  await expect(history).toBeVisible();
   await expect(
     places.getByRole("link", { name: /^All Accounts/ }),
   ).toHaveAttribute("aria-current", "page");

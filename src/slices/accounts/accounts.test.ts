@@ -295,6 +295,7 @@ describe("Accounts", () => {
         accountId: checking,
         date: "2100-10-20",
         amount: money(1000, "USD"),
+        balance: money(100000, "USD"),
       },
     ]);
     expect(accounts(changeLog.readAll())[0].lastChecked).toBe("2100-10-20");
@@ -511,6 +512,7 @@ describe("Accounts", () => {
           accountId: checking,
           date: "2100-10-20",
           amount: money(-5000, "USD"),
+          balance: money(95000, "USD"),
         },
       ]);
       expect(account()?.balance).toEqual(money(95000, "USD"));
@@ -530,6 +532,7 @@ describe("Accounts", () => {
           accountId: checking,
           date: "2100-10-20",
           amount: money(-10000, "USD"),
+          balance: money(90000, "USD"),
         },
       ]);
     });

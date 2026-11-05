@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { createBudget, goTo } from "./helpers";
+import { createBudget, goTo, show } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 async function createBudgetWithFirstAccount(page: Page) {
@@ -94,9 +94,9 @@ test("a user confirms a balance matches the bank, which moves no money and is ke
     await expect(readyToAssign).toHaveText(/\$1,250\.50/);
     await goTo(page, "Activity");
     const check = page
-      .getByRole("table", { name: "Transactions in Everyday checking" })
+      .getByRole("table", { name: "History of All Accounts" })
       .getByRole("row", { name: /Balance checked/ });
-    await expect(check).toContainText("2026-10-18");
+    await expect(check).toContainText("Oct 18");
     await expect(check).toContainText("Matched your bank at $1,250.50");
     await expect(check).not.toContainText("Ready to Assign");
   };
@@ -117,8 +117,15 @@ test("a user deletes a mistaken Adjustment and Balance check, and the balance an
     .getByRole("row", { name: /Everyday checking/ });
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
   const history = page.getByRole("table", {
-    name: "Transactions in Everyday checking",
+    name: "History of All Accounts",
   });
+  const deleteRow = async (name: RegExp) => {
+    await history
+      .getByRole("row", { name })
+      .getByRole("button", { name: /^More/ })
+      .click();
+    await page.getByRole("menuitem", { name: "Delete" }).click();
+  };
   const redeclare = page.getByRole("form", { name: "Re-declare a balance" });
   const redeclareTo = async (balance: string) => {
     await redeclare.getByLabel("Balance").fill(balance);
@@ -128,7 +135,9 @@ test("a user deletes a mistaken Adjustment and Balance check, and the balance an
   // No row offers a way to delete the Opening Balance.
   await goTo(page, "Activity");
   await expect(history).toBeVisible();
-  await expect(history.getByRole("button", { name: "Delete" })).toHaveCount(0);
+  await expect(
+    history.getByRole("row", { name: /Opening Balance/ }).getByRole("button"),
+  ).toHaveCount(0);
 
   await goTo(page, "Accounts");
   await page.clock.setFixedTime(new Date("2026-10-18T12:00:00"));
@@ -140,19 +149,16 @@ test("a user deletes a mistaken Adjustment and Balance check, and the balance an
   await expect(readyToAssign).toHaveText(/\$1,300\.00/);
 
   await goTo(page, "Activity");
-  await history
-    .getByRole("row", { name: /Balance adjustment/ })
-    .getByRole("button", { name: "Delete" })
-    .click();
+  await deleteRow(/^Adjustment/);
 
   const expectAdjustmentGone = async () => {
     await goTo(page, "Activity");
     await expect(
       history.getByRole("row", { name: /Balance checked/ }),
     ).toHaveCount(1);
-    await expect(
-      history.getByRole("row", { name: /Balance adjustment/ }),
-    ).toHaveCount(0);
+    await expect(history.getByRole("row", { name: /^Adjustment/ })).toHaveCount(
+      0,
+    );
     await goTo(page, "Accounts");
     await expect(row).toContainText("$1,250.50");
     await expect(row).toContainText("2026-10-18");
@@ -166,10 +172,7 @@ test("a user deletes a mistaken Adjustment and Balance check, and the balance an
   await expectAdjustmentGone();
 
   await goTo(page, "Activity");
-  await history
-    .getByRole("row", { name: /Balance checked/ })
-    .getByRole("button", { name: "Delete" })
-    .click();
+  await deleteRow(/Balance checked/);
 
   await expect(
     history.getByRole("row", { name: /Balance checked/ }),
@@ -209,10 +212,14 @@ test("a user re-declares a balance, Transfers an Account to $0, closes it and re
   await goTo(page, "Activity");
   // The Account's history explains the new balance. It can be deleted, not edited.
   const adjustment = page
-    .getByRole("table", { name: "Transactions in Everyday checking" })
-    .getByRole("row", { name: /Balance adjustment/ });
-  await expect(adjustment).toContainText(/Ready to Assign.*\$49\.50/);
-  await expect(adjustment.getByRole("button")).toHaveText(["Delete"]);
+    .getByRole("table", { name: "History of All Accounts" })
+    .getByRole("row", { name: /^Adjustment/ });
+  await expect(adjustment).toContainText(
+    /You updated the balance to \$1,300\.00.*\+\$49\.50/,
+  );
+  await adjustment.getByRole("button", { name: /^More/ }).click();
+  await expect(page.getByRole("menuitem")).toHaveText(["Delete"]);
+  await page.keyboard.press("Escape");
 
   await goTo(page, "Accounts");
   await accounts.getByRole("button", { name: "Close Rainy day" }).click();
@@ -250,21 +257,16 @@ test("a user re-declares a balance, Transfers an Account to $0, closes it and re
     await expect(readyToAssign).toHaveText(/\$4,300\.00/);
     await goTo(page, "Activity");
     // Its history stays, but it takes no new Transactions or Transfers.
-    const transactions = page.getByRole("region", {
-      name: "Transactions",
-      exact: true,
-    });
-    await transactions
-      .getByRole("combobox", { name: /^Account/ })
-      .selectOption({ label: "Rainy day (closed)" });
+    await show(page, { account: "Rainy day (closed)" });
     await expect(
       page
-        .getByRole("table", { name: "Transactions in Rainy day" })
+        .getByRole("table", { name: "History of Rainy day" })
         .getByRole("row")
         .nth(1),
-    ).toContainText(/Transfer to Bills.*−\$3,000\.00/);
+    ).toContainText(/To Bills.*Transfer.*−\$3,000\.00/);
+    await expect(page.getByText(/^Closed\. Its history stays/)).toBeVisible();
     await expect(
-      transactions.getByRole("form", { name: "Record a Transaction" }),
+      page.getByRole("form", { name: "Record a Transaction" }),
     ).toBeHidden();
     await expect(page.getByRole("region", { name: "Transfers" })).toBeHidden();
   };
