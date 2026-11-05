@@ -104,15 +104,21 @@ function compareStrings(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-export function createInMemoryChangeLog(): ChangeLog {
+export function createInMemoryChangeLog(): ChangeLog & {
+  /** Swaps every record for these, as a change of Budget does. */
+  replaceAll(records: readonly ChangeRecord[]): void;
+} {
   let records: readonly ChangeRecord[] = [];
   const listeners = new Set<() => void>();
-  const append = (added: readonly ChangeRecord[]) => {
-    records = [...records, ...added].sort(compareRecords);
+  const replaceAll = (next: readonly ChangeRecord[]) => {
+    records = [...next].sort(compareRecords);
     for (const listener of listeners) listener();
   };
+  const append = (added: readonly ChangeRecord[]) =>
+    replaceAll([...records, ...added]);
   return {
     append,
+    replaceAll,
     merge(arriving) {
       const added = recordsToMerge(records, arriving);
       if (added.length > 0) append(added);

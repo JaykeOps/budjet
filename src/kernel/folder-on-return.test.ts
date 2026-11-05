@@ -122,6 +122,8 @@ describe("reconnecting while the Budget is open", () => {
       indexedDB: new IDBFactory(),
       folder,
       oneTabAtATime: folder.oneTabAtATime,
+      budgetIds: () => [],
+      onTwoBudgets() {},
     });
     folder.failWith(errorName);
     changeLog.append([held]);

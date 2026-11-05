@@ -45,6 +45,8 @@ const adapters: Adapter[] = [
             indexedDB,
             folder,
             oneTabAtATime: folder.oneTabAtATime,
+            budgetIds: () => [],
+            onTwoBudgets() {},
           }),
       };
     },
@@ -158,6 +160,8 @@ describe("when a newer tab upgrades the database", () => {
           indexedDB,
           folder,
           oneTabAtATime: folder.oneTabAtATime,
+          budgetIds: () => [],
+          onTwoBudgets() {},
           onGaveWay,
         });
       },
@@ -222,6 +226,8 @@ describe("when a newer tab upgrades the database", () => {
       indexedDB,
       folder,
       oneTabAtATime: folder.oneTabAtATime,
+      budgetIds: () => [],
+      onTwoBudgets() {},
       onGaveWay: () => {},
     });
     folder.failWith("NotFoundError");

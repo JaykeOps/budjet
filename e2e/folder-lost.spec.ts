@@ -53,8 +53,11 @@ test("with the folder gone, work carries on and Reconnect's picker gets it writt
   await expect(banner(page)).toBeVisible();
 
   await reconnect(page).click();
+  await page.getByRole("button", { name: "Put my Budget here" }).click();
   await expect(banner(page)).toHaveCount(0);
+  await folderWritesFinished(page);
   const written = await folderText(page);
+  expect(written).toContain("BudgetCreated");
   expect(written).toContain("-1234");
   expect(written).toContain("-5678");
 });
@@ -87,6 +90,7 @@ test("changes held when the folder is lost are written after a reopen", async ({
   await page.reload();
 
   await page.getByRole("button", { name: "Choose a folder" }).click();
+  await page.getByRole("button", { name: "Put my Budget here" }).click();
   await goTo(page, "Budget");
   await expect(budgetRow(page, "Groceries")).toContainText("12.34");
   await expect(banner(page)).toHaveCount(0);

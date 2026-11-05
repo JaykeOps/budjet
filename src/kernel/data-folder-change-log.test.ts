@@ -10,20 +10,25 @@ import { createInMemoryFolder, type InMemoryFolder } from "./in-memory-folder";
 /** One browser: storage shared by its tabs, and the folder it was given. */
 function aBrowser(folder: InMemoryFolder = createInMemoryFolder()) {
   const indexedDB = new IDBFactory();
+  const onTwoBudgets = vi.fn();
+  const options = {
+    indexedDB,
+    oneTabAtATime: folder.oneTabAtATime,
+    budgetIds,
+    onTwoBudgets,
+  };
   return {
     folder,
-    openTab: () =>
-      openDataFolderChangeLog({
-        indexedDB,
-        folder,
-        oneTabAtATime: folder.oneTabAtATime,
-      }),
-    openTabWithoutItsFolder: () =>
-      openDataFolderChangeLog({
-        indexedDB,
-        oneTabAtATime: folder.oneTabAtATime,
-      }),
+    onTwoBudgets,
+    openTab: () => openDataFolderChangeLog({ ...options, folder }),
+    openTabWithoutItsFolder: () => openDataFolderChangeLog(options),
   };
+}
+
+function budgetIds(records: readonly ChangeRecord[]) {
+  return records
+    .filter(({ type }) => type === "BudgetCreated")
+    .map(({ subjectId }) => subjectId);
 }
 
 function saveStates(changeLog: ChangeLog): SaveState[] {
@@ -329,6 +334,8 @@ describe("a Budget not in a folder yet", () => {
       openDataFolderChangeLog({
         indexedDB,
         oneTabAtATime: folder.oneTabAtATime,
+        budgetIds,
+        onTwoBudgets() {},
       });
     const changeLog = await open();
 
@@ -583,6 +590,8 @@ describe("checking the Data Folder for other devices' changes", () => {
   it("does nothing for a Budget not in a folder", async () => {
     const changeLog = await openDataFolderChangeLog({
       indexedDB: new IDBFactory(),
+      budgetIds,
+      onTwoBudgets() {},
     });
 
     await changeLog.checkFolder("full");
@@ -593,8 +602,6 @@ describe("checking the Data Folder for other devices' changes", () => {
 
 describe("reading a whole Budget from a folder", () => {
   const created = (id: string) => ({ ...record(id), type: "BudgetCreated" });
-  const holdsBudget = (records: readonly ChangeRecord[]) =>
-    records.some(({ type }) => type === "BudgetCreated");
 
   it("fills the Local Copy from every file, counting as it goes", async () => {
     const { folder, openTabWithoutItsFolder } = aBrowser();
@@ -604,11 +611,10 @@ describe("reading a whole Budget from a folder", () => {
     const counts: string[] = [];
 
     const opened = await changeLog.readFolderInFull(folder, {
-      holdsBudget,
       onProgress: ({ read, of }) => counts.push(`${read} of ${of}`),
     });
 
-    expect(opened).toBe(true);
+    expect(opened).toBe("opened");
     expect(ids(changeLog)).toEqual(["a", "b"]);
     expect(counts).toEqual(["0 of 2", "1 of 2", "2 of 2"]);
     expect(ids(await openTabWithoutItsFolder())).toEqual(["a", "b"]);
@@ -620,11 +626,10 @@ describe("reading a whole Budget from a folder", () => {
     const onProgress = vi.fn();
 
     const opened = await changeLog.readFolderInFull(folder, {
-      holdsBudget,
       onProgress,
     });
 
-    expect(opened).toBe(false);
+    expect(opened).toBe("no-budget");
     expect(onProgress).not.toHaveBeenCalled();
   });
 
@@ -655,7 +660,6 @@ describe("reading a whole Budget from a folder", () => {
     const back = await openTabWithoutItsFolder();
     expect(await back.fullReadUnderway()).toBe(true);
     await back.readFolderInFull(folder, {
-      holdsBudget,
       onProgress: ({ read, of }) => counts.push(`${read} of ${of}`),
     });
 
@@ -678,7 +682,7 @@ describe("reading a whole Budget from a folder", () => {
     deliver(folder, "grows", [created("a"), record("b")], 2000);
     folder.files.delete("goes");
     const back = await openTabWithoutItsFolder();
-    await back.readFolderInFull(folder, { holdsBudget, onProgress() {} });
+    await back.readFolderInFull(folder, { onProgress() {} });
 
     expect(ids(back).sort()).toEqual(["a", "b", "c"]);
   });
@@ -694,7 +698,7 @@ describe("reading a whole Budget from a folder", () => {
     await back.forgetFullRead();
     const chosen = createInMemoryFolder();
     deliver(chosen, "same name", [created("ours")], 1000);
-    await back.readFolderInFull(chosen, { holdsBudget, onProgress() {} });
+    await back.readFolderInFull(chosen, { onProgress() {} });
 
     expect(ids(back)).toEqual(["ours"]);
   });
@@ -708,12 +712,11 @@ describe("reading a whole Budget from a folder", () => {
     const counts: string[] = [];
 
     const opened = await changeLog.readFolderInFull(folder, {
-      holdsBudget,
       onProgress: ({ read, of }) => counts.push(`${read} of ${of}`),
       waitToRetry: async () => folder.failReading("stuck", undefined),
     });
 
-    expect(opened).toBe(true);
+    expect(opened).toBe("opened");
     expect(counts).toEqual(["0 of 2", "1 of 2", "1 of 2", "2 of 2"]);
     expect(ids(changeLog)).toEqual(["a", "b"]);
   });
@@ -724,7 +727,7 @@ describe("reading a whole Budget from a folder", () => {
     folder.deliver("torn", `${whole}\n{"id":"cut o`);
     const changeLog = await openTabWithoutItsFolder();
 
-    await changeLog.readFolderInFull(folder, { holdsBudget, onProgress() {} });
+    await changeLog.readFolderInFull(folder, { onProgress() {} });
     expect(ids(changeLog)).toEqual(["a"]);
 
     folder.deliver("torn", `${whole}\n${JSON.stringify(record("b"))}\n`);
@@ -738,11 +741,10 @@ describe("reading a whole Budget from a folder", () => {
     const changeLog = await openTabWithoutItsFolder();
 
     const opened = await changeLog.readFolderInFull(folder, {
-      holdsBudget,
       onProgress() {},
     });
 
-    expect(opened).toBe(false);
+    expect(opened).toBe("no-budget");
     expect(changeLog.readAll()).toEqual([]);
     expect(await changeLog.fullReadUnderway()).toBe(false);
   });
@@ -764,7 +766,7 @@ describe("reading a whole Budget from a folder", () => {
     const { folder, openTabWithoutItsFolder } = aBrowser();
     deliver(folder, "laptop", [created("a")]);
     const changeLog = await openTabWithoutItsFolder();
-    await changeLog.readFolderInFull(folder, { holdsBudget, onProgress() {} });
+    await changeLog.readFolderInFull(folder, { onProgress() {} });
     folder.clearReads();
 
     await changeLog.checkFolder("full");
@@ -785,7 +787,6 @@ describe("reading a whole Budget from a folder", () => {
 
     await expect(
       changeLog.readFolderInFull(folder, {
-        holdsBudget,
         onProgress() {},
         waitToRetry: async () => folder.failWith("NotFoundError"),
       }),
@@ -802,7 +803,6 @@ describe("reading a whole Budget from a folder", () => {
   ) {
     await new Promise<void>((left) => {
       void changeLog.readFolderInFull(folder, {
-        holdsBudget,
         onProgress() {},
         waitToRetry: () => {
           left();
@@ -811,4 +811,320 @@ describe("reading a whole Budget from a folder", () => {
       });
     });
   }
+});
+
+function budgetCreated(budgetId: string, wallTime = OCT_31) {
+  return {
+    ...record(`created-${budgetId}`, wallTime, "laptop"),
+    subjectId: budgetId,
+    type: "BudgetCreated",
+  };
+}
+
+/** A browser with Budget "mine" in the Local Copy, all of it written to its folder. */
+async function aBudgetInItsFolder() {
+  const browser = aBrowser();
+  const changeLog = await browser.openTab();
+  changeLog.append([budgetCreated("mine"), record("my-change")]);
+  await settled(changeLog);
+  return { ...browser, changeLog };
+}
+
+/** Another folder, already holding Budget "theirs". */
+function theirFolder() {
+  const folder = createInMemoryFolder();
+  deliver(folder, "their-file", [
+    budgetCreated("theirs"),
+    record("their-change"),
+  ]);
+  return folder;
+}
+
+describe("telling what a chosen folder holds", () => {
+  it("knows this Budget by the id on its BudgetCreated, whatever else differs", async () => {
+    const { changeLog } = await aBudgetInItsFolder();
+    const chosen = createInMemoryFolder();
+    deliver(chosen, "a", [record("no-budget-here")]);
+    deliver(chosen, "b", [budgetCreated("mine", NOV_1)]);
+
+    expect(await changeLog.whatFolderHolds(chosen)).toBe("this-budget");
+  });
+
+  it("knows a different Budget, and brings none of it in", async () => {
+    const { changeLog } = await aBudgetInItsFolder();
+
+    expect(await changeLog.whatFolderHolds(theirFolder())).toBe(
+      "another-budget",
+    );
+    expect(ids(changeLog)).toEqual(["created-mine", "my-change"]);
+  });
+
+  it("says there's no Budget for an empty folder and for files with no BudgetCreated", async () => {
+    const { changeLog } = await aBudgetInItsFolder();
+    const noBudget = createInMemoryFolder();
+    deliver(noBudget, "a", [record("stray")]);
+
+    expect(await changeLog.whatFolderHolds(createInMemoryFolder())).toBe(
+      "no-budget",
+    );
+    expect(await changeLog.whatFolderHolds(noBudget)).toBe("no-budget");
+  });
+
+  it("doesn't call a folder empty until it could read every file", async () => {
+    const { changeLog } = await aBudgetInItsFolder();
+    const chosen = theirFolder();
+    chosen.failReading("their-file", "NotReadableError");
+
+    const holds = await changeLog.whatFolderHolds(chosen, async () => {
+      chosen.failReading("their-file", undefined);
+    });
+
+    expect(holds).toBe("another-budget");
+  });
+
+  it("calls any Budget another one when the Local Copy has none", async () => {
+    const { openTabWithoutItsFolder } = aBrowser();
+    const changeLog = await openTabWithoutItsFolder();
+
+    expect(await changeLog.whatFolderHolds(theirFolder())).toBe(
+      "another-budget",
+    );
+  });
+});
+
+describe("whether changes are still unsaved", () => {
+  it("is so only while a record hasn't reached the folder", async () => {
+    const { changeLog, folder } = await aBudgetInItsFolder();
+    expect(await changeLog.hasUnsavedChanges()).toBe(false);
+
+    folder.failWith("NotFoundError");
+    changeLog.append([record("held", NOV_1)]);
+    await settled(changeLog);
+    expect(await changeLog.hasUnsavedChanges()).toBe(true);
+
+    folder.failWith(undefined);
+    changeLog.append([record("next", NOV_1 + 1)]);
+    await vi.waitFor(async () =>
+      expect(await changeLog.hasUnsavedChanges()).toBe(false),
+    );
+  });
+});
+
+describe("a background check finding a different Budget", () => {
+  it("merges nothing, says so and stops using the folder", async () => {
+    const { changeLog, folder, onTwoBudgets } = await aBudgetInItsFolder();
+    deliver(folder, "their-file", [budgetCreated("theirs")]);
+    deliver(folder, "their-other-file", [record("their-change")]);
+    const appends = folder.appends();
+
+    await changeLog.checkFolder("full");
+
+    expect(onTwoBudgets).toHaveBeenCalledOnce();
+    expect(ids(changeLog)).toEqual(["created-mine", "my-change"]);
+
+    changeLog.append([record("after", NOV_1)]);
+    await settled(changeLog);
+    expect(folder.appends()).toBe(appends);
+  });
+
+  it("merges nothing from a file that arrives with another Budget in a quick check", async () => {
+    const { changeLog, folder, onTwoBudgets } = await aBudgetInItsFolder();
+    await changeLog.checkFolder("full");
+    deliver(folder, "their-file", [record("first"), budgetCreated("theirs")]);
+
+    await changeLog.checkFolder("quick");
+
+    expect(onTwoBudgets).toHaveBeenCalledOnce();
+    expect(ids(changeLog)).not.toContain("first");
+  });
+
+  it("finds it again after a reopen, because nothing was marked as read", async () => {
+    const { changeLog, folder, openTab, onTwoBudgets } =
+      await aBudgetInItsFolder();
+    deliver(folder, "their-file", [budgetCreated("theirs")]);
+    await changeLog.checkFolder("full");
+
+    const reopened = await openTab();
+    await reopened.checkFolder("full");
+
+    expect(onTwoBudgets).toHaveBeenCalledTimes(2);
+    expect(ids(reopened)).toEqual(["created-mine", "my-change"]);
+  });
+
+  it("merges this Budget's own BudgetCreated from another device as usual", async () => {
+    const { changeLog, folder, onTwoBudgets } = await aBudgetInItsFolder();
+    deliver(folder, "other-device", [
+      { ...budgetCreated("mine"), id: "created-again" },
+      record("from-other-device", NOV_1, "laptop"),
+    ]);
+
+    await changeLog.checkFolder("full");
+
+    expect(onTwoBudgets).not.toHaveBeenCalled();
+    expect(ids(changeLog)).toContain("from-other-device");
+  });
+
+  it("stops for two Budgets even with none in the Local Copy", async () => {
+    const { openTabWithoutItsFolder, onTwoBudgets } = aBrowser();
+    const changeLog = await openTabWithoutItsFolder();
+    const chosen = createInMemoryFolder();
+    changeLog.startNewBudget(chosen);
+    await settled(changeLog);
+    deliver(chosen, "one", [budgetCreated("one")]);
+    deliver(chosen, "two", [budgetCreated("two")]);
+
+    await changeLog.checkFolder("full");
+
+    expect(onTwoBudgets).toHaveBeenCalledOnce();
+    expect(ids(changeLog)).toEqual([]);
+  });
+});
+
+describe("a full read finding two Budgets", () => {
+  it("opens neither and keeps none of it", async () => {
+    const { openTabWithoutItsFolder } = aBrowser();
+    const changeLog = await openTabWithoutItsFolder();
+    const chosen = theirFolder();
+    deliver(chosen, "another", [budgetCreated("also-theirs")]);
+
+    const opened = await changeLog.readFolderInFull(chosen, {
+      onProgress() {},
+    });
+
+    expect(opened).toBe("two-budgets");
+    expect(ids(changeLog)).toEqual([]);
+    expect(await changeLog.fullReadUnderway()).toBe(false);
+  });
+});
+
+describe("replacing the Local Copy with a folder's Budget", () => {
+  it("swaps the Budget, counting as it goes, and leaves the old folder as it was", async () => {
+    const { changeLog, folder, openTabWithoutItsFolder } =
+      await aBudgetInItsFolder();
+    const oldFiles = new Map(folder.files);
+    const chosen = theirFolder();
+    const progress = vi.fn();
+
+    const outcome = await changeLog.replaceWithFolder(chosen, {
+      onProgress: progress,
+    });
+
+    expect(outcome).toBe("replaced");
+    expect(progress).toHaveBeenLastCalledWith({ read: 1, of: 1 });
+    expect(ids(changeLog)).toEqual(["created-theirs", "their-change"]);
+    expect(ids(await openTabWithoutItsFolder())).toEqual([
+      "created-theirs",
+      "their-change",
+    ]);
+    expect(folder.files).toEqual(oldFiles);
+  });
+
+  it("is then in that folder: it writes there and won't read it all again", async () => {
+    const { changeLog, folder, openTabWithoutItsFolder } =
+      await aBudgetInItsFolder();
+    const chosen = theirFolder();
+    await changeLog.replaceWithFolder(chosen, { onProgress() {} });
+    const oldAppends = folder.appends();
+
+    changeLog.append([record("next", NOV_1)]);
+    await settled(changeLog);
+    expect(chosen.appends()).toBe(1);
+    expect(folder.appends()).toBe(oldAppends);
+
+    chosen.clearReads();
+    const reopened = await openTabWithoutItsFolder();
+    reopened.returnToFolder(chosen);
+    await reopened.checkFolder("full");
+    expect(chosen.reads()).not.toContain("their-file");
+  });
+
+  it("refuses while changes are unsaved, and takes them away only when told to", async () => {
+    const { changeLog, folder, openTabWithoutItsFolder } =
+      await aBudgetInItsFolder();
+    folder.failWith("NotFoundError");
+    changeLog.append([record("held", NOV_1)]);
+    await settled(changeLog);
+    const chosen = theirFolder();
+
+    expect(await changeLog.replaceWithFolder(chosen, { onProgress() {} })).toBe(
+      "unsaved",
+    );
+    expect(ids(changeLog)).toContain("held");
+
+    expect(
+      await changeLog.replaceWithFolder(chosen, {
+        discardUnsaved: true,
+        onProgress() {},
+      }),
+    ).toBe("replaced");
+    await settled(changeLog);
+    expect(await changeLog.hasUnsavedChanges()).toBe(false);
+    expect(chosen.files.get("their-file")).not.toContain("held");
+    expect(ids(await openTabWithoutItsFolder())).not.toContain("held");
+  });
+
+  it("changes nothing when the folder turns out to hold two Budgets or none", async () => {
+    const { changeLog } = await aBudgetInItsFolder();
+    const two = theirFolder();
+    deliver(two, "another", [budgetCreated("also-theirs")]);
+    const stray = createInMemoryFolder();
+    deliver(stray, "a", [record("stray")]);
+
+    expect(await changeLog.replaceWithFolder(two, { onProgress() {} })).toBe(
+      "two-budgets",
+    );
+    expect(await changeLog.replaceWithFolder(stray, { onProgress() {} })).toBe(
+      "no-budget",
+    );
+    expect(ids(changeLog)).toEqual(["created-mine", "my-change"]);
+  });
+
+  it("leaves the Local Copy alone when the folder can't be listed", async () => {
+    const { changeLog } = await aBudgetInItsFolder();
+    const gone = theirFolder();
+    gone.failWith("NotFoundError");
+
+    await expect(
+      changeLog.replaceWithFolder(gone, { onProgress() {} }),
+    ).rejects.toThrow();
+    expect(ids(changeLog)).toEqual(["created-mine", "my-change"]);
+  });
+});
+
+describe("putting the Budget in a folder with none", () => {
+  it("writes the whole Budget there, including changes not yet saved", async () => {
+    const { changeLog, folder } = await aBudgetInItsFolder();
+    folder.failWith("NotFoundError");
+    changeLog.append([record("held", NOV_1)]);
+    await settled(changeLog);
+    const chosen = createInMemoryFolder();
+
+    await changeLog.putBudgetIn(chosen);
+    await settled(changeLog);
+
+    const written = [...chosen.files.values()].flatMap(lines).map((r) => r.id);
+    expect(written.sort()).toEqual(["created-mine", "held", "my-change"]);
+    expect(await changeLog.hasUnsavedChanges()).toBe(false);
+    expect(changeLog.saveState()).toEqual({ status: "saved" });
+  });
+});
+
+describe("starting a new Budget in a folder with none", () => {
+  it("empties the Local Copy and keeps what's written next in that folder", async () => {
+    const { changeLog, folder, openTabWithoutItsFolder } =
+      await aBudgetInItsFolder();
+    const oldFiles = new Map(folder.files);
+    const chosen = createInMemoryFolder();
+
+    changeLog.startNewBudget(chosen);
+    expect(ids(changeLog)).toEqual([]);
+    changeLog.append([budgetCreated("new")]);
+    await settled(changeLog);
+
+    expect([...chosen.files.values()].flatMap(lines).map((r) => r.id)).toEqual([
+      "created-new",
+    ]);
+    expect(folder.files).toEqual(oldFiles);
+    expect(ids(await openTabWithoutItsFolder())).toEqual(["created-new"]);
+  });
 });
