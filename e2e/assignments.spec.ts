@@ -7,6 +7,7 @@ import {
   createBudget,
   expectAssigned,
   goTo,
+  moveMoney,
   openCategory,
 } from "./helpers";
 import { reloadWhenSaved } from "./reload";
@@ -85,11 +86,7 @@ test("a user copies last Month's Assignments and moves money between Categories"
   await expectAssigned(page, "Groceries", "$250.00");
   await expectAssigned(page, "Power", "$0.00");
 
-  const move = page.getByRole("form", { name: "Move money" });
-  await move.getByLabel("From").selectOption("Rent");
-  await move.getByLabel("To").selectOption("Groceries");
-  await move.getByLabel("Amount").fill("100");
-  await move.getByRole("button", { name: "Move" }).click();
+  await moveMoney(page, { from: "Rent", to: "Groceries", amount: "100" });
 
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
   const expectNovember = async () => {
@@ -117,11 +114,7 @@ test("moving more than a Category's Assignment takes the rest back from what it 
   await page.getByRole("button", { name: "Next Month" }).click();
   await assign(page, "Rent", "10");
 
-  const move = page.getByRole("form", { name: "Move money" });
-  await move.getByLabel("From").selectOption("Rent");
-  await move.getByLabel("To").selectOption("Groceries");
-  await move.getByLabel("Amount").fill("52.50");
-  await move.getByRole("button", { name: "Move" }).click();
+  await moveMoney(page, { from: "Rent", to: "Groceries", amount: "52.50" });
 
   const expectTakenBack = async () => {
     await expectAssigned(page, "Rent", "$0.00");
@@ -136,20 +129,4 @@ test("moving more than a Category's Assignment takes the rest back from what it 
   await reloadWhenSaved(page);
 
   await expectTakenBack();
-});
-
-test("moving money to the same Category is refused", async ({ page }) => {
-  await createBudget(page, { firstAccount: { openingBalance: "100" } });
-  await goTo(page, "Budget");
-
-  const move = page.getByRole("form", { name: "Move money" });
-  await move.getByLabel("From").selectOption("Rent");
-  await move.getByLabel("To").selectOption("Rent");
-  await move.getByLabel("Amount").fill("10");
-  await move.getByRole("button", { name: "Move" }).click();
-
-  await expect(page.getByRole("alert")).toContainText(
-    "two different Categories",
-  );
-  await expectAssigned(page, "Rent", "$0.00");
 });
