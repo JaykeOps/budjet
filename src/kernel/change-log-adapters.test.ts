@@ -10,6 +10,7 @@ import { createInMemoryFolder } from "./in-memory-folder";
 import {
   openIndexedDbChangeLog,
   openIndexedDbDeviceId,
+  upgradeDatabase,
 } from "./indexed-db-change-log";
 
 /**
@@ -142,6 +143,118 @@ describe("IndexedDB Change Log", () => {
   });
 });
 
+describe("when a newer tab upgrades the database", () => {
+  const stores = [
+    {
+      name: "IndexedDB",
+      open: (indexedDB: IDBFactory, onGaveWay: () => void) =>
+        openIndexedDbChangeLog({ indexedDB, onGaveWay }),
+    },
+    {
+      name: "Data Folder",
+      open: (indexedDB: IDBFactory, onGaveWay: () => void) => {
+        const folder = createInMemoryFolder();
+        return openDataFolderChangeLog({
+          indexedDB,
+          folder,
+          oneTabAtATime: folder.oneTabAtATime,
+          onGaveWay,
+        });
+      },
+    },
+  ];
+
+  it.each(stores)(
+    "$name gives way, so the upgrade isn't blocked",
+    async ({ open }) => {
+      const indexedDB = new IDBFactory();
+      let gaveWay = 0;
+      const changeLog = await open(indexedDB, () => gaveWay++);
+      changeLog.append([earlier]);
+
+      const newer = await openNewerVersion(indexedDB);
+
+      expect(gaveWay).toBe(1);
+      expect(await readStore(newer, "records")).toEqual([earlier]);
+      newer.close();
+    },
+  );
+
+  it("only gives way once the changes already made are saved", async () => {
+    const indexedDB = new IDBFactory();
+    let statusWhenGivingWay: string | undefined;
+    const changeLog = await openIndexedDbChangeLog({
+      indexedDB,
+      onGaveWay: () => {
+        statusWhenGivingWay = changeLog.saveState().status;
+      },
+    });
+    // Big enough to still be underway when the newer tab's request arrives.
+    const burst = Array.from({ length: 2_000 }, (_, i) =>
+      record(`r${i}`, i, {}),
+    );
+    changeLog.append(burst);
+
+    const newer = await openNewerVersion(indexedDB);
+
+    expect(statusWhenGivingWay).toBe("saved");
+    expect(await readStore(newer, "records")).toHaveLength(burst.length);
+    newer.close();
+  });
+
+  it.each(stores)(
+    "$name refuses a change after giving way, rather than showing one it can't save",
+    async ({ open }) => {
+      const indexedDB = new IDBFactory();
+      const changeLog = await open(indexedDB, () => {});
+      (await openNewerVersion(indexedDB)).close();
+
+      expect(() => changeLog.append([earlier])).toThrow();
+
+      expect(changeLog.readAll()).toEqual([]);
+    },
+  );
+
+  it("keeps a record the folder hasn't got marked unwritten through the upgrade", async () => {
+    const indexedDB = new IDBFactory();
+    const folder = createInMemoryFolder();
+    const changeLog = await openDataFolderChangeLog({
+      indexedDB,
+      folder,
+      oneTabAtATime: folder.oneTabAtATime,
+      onGaveWay: () => {},
+    });
+    folder.failWith("NotFoundError");
+    changeLog.append([earlier]);
+    await settledAsUnsaved(changeLog);
+
+    const newer = await openNewerVersion(indexedDB);
+
+    expect(await readStore(newer, "unwritten")).toEqual([earlier]);
+    newer.close();
+  });
+});
+
+describe("upgrading the database", () => {
+  it("says when another tab blocks it, then finishes once that tab closes", async () => {
+    const indexedDB = new IDBFactory();
+    const olderTab = await openFirstVersion(indexedDB);
+    let blocked = 0;
+
+    const upgrading = upgradeDatabase({
+      indexedDB,
+      onBlocked: () => {
+        blocked++;
+        olderTab.close();
+      },
+    });
+
+    await upgrading;
+    expect(blocked).toBe(1);
+    expect((await openIndexedDbChangeLog({ indexedDB })).readAll()).toEqual([]);
+  });
+});
+
 describe("this device's id in IndexedDB", () => {
   it("is the same every time the same storage is opened", async () => {
     const indexedDB = new IDBFactory();
@@ -169,6 +282,43 @@ describe("this device's id in IndexedDB", () => {
     expect(changeLog.readAll()).toEqual([earlier, later]);
   });
 });
+
+function openVersion(indexedDB: IDBFactory, version: number) {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open("budjet", version);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/** Opens the database as a tab running the first version would, and stays open. */
+function openFirstVersion(indexedDB: IDBFactory) {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open("budjet", 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("records");
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+const openNewerVersion = (indexedDB: IDBFactory) => openVersion(indexedDB, 99);
+
+function readStore(database: IDBDatabase, name: string): Promise<unknown[]> {
+  return new Promise((resolve, reject) => {
+    const reading = database.transaction(name).objectStore(name).getAll();
+    reading.onsuccess = () =>
+      resolve(reading.result.map((row: string) => JSON.parse(row)));
+    reading.onerror = () => reject(reading.error);
+  });
+}
+
+function settledAsUnsaved(changeLog: ChangeLog): Promise<void> {
+  return new Promise((resolve) => {
+    changeLog.subscribeToSaveState(() => {
+      if (changeLog.saveState().status === "unsaved") resolve();
+    });
+  });
+}
 
 function saved(changeLog: ChangeLog): Promise<void> {
   return new Promise((resolve) => {

@@ -116,3 +116,16 @@ test("two tabs writing at once keep every record in the folder", async ({
   );
   expect(ids.sort()).toEqual(localIds.sort());
 });
+
+test("an open tab reloads to give way to a newer version of the database", async ({
+  page,
+}) => {
+  await createBudget(page);
+  await goTo(page, "Budget");
+
+  const reloaded = page.waitForEvent("load");
+  await page.evaluate(() => {
+    indexedDB.open("budjet", 99);
+  });
+  await reloaded;
+});

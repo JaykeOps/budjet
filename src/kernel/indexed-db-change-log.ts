@@ -25,10 +25,27 @@ const FOLDER_HANDLE = "folder";
 
 export async function openIndexedDbChangeLog({
   indexedDB = globalThis.indexedDB,
+  onGaveWay,
 }: {
   indexedDB?: IDBFactory;
+  onGaveWay?: () => void;
 } = {}): Promise<ChangeLog> {
-  return openLocalCopy(await openDatabase(indexedDB));
+  return openLocalCopy(await openDatabase(indexedDB, onGaveWay));
+}
+
+/**
+ * Brings the database up to this version before anything else opens it. A tab
+ * running code too old to give way blocks that until it closes, so `onBlocked`
+ * lets the app say so instead of showing a blank page.
+ */
+export async function upgradeDatabase({
+  indexedDB = globalThis.indexedDB,
+  onBlocked,
+}: {
+  indexedDB?: IDBFactory;
+  onBlocked: () => void;
+}): Promise<void> {
+  (await openDatabase(indexedDB, undefined, onBlocked)).close();
 }
 
 /**
@@ -172,7 +189,18 @@ function toPayload(record: ChangeRecord): string {
   return JSON.stringify(record);
 }
 
-export function openDatabase(indexedDB: IDBFactory): Promise<IDBDatabase> {
+/**
+ * Opens the database, and gives way when a newer tab needs to upgrade it, since
+ * this tab's code doesn't know the new shape. New changes are refused from that
+ * moment, so none is shown that can't be saved. A read queued behind every write
+ * already underway finishes first, because reloading could abort them. A record
+ * the folder hasn't got is still marked, so the reloaded tab goes on to write it.
+ */
+export function openDatabase(
+  indexedDB: IDBFactory,
+  onGaveWay: () => void = () => location.reload(),
+  onBlocked?: () => void,
+): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE, 3);
     request.onupgradeneeded = ({ oldVersion }) => {
@@ -184,7 +212,19 @@ export function openDatabase(indexedDB: IDBFactory): Promise<IDBDatabase> {
       if (oldVersion < 2) request.result.createObjectStore(DEVICE);
       if (oldVersion < 3) request.result.createObjectStore(UNWRITTEN);
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onblocked = () => onBlocked?.();
+    request.onsuccess = () => {
+      const database = request.result;
+      database.onversionchange = () => {
+        const afterWrites = database.transaction([
+          ...database.objectStoreNames,
+        ]);
+        afterWrites.objectStore(RECORDS).count();
+        afterWrites.oncomplete = onGaveWay;
+        database.close();
+      };
+      resolve(database);
+    };
     request.onerror = () => reject(request.error);
   });
 }

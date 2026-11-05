@@ -41,14 +41,17 @@ export async function openDataFolderChangeLog({
   indexedDB = globalThis.indexedDB,
   folder: initialFolder,
   oneTabAtATime = webLock,
+  onGaveWay,
 }: {
   indexedDB?: IDBFactory;
   /** Absent for a Budget not in a folder, which stays in browser storage. */
   folder?: Folder;
   oneTabAtATime?: OneTabAtATime;
+  /** What to do after giving way to a newer tab. Reloads the page by default. */
+  onGaveWay?: () => void;
 } = {}): Promise<DataFolderChangeLog> {
   let folder = initialFolder;
-  const database = await openDatabase(indexedDB);
+  const database = await openDatabase(indexedDB, onGaveWay);
   const localCopy = await openLocalCopy(database, () => folder !== undefined);
   const saveState = createSaveStateStore();
   let writing = false;

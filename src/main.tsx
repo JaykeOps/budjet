@@ -11,10 +11,19 @@ import {
   openIndexedDbDeviceId,
   rememberedFolderHandle,
   rememberFolderHandle,
+  upgradeDatabase,
 } from "./kernel/indexed-db-change-log";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing from index.html");
+
+// Rendering replaces this message, if it ever had to show.
+await upgradeDatabase({
+  onBlocked() {
+    root.innerHTML =
+      '<p role="alert">Close Crownkeep\'s other tabs to finish updating.</p>';
+  },
+});
 
 // Every record is read from browser storage before the first render, so a
 // returning user opens straight into their Budget.
