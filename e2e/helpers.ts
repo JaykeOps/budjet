@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 type FirstAccount = {
   name?: string;
@@ -67,4 +67,57 @@ export async function goTo(page: Page, place: Place): Promise<void> {
   };
   await links[place].click();
   await expect(landmarks[place]).toBeVisible();
+}
+
+/** A Category's or Category Group's row on the Budget: a list item on a phone, a table row on desktop. */
+export function budgetRow(page: Page, name: string): Locator {
+  return page
+    .getByRole("listitem", { name, exact: true })
+    .or(page.getByRole("row", { name: new RegExp(`^${name}\\b`) }));
+}
+
+/** The Budget's Category Groups and Categories, in the order they show, in one flat list. */
+export function budgetOutline(page: Page): Promise<(string | null)[]> {
+  return page
+    .getByRole("region", { name: /^\w+ \d{4}$/ })
+    .getByRole("heading", { level: 3 })
+    .or(page.getByRole("meter"))
+    .evaluateAll((found) =>
+      found.map(
+        (element) =>
+          element.getAttribute("aria-label")?.replace("Spending in ", "") ??
+          element.textContent,
+      ),
+    );
+}
+
+/** Records a Transaction in Activity and comes back to the Budget. */
+export async function record(
+  page: Page,
+  {
+    date,
+    amount,
+    category,
+    money = "out",
+  }: { date: string; amount: string; category: string; money?: "in" | "out" },
+): Promise<void> {
+  await goTo(page, "Activity");
+  const form = page.getByRole("form", { name: "Record a Transaction" });
+  await form.getByLabel("Date").fill(date);
+  await form.getByLabel("Money").selectOption(money);
+  await form.getByLabel("Amount").fill(amount);
+  await form.getByLabel("Category").selectOption({ label: category });
+  await form.getByRole("button", { name: "Record Transaction" }).click();
+  await goTo(page, "Budget");
+}
+
+/** Gives a Category an Assignment in the Month showing. */
+export async function assign(
+  page: Page,
+  category: string,
+  amount: string,
+): Promise<void> {
+  const field = page.getByLabel(`Assignment for ${category}`);
+  await field.fill(amount);
+  await field.press("Enter");
 }

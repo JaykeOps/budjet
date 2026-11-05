@@ -1,33 +1,52 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { createBudget, goTo } from "./helpers";
+import {
+  assign,
+  budgetOutline,
+  budgetRow,
+  createBudget,
+  goTo,
+  record,
+} from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 test.beforeEach(({ page }) =>
   page.clock.setFixedTime(new Date("2026-10-15T12:00:00")),
 );
 
-test("the Month Budget view opens on the current Month with every Category in its Category Group", async ({
+const monthHeading = (page: Page, name: string) =>
+  page.getByRole("heading", { name, exact: true });
+const meterOf = (page: Page, category: string) =>
+  budgetRow(page, category).getByRole("meter");
+const spentCard = (page: Page) =>
+  page.getByRole("region", { name: "Spent this Month" });
+const nextMonth = (page: Page) =>
+  page.getByRole("button", { name: "Next Month" }).click();
+
+test("the Budget opens on the current Month with every Category in its Category Group", async ({
   page,
 }) => {
   await createBudget(page, { firstAccount: { openingBalance: "0" } });
   await goTo(page, "Budget");
   await page.getByRole("button", { name: "Move Savings up" }).click();
 
-  const month = page.getByRole("table", { name: "October 2026" });
-  const expectOutline = async () =>
-    expect(month.getByRole("rowheader")).toHaveText([
-      "Bills",
-      "Rent",
-      "Power",
-      "Phone",
-      "Internet",
-      "Savings",
-      "Emergency Fund",
-      "Everyday",
-      "Groceries",
-      "Transport",
-      "Dining Out",
-    ]);
+  const expectOutline = () =>
+    expect
+      .poll(() => budgetOutline(page))
+      .toEqual([
+        "Bills",
+        "Rent",
+        "Power",
+        "Phone",
+        "Internet",
+        "Savings",
+        "Emergency Fund",
+        "Everyday",
+        "Groceries",
+        "Transport",
+        "Dining Out",
+      ]);
+  await expect(monthHeading(page, "October 2026")).toBeVisible();
   await expectOutline();
 
   await reloadWhenSaved(page);
@@ -35,29 +54,35 @@ test("the Month Budget view opens on the current Month with every Category in it
   await expectOutline();
 });
 
-test("Ready to Assign turns into a warning once more is assigned than there is", async ({
-  page,
-}) => {
+test("Ready to Assign's line changes with its amount", async ({ page }) => {
   await createBudget(page, { firstAccount: { openingBalance: "1000" } });
   await goTo(page, "Budget");
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
   await expect(readyToAssign).toHaveText(/\$1,000\.00/);
-  await expect(readyToAssign).not.toHaveText(/assigned more money/);
+  await expect(readyToAssign).toContainText(
+    "This is the money in your Accounts. Give each dollar a job.",
+  );
 
-  await page.getByLabel("Assignment for Rent").fill("1200");
-  await page.getByLabel("Assignment for Rent").press("Enter");
+  await assign(page, "Rent", "400");
+  await expect(readyToAssign).toHaveText(/\$600\.00/);
+  await expect(readyToAssign).toContainText("Give these dollars a job.");
 
-  const expectWarning = async () => {
+  await assign(page, "Rent", "1000");
+  await expect(readyToAssign).toHaveText(/\$0\.00/);
+  await expect(readyToAssign).toContainText("Every dollar has a job.");
+
+  await assign(page, "Rent", "1200");
+  const expectBelowZero = async () => {
     await expect(readyToAssign).toHaveText(/−\$200\.00/);
-    await expect(readyToAssign).toHaveText(
-      /You have assigned more money than you have\./,
+    await expect(readyToAssign).toContainText(
+      "You've assigned more than you have. Take some back.",
     );
   };
-  await expectWarning();
+  await expectBelowZero();
 
   await reloadWhenSaved(page);
 
-  await expectWarning();
+  await expectBelowZero();
 });
 
 test("a user steps between Months, assigns money in a future Month and stays on it after a reload", async ({
@@ -66,39 +91,32 @@ test("a user steps between Months, assigns money in a future Month and stays on 
   await createBudget(page, { firstAccount: { openingBalance: "1000" } });
   await goTo(page, "Budget");
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
-  await expect(page.getByRole("table", { name: "October 2026" })).toBeVisible();
+  await expect(monthHeading(page, "October 2026")).toBeVisible();
 
-  await page.getByRole("button", { name: "Next Month" }).click();
-  await expect(
-    page.getByRole("table", { name: "November 2026" }),
-  ).toBeVisible();
+  await nextMonth(page);
+  await expect(monthHeading(page, "November 2026")).toBeVisible();
   await expect(page).toHaveURL(/month=2026-11/);
 
-  await page.getByRole("button", { name: "Next Month" }).click();
-  const december = page.getByRole("table", { name: "December 2026" });
-  await expect(december).toBeVisible();
+  await nextMonth(page);
+  await expect(monthHeading(page, "December 2026")).toBeVisible();
   await expect(page).toHaveURL(/month=2026-12/);
 
-  const rent = december.getByLabel("Assignment for Rent");
-  await rent.fill("150");
-  await rent.press("Enter");
+  await assign(page, "Rent", "150");
   await expect(readyToAssign).toHaveText(/\$850\.00/);
 
   await reloadWhenSaved(page);
 
-  await expect(december).toBeVisible();
+  const rent = page.getByLabel("Assignment for Rent");
+  await expect(monthHeading(page, "December 2026")).toBeVisible();
   await expect(rent).toHaveValue("150.00");
   await expect(readyToAssign).toHaveText(/\$850\.00/);
 
   await page.goBack();
-  await expect(
-    page.getByRole("table", { name: "November 2026" }),
-  ).toBeVisible();
+  await expect(monthHeading(page, "November 2026")).toBeVisible();
 
   await page.getByRole("button", { name: "Previous Month" }).click();
-  const october = page.getByRole("table", { name: "October 2026" });
-  await expect(october).toBeVisible();
-  await expect(october.getByLabel("Assignment for Rent")).toHaveValue("0.00");
+  await expect(monthHeading(page, "October 2026")).toBeVisible();
+  await expect(rent).toHaveValue("0.00");
   await expect(readyToAssign).toHaveText(/\$850\.00/);
 });
 
@@ -107,76 +125,58 @@ test("Months before the Budget was created can't be opened", async ({
 }) => {
   await createBudget(page, { firstAccount: { openingBalance: "0" } });
   await goTo(page, "Budget");
-  await expect(page.getByRole("table", { name: "October 2026" })).toBeVisible();
+  await expect(monthHeading(page, "October 2026")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Previous Month" }),
   ).toBeDisabled();
 
   await page.goto("/?month=2026-09");
-  await expect(page.getByRole("table", { name: "October 2026" })).toBeVisible();
+  await expect(monthHeading(page, "October 2026")).toBeVisible();
   await expect(page).toHaveURL(/month=2026-10/);
 
   await page.goto("/?month=not-a-month");
-  await expect(page.getByRole("table", { name: "October 2026" })).toBeVisible();
+  await expect(monthHeading(page, "October 2026")).toBeVisible();
 });
 
-async function recordSpending(
-  page: Page,
-  date: string,
-  amount: string,
-  category: string,
-) {
-  await goTo(page, "Activity");
-  const record = page.getByRole("form", { name: "Record a Transaction" });
-  await record.getByLabel("Date").fill(date);
-  await record.getByLabel("Amount").fill(amount);
-  await record.getByLabel("Category").selectOption({ label: category });
-  await record.getByRole("button", { name: "Record Transaction" }).click();
-  await goTo(page, "Budget");
-}
-
-async function assign(page: Page, category: string, amount: string) {
-  const input = page.getByLabel(`Assignment for ${category}`);
-  await input.fill(amount);
-  await input.press("Enter");
-}
-
-test("an Overspent Category is red in its Month and the next until an Assignment covers it", async ({
+test("an Overspent Category reads Overspent with a full bar, in its Month and the next, until an Assignment covers it", async ({
   page,
 }) => {
   await createBudget(page, { firstAccount: { openingBalance: "1000" } });
   await goTo(page, "Budget");
   await assign(page, "Groceries", "100");
-  await recordSpending(page, "2026-10-12", "150", "Groceries");
+  await record(page, {
+    date: "2026-10-12",
+    amount: "150",
+    category: "Groceries",
+  });
 
-  const groceries = (month: string) =>
-    page
-      .getByRole("table", { name: month })
-      .getByRole("row", { name: /Groceries/ });
-  const overspent = page.getByRole("list", { name: "Overspent Categories" });
-  const expectOverspent = async (month: string) => {
-    await expect(groceries(month).getByRole("cell").last()).toHaveText(
-      "−$50.00",
+  const groceries = budgetRow(page, "Groceries");
+  const expectOverspent = async () => {
+    await expect(groceries).toContainText("−$50.00");
+    await expect(groceries).toContainText("Overspent by $50.00");
+    await expect(meterOf(page, "Groceries")).toHaveAttribute(
+      "aria-valuenow",
+      "100",
     );
-    await expect(overspent.getByRole("listitem")).toHaveText([
-      /Groceries.*−\$50\.00/,
-    ]);
   };
 
-  await expectOverspent("October 2026");
-  await page.getByRole("button", { name: "Next Month" }).click();
-  await expectOverspent("November 2026");
+  await expectOverspent();
+  await nextMonth(page);
+  await expect(monthHeading(page, "November 2026")).toBeVisible();
+  await expectOverspent();
 
   await reloadWhenSaved(page);
-  await expectOverspent("November 2026");
+  await expectOverspent();
 
   await assign(page, "Groceries", "50");
 
   const covered = async () => {
-    await expect(
-      groceries("November 2026").getByRole("cell").last(),
-    ).toHaveText("$0.00");
-    await expect(overspent).toHaveCount(0);
+    await expect(groceries).toContainText("$0.00");
+    await expect(groceries).not.toContainText("Overspent");
+    await expect(meterOf(page, "Groceries")).toHaveAttribute(
+      "aria-valuenow",
+      "0",
+    );
   };
   await covered();
 
@@ -184,62 +184,176 @@ test("an Overspent Category is red in its Month and the next until an Assignment
   await covered();
 });
 
-test("a refund larger than the Month's money going out shows signed Spending", async ({
+test("Overspent wins over negative Spending", async ({ page }) => {
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
+  await record(page, {
+    date: "2026-10-12",
+    amount: "50",
+    category: "Groceries",
+  });
+  await record(page, {
+    date: "2026-11-02",
+    amount: "12",
+    category: "Groceries",
+    money: "in",
+  });
+  await nextMonth(page);
+  await expect(monthHeading(page, "November 2026")).toBeVisible();
+
+  await expect(budgetRow(page, "Groceries")).toContainText(
+    "Overspent by $38.00",
+  );
+  await expect(meterOf(page, "Groceries")).toHaveAttribute(
+    "aria-valuenow",
+    "100",
+  );
+});
+
+test("negative Spending reads as a signed figure, with no 'of' and an empty bar", async ({
   page,
 }) => {
   await createBudget(page, { firstAccount: { openingBalance: "1000" } });
   await goTo(page, "Budget");
   await assign(page, "Groceries", "100");
-  await recordSpending(page, "2026-10-03", "20", "Groceries");
-  await goTo(page, "Activity");
-  const record = page.getByRole("form", { name: "Record a Transaction" });
-  await record.getByLabel("Date").fill("2026-10-05");
-  await record.getByLabel("Money").selectOption("in");
-  await record.getByLabel("Amount").fill("32");
-  await record.getByLabel("Category").selectOption({ label: "Groceries" });
-  await record.getByRole("button", { name: "Record Transaction" }).click();
+  await record(page, {
+    date: "2026-10-03",
+    amount: "20",
+    category: "Groceries",
+  });
+  await record(page, {
+    date: "2026-10-05",
+    amount: "32",
+    category: "Groceries",
+    money: "in",
+  });
 
-  await goTo(page, "Budget");
-  const october = page.getByRole("table", { name: "October 2026" });
-  const groceries = october.getByRole("row", { name: /^Groceries/ });
-  await expect(groceries.getByRole("cell").nth(1)).toHaveText("−$12.00");
-  await expect(groceries.getByRole("cell").nth(2)).toHaveText("$112.00");
-  const everyday = october.getByRole("row", { name: /^Everyday/ });
-  await expect(everyday.getByRole("cell").nth(1)).toHaveText("−$12.00");
+  const groceries = budgetRow(page, "Groceries");
+  await expect(groceries).toContainText("−$12.00");
+  await expect(groceries).toContainText("$112.00");
+  await expect(groceries).not.toContainText(" of ");
+  await expect(meterOf(page, "Groceries")).toHaveAttribute(
+    "aria-valuenow",
+    "0",
+  );
+
+  await expect(spentCard(page)).toContainText("−$12.00");
+  await expect(spentCard(page)).not.toContainText(" of ");
+  await expect(spentCard(page).getByRole("img")).toBeVisible();
 });
 
-test("Category Groups show subtotals and collapse and expand", async ({
+test("Spent this Month is measured against the Month's Assignments with days to go", async ({
   page,
 }) => {
   await createBudget(page, { firstAccount: { openingBalance: "1000" } });
   await goTo(page, "Budget");
+  await expect(spentCard(page)).toContainText(
+    "Nothing recorded yet. Spending shows up here as you record it.",
+  );
+  await expect(spentCard(page).getByRole("img")).toBeHidden();
+
   await assign(page, "Groceries", "300");
-  await assign(page, "Transport", "50.50");
-  await recordSpending(page, "2026-10-03", "20", "Groceries");
-  await recordSpending(page, "2026-10-04", "10.25", "Dining Out");
+  await record(page, {
+    date: "2026-10-03",
+    amount: "20",
+    category: "Groceries",
+  });
 
-  const october = page.getByRole("table", { name: "October 2026" });
-  const everyday = october.getByRole("row", { name: /^Everyday/ });
-  const expectSubtotals = async () => {
-    await expect(everyday.getByRole("cell")).toHaveText([
-      "$350.50",
-      "$30.25",
-      "$320.25",
-    ]);
-  };
-  await expectSubtotals();
+  await expect(spentCard(page)).toContainText("$20.00 of $300.00 assigned");
+  await expect(spentCard(page).getByRole("img")).toBeVisible();
+  await expect(spentCard(page)).toContainText("16 days to go.");
 
-  const toggle = october.getByRole("button", { name: "Everyday" });
-  await expect(toggle).toHaveAttribute("aria-expanded", "true");
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await expect(october.getByLabel("Assignment for Groceries")).toHaveCount(0);
-  await expect(october.getByLabel("Assignment for Rent")).toBeVisible();
-  await expectSubtotals();
-
-  await toggle.click();
-  await expect(october.getByLabel("Assignment for Groceries")).toBeVisible();
-
-  await reloadWhenSaved(page);
-  await expectSubtotals();
+  await page.goto("/?month=2026-11");
+  await expect(spentCard(page)).toContainText("Nothing recorded yet.");
 });
+
+test("rows read Spending against what the Category had", async ({ page }) => {
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
+  await assign(page, "Groceries", "300");
+  await record(page, {
+    date: "2026-10-03",
+    amount: "75",
+    category: "Groceries",
+  });
+
+  await expect(budgetRow(page, "Groceries")).toContainText("$225.00");
+  await expect(meterOf(page, "Groceries")).toHaveAttribute(
+    "aria-valuenow",
+    "25",
+  );
+  await expect(meterOf(page, "Rent")).toHaveAttribute("aria-valuenow", "0");
+});
+
+test("a hidden Category's Group doesn't show once nothing in it does", async ({
+  page,
+}) => {
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
+  await page.getByRole("button", { name: "Hide Emergency Fund" }).click();
+
+  await expect.poll(() => budgetOutline(page)).not.toContain("Savings");
+});
+
+test("`?` hints explain Ready to Assign, Available and Overspent in the Category's own numbers", async ({
+  page,
+}) => {
+  await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+  await goTo(page, "Budget");
+  await assign(page, "Dining Out", "60");
+  await record(page, {
+    date: "2026-10-03",
+    amount: "80",
+    category: "Dining Out",
+  });
+
+  const expectHint = async (button: string, text: string, index = 0) => {
+    await page.getByRole("button", { name: button }).nth(index).click();
+    await expect(page.getByRole("dialog")).toHaveText(text);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+  };
+  await expectHint(
+    "What is Ready to Assign?",
+    "The money in your Accounts that doesn't have a job yet.",
+  );
+  await expectHint(
+    "What is Available?",
+    "What a Category has left to spend this Month. Whatever's left carries into next Month.",
+  );
+  await expectHint(
+    "What is Overspent?",
+    "Dining Out had $60.00 and spent $80.00. Cover the $20.00, or it stays red, Month after Month.",
+  );
+});
+
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`the Budget screen has no serious accessibility violations in ${colorScheme}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme });
+    await createBudget(page, { firstAccount: { openingBalance: "1000" } });
+    await goTo(page, "Budget");
+    await assign(page, "Rent", "100");
+    await assign(page, "Dining Out", "10");
+    await record(page, {
+      date: "2026-10-03",
+      amount: "80",
+      category: "Dining Out",
+    });
+    await record(page, {
+      date: "2026-10-04",
+      amount: "40",
+      category: "Rent",
+      money: "in",
+    });
+    await expect(budgetRow(page, "Dining Out")).toContainText("Overspent");
+
+    const { violations } = await new AxeBuilder({ page }).analyze();
+
+    const serious = violations.filter(
+      ({ impact }) => impact === "serious" || impact === "critical",
+    );
+    expect(serious).toEqual([]);
+  });
+}
