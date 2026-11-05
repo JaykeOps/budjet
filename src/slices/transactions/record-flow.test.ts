@@ -5,7 +5,7 @@ import {
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import type { AccountOpened } from "../accounts/records";
-import { setAssignment } from "../assignments/commands";
+import type { AssignmentSet } from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
 import type {
   CategoryCreated,
@@ -229,11 +229,16 @@ describe("withDirection", () => {
 describe("categoryChoices", () => {
   it("lists Available in the Month by Group, and Ready to Assign, leaving hidden Categories out", () => {
     const { writer, records } = budget();
-    setAssignment(writer, {
-      categoryId: "groceries",
-      month: "2026-10",
-      amount: money(5000, "USD"),
-    });
+    writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+      "groceries-2026-10",
+      "AssignmentSet",
+      {
+        version: 1,
+        categoryId: "groceries",
+        month: "2026-10",
+        amount: money(5000, "USD"),
+      },
+    );
     recordTransaction(writer, {
       ...spend,
       accountId: "checking",
