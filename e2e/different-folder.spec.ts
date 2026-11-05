@@ -29,6 +29,18 @@ const theirBudget = `${JSON.stringify({
   timestamp: { wallTime: Date.UTC(2026, 9, 1), counter: 0 },
   type: "BudgetCreated",
   payload: { currency: "SEK", version: 2, firstMonth: "2026-10" },
+})}\n${JSON.stringify({
+  id: "their-account",
+  subjectId: "their-savings",
+  deviceId: "laptop",
+  timestamp: { wallTime: Date.UTC(2026, 9, 1), counter: 1 },
+  type: "AccountOpened",
+  payload: {
+    version: 1,
+    name: "Their savings",
+    kind: "savings",
+    openingBalance: { minorUnits: 10000, currency: "SEK" },
+  },
 })}\n`;
 
 async function aSavedBudget(page: Page) {
@@ -89,7 +101,7 @@ test("first run stops at a folder holding two Budgets", async ({ page }) => {
   await deliverFile(
     page,
     "another-file",
-    theirBudget.replaceAll("their-budget", "second-budget"),
+    theirBudget.replaceAll("their-", "second-"),
   );
 
   await startFirstRun(page);
