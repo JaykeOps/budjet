@@ -166,7 +166,7 @@ function Shell({
       recordButton={recording.recordButton}
       plus={<RecordMenu currency={budget.currency} />}
     >
-      <Page titled={place === "activity"} folderConnection={folderConnection}>
+      <Page titled={false} folderConnection={folderConnection}>
         {folderOffer && <MoveIntoFolderOffer {...folderOffer} />}
         {place === "budget" && (
           <BudgetMonth

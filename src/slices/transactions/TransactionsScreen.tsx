@@ -63,8 +63,8 @@ export function TransactionsScreen({
     entries.every(({ kind }) => kind === "opening-balance"),
   );
   return (
-    <section aria-labelledby={headingId} className={styles.screen}>
-      <h2 id={headingId}>
+    <>
+      <h1 id={headingId} className={styles.screenTitle}>
         {account ? (
           account.name
         ) : (
@@ -73,64 +73,66 @@ export function TransactionsScreen({
             <span className={styles.notOnPhone}>All Accounts</span>
           </>
         )}
-      </h2>
-      {account?.closed && (
-        <p>
-          Closed. Its history stays here, and it takes no new Transactions or
-          Transfers.
-        </p>
-      )}
-      <ShowingPicker
-        showing={{ accountId: account?.id, month: showing.month }}
-        onShow={onShow}
-      />
-      {!account?.closed && recordRow}
-      {statements.length === 0 ? (
-        <p>Nothing here. Try another Month.</p>
-      ) : (
-        <History
-          label={`History of ${account?.name ?? "All Accounts"}`}
-          statements={statements}
-          accountId={account?.id}
-          askedMonth={showing.month}
-          actionsFor={rows.actionsFor}
-          onOpen={rows.open}
-          inPlace={rows.inPlace}
+      </h1>
+      <section aria-labelledby={headingId} className={styles.screen}>
+        {account?.closed && (
+          <p>
+            Closed. Its history stays here, and it takes no new Transactions or
+            Transfers.
+          </p>
+        )}
+        <ShowingPicker
+          showing={{ accountId: account?.id, month: showing.month }}
+          onShow={onShow}
         />
-      )}
-      {!account && openAccounts.length === 0 ? (
-        <EmptyState
-          plain
-          actions={
-            <button type="button" data-primary onClick={onAddAccount}>
-              Add an Account
-            </button>
-          }
-        >
-          Nothing here yet. Add an Account, and everything that moves through it
-          shows up here.
-        </EmptyState>
-      ) : (
-        !account?.closed &&
-        onlyOpeningBalances && (
+        {!account?.closed && recordRow}
+        {statements.length === 0 ? (
+          <p>Nothing here. Try another Month.</p>
+        ) : (
+          <History
+            label={`History of ${account?.name ?? "All Accounts"}`}
+            statements={statements}
+            accountId={account?.id}
+            askedMonth={showing.month}
+            actionsFor={rows.actionsFor}
+            onOpen={rows.open}
+            inPlace={rows.inPlace}
+          />
+        )}
+        {!account && openAccounts.length === 0 ? (
           <EmptyState
             plain
             actions={
-              <button
-                type="button"
-                data-primary
-                onClick={() => onRecordFirst(account?.id)}
-              >
-                Record a Transaction
+              <button type="button" data-primary onClick={onAddAccount}>
+                Add an Account
               </button>
             }
           >
-            Nothing recorded yet. Record what you spend, and it shows up here.
+            Nothing here yet. Add an Account, and everything that moves through
+            it shows up here.
           </EmptyState>
-        )
-      )}
-      {rows.sheets}
-    </section>
+        ) : (
+          !account?.closed &&
+          onlyOpeningBalances && (
+            <EmptyState
+              plain
+              actions={
+                <button
+                  type="button"
+                  data-primary
+                  onClick={() => onRecordFirst(account?.id)}
+                >
+                  Record a Transaction
+                </button>
+              }
+            >
+              Nothing recorded yet. Record what you spend, and it shows up here.
+            </EmptyState>
+          )
+        )}
+        {rows.sheets}
+      </section>
+    </>
   );
 }
 

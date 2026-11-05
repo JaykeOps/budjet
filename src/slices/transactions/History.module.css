@@ -243,3 +243,8 @@
 .reading > :last-child {
   align-self: flex-end;
 }
+
+/* The screen's own heading, above its card, as on the other places. */
+.screenTitle {
+  margin: 0;
+}

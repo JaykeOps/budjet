@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createBudget, goTo, openApp } from "./helpers";
+import { createBudget, goTo, hasRail, openApp } from "./helpers";
 
 test("the tab and the installed app are called Crownkeep", async ({ page }) => {
   await openApp(page);
@@ -12,13 +12,16 @@ test("the tab and the installed app are called Crownkeep", async ({ page }) => {
   expect(manifest.short_name).toBe("Crownkeep");
 });
 
-test("a screen with no heading of its own is headed Crownkeep", async ({
+test("Activity is headed Activity on a phone and All Accounts on desktop", async ({
   page,
 }) => {
   await createBudget(page);
   await goTo(page, "Activity");
 
+  const name = hasRail(page) ? "All Accounts" : "Activity";
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
   await expect(
-    page.getByRole("heading", { level: 1, name: "Crownkeep" }),
+    page.getByRole("heading", { level: 1, name, exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole("region", { name })).toBeVisible();
 });
