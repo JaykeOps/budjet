@@ -1,4 +1,7 @@
-/** Whether this browser can keep a Budget in a Data Folder. Only ever ask this, never which browser it is. */
+/**
+ * Whether this browser can keep a Budget in a Data Folder. Ask this, not which
+ * browser it is: the one exception is `shouldSuggestHomeScreen`.
+ */
 export function hasFolderPicker(): boolean {
   return "showDirectoryPicker" in window;
 }
@@ -21,7 +24,11 @@ export async function chooseFolder(
   }
 }
 
-/** On an iPhone, a site added to the Home Screen has the best chance of keeping its storage. */
+/**
+ * On an iPhone, a site added to the Home Screen has the best chance of keeping
+ * its storage. No feature tells that apart, so this alone reads the user agent,
+ * and only for the hint.
+ */
 export function shouldSuggestHomeScreen(): boolean {
   return (
     /iPhone|iPod/.test(navigator.userAgent) &&
