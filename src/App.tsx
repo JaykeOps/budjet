@@ -5,6 +5,7 @@ import {
   useState,
 } from "react";
 import { AccountsPlace } from "./AccountsPlace";
+import { FolderBanner, type FolderConnection } from "./FolderBanner";
 import { FirstRun } from "./first-run/FirstRun";
 import type { ChangeLogWriter } from "./kernel/change-log";
 import { parseMonth } from "./kernel/month";
@@ -49,13 +50,16 @@ type KeepInFolder = ComponentProps<typeof FirstRun>["keepInFolder"];
 export function App({
   writer,
   keepInFolder,
+  folderConnection,
 }: {
   writer: ChangeLogWriter;
   keepInFolder: KeepInFolder;
+  /** Absent where a Budget can only live in Browser storage. */
+  folderConnection?: FolderConnection;
 }) {
   return (
     <ChangeLogWriterProvider value={writer}>
-      <Root keepInFolder={keepInFolder} />
+      <Root keepInFolder={keepInFolder} folderConnection={folderConnection} />
     </ChangeLogWriterProvider>
   );
 }
@@ -63,13 +67,16 @@ export function App({
 /** `titled` is false for a screen with its own top-level heading. */
 function Page({
   titled = true,
+  folderConnection,
   children,
 }: {
   titled?: boolean;
+  folderConnection?: FolderConnection;
   children: ReactNode;
 }) {
   return (
     <main>
+      {folderConnection && <FolderBanner connection={folderConnection} />}
       {titled && <h1>budjet</h1>}
       {children}
       <p>Version {__APP_VERSION__}</p>
@@ -78,7 +85,13 @@ function Page({
 }
 
 /** First run, which has no navigation, until there's a Budget, then the Budget. */
-function Root({ keepInFolder }: { keepInFolder: KeepInFolder }) {
+function Root({
+  keepInFolder,
+  folderConnection,
+}: {
+  keepInFolder: KeepInFolder;
+  folderConnection?: FolderConnection;
+}) {
   const budget = useBudget();
   const hasBudget = budget !== undefined;
 
@@ -90,7 +103,7 @@ function Root({ keepInFolder }: { keepInFolder: KeepInFolder }) {
   if (!budget) return <FirstRun keepInFolder={keepInFolder} />;
   return (
     <Toasts>
-      <Shell budget={budget} />
+      <Shell budget={budget} folderConnection={folderConnection} />
     </Toasts>
   );
 }
@@ -100,7 +113,13 @@ function Root({ keepInFolder }: { keepInFolder: KeepInFolder }) {
  * Account yet can only come from an older setup, or a page closed while first
  * run was writing, so it asks for one, without navigation.
  */
-function Shell({ budget }: { budget: Budget }) {
+function Shell({
+  budget,
+  folderConnection,
+}: {
+  budget: Budget;
+  folderConnection?: FolderConnection;
+}) {
   const writer = useChangeLogWriter();
   const accounts = useAccounts();
   const place = usePlace();
@@ -109,7 +128,7 @@ function Shell({ budget }: { budget: Budget }) {
 
   if (accounts.length === 0) {
     return (
-      <Page>
+      <Page folderConnection={folderConnection}>
         <OpenAccountForm
           label="Add your first Account"
           currency={budget.currency}
@@ -123,7 +142,7 @@ function Shell({ budget }: { budget: Budget }) {
       onAddAccount={() => setAddingAccount(true)}
       plus={<RecordMenu currency={budget.currency} />}
     >
-      <Page titled={place === "activity"}>
+      <Page titled={place === "activity"} folderConnection={folderConnection}>
         {place === "budget" && (
           <>
             <BudgetMonth
