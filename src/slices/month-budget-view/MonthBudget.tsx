@@ -6,11 +6,15 @@ import {
   nextMonth,
   previousMonth,
 } from "../../kernel/month";
+import { Sheet } from "../../ui/Sheet";
+import type { CategoryGroup } from "../categories";
+import { AssignPanel } from "./AssignPanel";
 import { CategoryLists, CategoryTables } from "./CategoryRows";
 import { CategorySheet, type SheetSteps } from "./CategorySheet";
 import styles from "./MonthBudget.module.css";
 import { type MoveInput, MoveMoneyForm } from "./MoveMoneyForm";
 import { ReadyToAssign, SpentThisMonthCard } from "./Summary";
+import { useAssignedColumn } from "./use-assigned-column";
 import { useWide } from "./use-wide";
 import { useVisibleCategoryGroups } from "./visible-categories";
 
@@ -48,7 +52,17 @@ export function MonthBudget({
   const wide = useWide();
   const [error, setError] = useState<string>();
   const [steps, setSteps] = useState<SheetSteps>();
-  const Rows = wide ? CategoryTables : CategoryLists;
+  const ids = groups.flatMap(({ categories }) =>
+    categories.map(({ id }) => id),
+  );
+  const column = useAssignedColumn({
+    ids,
+    month,
+    currency,
+    onAssign: (categoryId, amount) =>
+      attempt(() => onAssign({ categoryId, month, amount })),
+    onError: setError,
+  });
 
   /** Runs a change, showing the error if it is refused; true when it went through. */
   function attempt(action: () => void): boolean {
@@ -61,6 +75,20 @@ export function MonthBudget({
       return false;
     }
   }
+
+  const rows = {
+    groups,
+    month,
+    currency,
+    onOpenCategory: (categoryId: string) =>
+      setSteps({ title: "Categories", ids, start: ids.indexOf(categoryId) }),
+    onAssignGroup: ({ name, categories }: CategoryGroup) =>
+      setSteps({
+        title: `Assign ${name}`,
+        ids: categories.map(({ id }) => id),
+        start: 0,
+      }),
+  };
 
   return (
     <div className={styles.screen}>
@@ -97,40 +125,41 @@ export function MonthBudget({
             Copy last Month
           </button>
         )}
+        {wide && (
+          <Sheet
+            title="Move money"
+            trigger="Move money"
+            triggerClassName={styles.headerAction}
+          >
+            {(close) => (
+              <MoveMoneyForm
+                month={month}
+                currency={currency}
+                onMove={(input) => onMoveMoney({ ...input, month })}
+                onAssign={(categoryId, amount) =>
+                  onAssign({ categoryId, month, amount })
+                }
+                onDone={close}
+              />
+            )}
+          </Sheet>
+        )}
       </header>
       {error && <p role="alert">{error}</p>}
       <section className={styles.columns} aria-labelledby={monthId}>
         <div className={styles.summary}>
           <ReadyToAssign />
+          {wide && (
+            <AssignPanel column={column} month={month} currency={currency} />
+          )}
           <SpentThisMonthCard month={month} />
         </div>
         <div className={styles.groups}>
-          <Rows
-            groups={groups}
-            month={month}
-            currency={currency}
-            onAssign={(categoryId, amount) =>
-              attempt(() => onAssign({ categoryId, month, amount }))
-            }
-            onError={setError}
-            onOpenCategory={(categoryId) => {
-              const ids = groups.flatMap(({ categories }) =>
-                categories.map(({ id }) => id),
-              );
-              setSteps({
-                title: "Categories",
-                ids,
-                start: ids.indexOf(categoryId),
-              });
-            }}
-            onAssignGroup={({ name, categories }) =>
-              setSteps({
-                title: `Assign ${name}`,
-                ids: categories.map(({ id }) => id),
-                start: 0,
-              })
-            }
-          />
+          {wide ? (
+            <CategoryTables {...rows} column={column} />
+          ) : (
+            <CategoryLists {...rows} />
+          )}
         </div>
       </section>
       {steps && (
@@ -150,14 +179,6 @@ export function MonthBudget({
           }
         />
       )}
-      {/* Stands in until Move money has its own dialog (#107). */}
-      <div className={styles.standIn}>
-        <MoveMoneyForm
-          currency={currency}
-          onMove={(input) => attempt(() => onMoveMoney({ ...input, month }))}
-          onError={setError}
-        />
-      </div>
     </div>
   );
 }

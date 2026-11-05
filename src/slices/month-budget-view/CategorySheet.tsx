@@ -21,6 +21,7 @@ import styles from "./CategorySheet.module.css";
 import {
   assignPreview,
   breakdown,
+  groupsOf,
   mainButton,
   movePreview,
   type SheetBudget,
@@ -449,15 +450,4 @@ function sheetChange(
   return by.minorUnits > 0
     ? { kind: "raise", by }
     : { kind: "lower", by: subtractMoney(assigned, amount) };
-}
-
-function groupsOf(categories: SheetCategory[]): [string, SheetCategory[]][] {
-  const groups = new Map<string, SheetCategory[]>();
-  for (const category of categories) {
-    groups.set(category.groupName, [
-      ...(groups.get(category.groupName) ?? []),
-      category,
-    ]);
-  }
-  return [...groups];
 }

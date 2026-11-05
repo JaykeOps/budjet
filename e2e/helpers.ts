@@ -204,3 +204,36 @@ export async function expectAssigned(
   );
   await closeSheet(sheet);
 }
+
+/** The option in a select whose text starts with this name, ignoring the amount after it. */
+async function selectByName(select: Locator, name: string): Promise<void> {
+  const value = await select
+    .locator("option", { hasText: new RegExp(`^${name} \\(`) })
+    .first()
+    .getAttribute("value");
+  await select.selectOption(value ?? "");
+}
+
+/** Moves money between two Categories in the Month showing, however this screen does it. */
+export async function moveMoney(
+  page: Page,
+  { from, to, amount }: { from: string; to: string; amount: string },
+): Promise<void> {
+  if (hasAssignedColumn(page)) {
+    await page.getByRole("button", { name: "Move money" }).click();
+    const dialog = page.getByRole("dialog", { name: "Move money" });
+    await selectByName(dialog.getByLabel("From", { exact: true }), from);
+    await selectByName(dialog.getByLabel("To", { exact: true }), to);
+    await dialog.getByLabel("Amount").fill(amount);
+    await dialog.getByRole("button", { name: /^Move / }).click();
+    await expect(dialog).toHaveCount(0);
+    return;
+  }
+  const sheet = await openCategory(page, to);
+  await sheet.getByRole("button", { name: "Another Category" }).click();
+  await selectByName(sheet.getByLabel("Take it from"), from);
+  const field = sheet.getByRole("textbox", { name: `Move to ${to}` });
+  await field.fill(amount);
+  await field.press("Enter");
+  await closeSheet(sheet);
+}

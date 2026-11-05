@@ -230,6 +230,15 @@
   white-space: normal;
 }
 
+.moveForm {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 12px;
+  margin: 0;
+}
+
 /* Same width as use-wide.ts, where the sheet becomes a side panel. */
 @media (min-width: 1180px) {
   .overlay {

@@ -58,6 +58,19 @@ export function useSheetBudget(of: Month, currency: Currency): SheetBudget {
   );
 }
 
+export function groupsOf(
+  categories: SheetCategory[],
+): [string, SheetCategory[]][] {
+  const groups = new Map<string, SheetCategory[]>();
+  for (const category of categories) {
+    groups.set(category.groupName, [
+      ...(groups.get(category.groupName) ?? []),
+      category,
+    ]);
+  }
+  return [...groups];
+}
+
 const negated = (amount: Money) => money(-amount.minorUnits, amount.currency);
 
 /** How much a Category is short by: zero unless it's Overspent. */
@@ -140,7 +153,7 @@ export function suggestions(
 }
 
 /** Says what lowering a Category by `by` will do, before saving. */
-function loweringNote(
+export function loweringNote(
   { name, row: { assigned } }: SheetCategory,
   by: Money,
   of: Month,
