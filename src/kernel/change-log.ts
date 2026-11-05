@@ -16,12 +16,66 @@ export type ChangeRecord<Type extends string = string, Payload = unknown> = {
   payload: Payload;
 };
 
+/** Why a change isn't saved yet: the folder's access lapsed, the folder is gone, or the write failed some other way. */
+export type UnsavedReason = "access-lapsed" | "folder-gone" | "write-failed";
+
+/**
+ * Whether every change has reached where this Change Log keeps them. The same
+ * object comes back until the state changes.
+ */
+export type SaveState =
+  | { status: "saved" }
+  | { status: "saving" }
+  | { status: "unsaved"; reason: UnsavedReason };
+
 export type ChangeLog = {
+  /** Records a change. It shows at once, and `saveState` follows its write. */
   append(records: readonly ChangeRecord[]): void;
+  /** Adds records that arrived from elsewhere, ignoring ids it already has. */
+  merge(records: readonly ChangeRecord[]): void;
   /** Every record, oldest first. The same array comes back until the next append. */
   readAll(): readonly ChangeRecord[];
   subscribe(listener: () => void): () => void;
+  saveState(): SaveState;
+  subscribeToSaveState(listener: () => void): () => void;
 };
+
+export const SAVED: SaveState = { status: "saved" };
+export const SAVING: SaveState = { status: "saving" };
+
+/** Holds a Change Log's save state and tells subscribers when it changes. */
+export function createSaveStateStore() {
+  let state = SAVED;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => state,
+    set(next: SaveState) {
+      if (JSON.stringify(next) === JSON.stringify(state)) return;
+      state = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe(listener: () => void) {
+      const entry = () => listener();
+      listeners.add(entry);
+      return () => {
+        listeners.delete(entry);
+      };
+    },
+  };
+}
+
+/** What `merge` should add: each id once, leaving out ids already held. */
+export function recordsToMerge(
+  held: readonly ChangeRecord[],
+  arriving: readonly ChangeRecord[],
+): ChangeRecord[] {
+  const seen = new Set(held.map(({ id }) => id));
+  return arriving.filter(({ id }) => {
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
 
 /** Orders records oldest first: by timestamp, then device id, so every device agrees. */
 export function compareRecords(a: ChangeRecord, b: ChangeRecord): number {
@@ -53,10 +107,15 @@ function compareStrings(a: string, b: string): number {
 export function createInMemoryChangeLog(): ChangeLog {
   let records: readonly ChangeRecord[] = [];
   const listeners = new Set<() => void>();
+  const append = (added: readonly ChangeRecord[]) => {
+    records = [...records, ...added].sort(compareRecords);
+    for (const listener of listeners) listener();
+  };
   return {
-    append(added) {
-      records = [...records, ...added].sort(compareRecords);
-      for (const listener of listeners) listener();
+    append,
+    merge(arriving) {
+      const added = recordsToMerge(records, arriving);
+      if (added.length > 0) append(added);
     },
     readAll: () => records,
     subscribe(listener) {
@@ -65,6 +124,9 @@ export function createInMemoryChangeLog(): ChangeLog {
       listeners.add(entry);
       return () => listeners.delete(entry);
     },
+    // Nothing to wait for: a change is as saved as it will ever be.
+    saveState: () => SAVED,
+    subscribeToSaveState: () => () => {},
   };
 }
 

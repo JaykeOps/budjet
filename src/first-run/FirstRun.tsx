@@ -25,6 +25,13 @@ import { guessCurrency } from "./guess-currency";
 import { type CategoriesChoice, openMyBudget } from "./open-my-budget";
 
 const STEPS = ["welcome", "currency", "categories", "accounts"] as const;
+const STEPS_WITH_FOLDER = [
+  "welcome",
+  "folder",
+  "currency",
+  "categories",
+  "accounts",
+] as const;
 
 const KINDS: readonly { kind: AccountKind; label: string }[] = [
   { kind: "checking", label: "Checking" },
@@ -52,9 +59,17 @@ function readAmount(holds: string, currency: Currency): Money | undefined {
 
 /**
  * Asks a new user one question per screen. Every answer stays in this
- * component's state until Open my Budget, so leaving saves nothing.
+ * component's state until Open my Budget, so leaving saves no records. Only the
+ * chosen folder is remembered at once, and choosing again replaces it.
  */
-export function FirstRun() {
+export function FirstRun({
+  keepInFolder,
+}: {
+  /** Keeps the Budget in the folder chosen. Absent where the browser has no folder picker. */
+  keepInFolder:
+    | ((folder: FileSystemDirectoryHandle) => Promise<void>)
+    | undefined;
+}) {
   const writer = useChangeLogWriter();
   const [stepIndex, setStepIndex] = useState(0);
   const [currency, setCurrency] = useState(() =>
@@ -66,7 +81,8 @@ export function FirstRun() {
   const [adding, setAdding] = useState(true);
 
   const next = () => setStepIndex(stepIndex + 1);
-  const step = STEPS[stepIndex];
+  const steps = keepInFolder ? STEPS_WITH_FOLDER : STEPS;
+  const step = steps[stepIndex];
 
   return (
     <main className={styles.page}>
@@ -80,11 +96,19 @@ export function FirstRun() {
             <span aria-hidden="true">‹ </span>Back
           </button>
           <span className={styles.note}>
-            {stepIndex} of {STEPS.length - 1}
+            {stepIndex} of {steps.length - 1}
           </span>
         </div>
       )}
       {step === "welcome" && <Welcome onNext={next} />}
+      {step === "folder" && keepInFolder && (
+        <DataFolderStep
+          onChoose={async (folder) => {
+            await keepInFolder(folder);
+            next();
+          }}
+        />
+      )}
       {step === "currency" && (
         <CurrencyStep value={currency} onChange={setCurrency} onNext={next} />
       )}
@@ -161,6 +185,52 @@ function Welcome({ onNext }: { onNext: () => void }) {
       )}
       <button type="button" className={styles.primary} onClick={onNext}>
         Get started
+      </button>
+    </>
+  );
+}
+
+/** Can't be skipped: the only way on is choosing a folder, and cancelling stays here. */
+function DataFolderStep({
+  onChoose,
+}: {
+  onChoose: (folder: FileSystemDirectoryHandle) => Promise<void>;
+}) {
+  async function choose() {
+    try {
+      const folder = await window.showDirectoryPicker?.({
+        id: "crownkeep",
+        mode: "readwrite",
+      });
+      if (folder) await onChoose(folder);
+    } catch (error) {
+      // Cancelling, and declining the browser's prompt, both arrive as AbortError.
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        console.error("Crownkeep could not use that folder", error);
+      }
+    }
+  }
+
+  return (
+    <>
+      <Title>Where should your Budget live?</Title>
+      <p className={styles.lead}>
+        Crownkeep keeps everything in that folder, and nothing goes to us.
+      </p>
+      <p className={styles.note}>
+        Pick a folder a sync service already watches to reach other devices, or
+        the same folder as another device to open that Budget.
+      </p>
+      <p className={styles.note}>
+        You can move this folder later. Crownkeep will ask you to find it again.
+      </p>
+      <p className={styles.note}>
+        Setting up a second device? Wait until your sync service has finished,
+        then pick the folder.
+      </p>
+      <p className={styles.note}>Choose Allow when your browser asks.</p>
+      <button type="button" className={styles.primary} onClick={choose}>
+        Choose a folder
       </button>
     </>
   );
