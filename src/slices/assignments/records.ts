@@ -15,11 +15,18 @@ import type { Month } from "../../kernel/month";
  * The Assignment for one Category in one Month. Its subject is that Category
  * in that Month (see `assignmentSubject`), so the latest record for it wins.
  * Commands no longer store one below zero, but records from before Take-backs
- * can hold one; read them through `currentAssignments`.
+ * can hold one; read them through `currentAssignments`. An Undo back to no
+ * Assignment at all stores zero with `cleared`, so it reads as never having been set.
  */
 export type AssignmentSet = ChangeRecord<
   "AssignmentSet",
-  { version: 1; categoryId: string; month: Month; amount: Money }
+  {
+    version: 1;
+    categoryId: string;
+    month: Month;
+    amount: Money;
+    cleared?: true;
+  }
 >;
 
 export function isAssignmentSet(record: ChangeRecord): record is AssignmentSet {
@@ -92,8 +99,10 @@ export const currentAssignments = perSnapshot(
       records.filter(isAssignmentSet),
     )) {
       const found = entry(subject, payload);
-      const { amount } = payload;
-      if (amount.minorUnits < 0) {
+      const { amount, cleared } = payload;
+      if (cleared) {
+        found.assigned = undefined;
+      } else if (amount.minorUnits < 0) {
         const difference = money(-amount.minorUnits, amount.currency);
         found.assigned = money(0, amount.currency);
         found.takenBack = found.takenBack

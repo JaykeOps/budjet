@@ -9,15 +9,7 @@ import { formatMoney, money, subtractMoney } from "./kernel/money";
 import { currentMonth, type Month } from "./kernel/month";
 import { useChangeLogWriter } from "./kernel/use-change-log-query";
 import { assignment } from "./slices/assignments";
-import {
-  moveMoney,
-  restoreAssignment,
-  setAssignment,
-} from "./slices/assignments/commands";
-import {
-  assignmentSubject,
-  currentAssignments,
-} from "./slices/assignments/records";
+import { moveMoney, setAssignment } from "./slices/assignments/commands";
 import { assignmentsAfter, available } from "./slices/budget-totals";
 import {
   type CategoryChanges,
@@ -40,7 +32,7 @@ import {
   unhideCategory,
 } from "./slices/categories/commands";
 import { useToast } from "./ui/Toast";
-import type { Undo } from "./undo";
+import { type Place, rememberMoney, type Undo } from "./undo";
 
 function groupsNow(writer: ChangeLogWriter) {
   return categoryGroups(writer.changeLog.readAll());
@@ -103,20 +95,6 @@ export function renameCategoryGroupWithUndo(
   const { name } = groupNow(writer, groupId).group;
   renameCategoryGroup(writer, groupId, input);
   return () => renameCategoryGroup(writer, groupId, { name });
-}
-
-type Place = { categoryId: string; month: Month };
-
-/** Notes the Assignment and Take-back at each place, and returns what writes them back. */
-function rememberMoney(writer: ChangeLogWriter, places: Place[]): Undo {
-  const current = currentAssignments(writer.changeLog.readAll());
-  const remembered = places.map((place) => {
-    const now = current.get(assignmentSubject(place.categoryId, place.month));
-    return { ...place, assigned: now?.assigned, takenBack: now?.takenBack };
-  });
-  return () => {
-    for (const place of remembered) restoreAssignment(writer, place);
-  };
 }
 
 /**

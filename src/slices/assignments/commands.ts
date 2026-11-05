@@ -36,21 +36,24 @@ export function setAssignment(
  * Categories that have no Assignment in `month` yet: one set there is never
  * overwritten.
  * Categories in `skipping` (the app shell passes the hidden ones; Assignments
- * doesn't know which those are) are left out.
+ * doesn't know which those are) are left out. Says how many it copied.
  */
 export function copyLastMonth(
   writer: ChangeLogWriter,
   { month, skipping = [] }: { month: Month; skipping?: Iterable<string> },
-): void {
+): number {
   const current = currentAssignments(writer.changeLog.readAll());
   const lastMonth = previousMonth(month);
   const skipped = new Set(skipping);
+  let copied = 0;
   for (const { categoryId, month: of, assigned } of current.values()) {
     if (of !== lastMonth || !assigned?.minorUnits) continue;
     if (skipped.has(categoryId)) continue;
     if (current.get(assignmentSubject(categoryId, month))?.assigned) continue;
     setAssignment(writer, { categoryId, month, amount: assigned });
+    copied++;
   }
+  return copied;
 }
 
 export type MoveMoneyInput = {
@@ -88,7 +91,7 @@ export function moveMoney(
 /**
  * Writes a Category's Assignment and Take-back in a Month back as they were,
  * for Undo. Only what differs is written, so an Undo leaves alone anything it
- * didn't change. Unset ones go back to zero, which reads the same.
+ * didn't change.
  */
 export function restoreAssignment(
   writer: ChangeLogWriter,
@@ -101,9 +104,10 @@ export function restoreAssignment(
   const stored = writer.changeLog
     .readAll()
     .filter(isAssignmentSet)
-    .findLast((record) => record.subjectId === subject)?.payload.amount;
+    .findLast((record) => record.subjectId === subject)?.payload;
   // Compared as stored: one below zero has to be replaced to stop counting.
-  if ((stored?.minorUnits ?? 0) !== (assigned?.minorUnits ?? 0)) {
+  const storedNow = stored?.cleared ? undefined : stored?.amount.minorUnits;
+  if (storedNow !== assigned?.minorUnits) {
     writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
       subject,
       "AssignmentSet",
@@ -112,6 +116,7 @@ export function restoreAssignment(
         categoryId,
         month,
         amount: money(assigned?.minorUnits ?? 0, currency),
+        ...(assigned ? {} : { cleared: true as const }),
       },
     );
   }

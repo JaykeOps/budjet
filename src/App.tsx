@@ -27,11 +27,6 @@ import {
   useAccounts,
 } from "./slices/accounts";
 import { openAccount } from "./slices/accounts/commands";
-import {
-  copyLastMonth,
-  moveMoney,
-  setAssignment,
-} from "./slices/assignments/commands";
 import { type Budget, useBudget } from "./slices/budget-setup";
 import { categoryGroups } from "./slices/categories";
 import { MoveIntoFolderOffer } from "./slices/data-folder";
@@ -41,7 +36,7 @@ import {
   TransactionsScreen,
 } from "./slices/transactions";
 import { Toasts, useToast } from "./ui/Toast";
-import { useHistoryChanges } from "./undo";
+import { useAssignmentChanges, useHistoryChanges } from "./undo";
 import { pushAddress, useUrlParameter } from "./url-parameter";
 import { useRecordCommands } from "./use-record-commands";
 
@@ -149,6 +144,7 @@ function Shell({
   const place = usePlace();
   const toast = useToast();
   const historyChanges = useHistoryChanges();
+  const assignmentChanges = useAssignmentChanges();
   const [addingAccount, setAddingAccount] = useState(false);
   const recording = useRecordingRow(budget.currency);
 
@@ -176,14 +172,14 @@ function Shell({
           <BudgetMonth
             firstMonth={budget.firstMonth}
             currency={budget.currency}
-            onAssign={(input) => setAssignment(writer, input)}
+            onAssign={assignmentChanges.onAssign}
             onCopyLastMonth={(month, unticked) =>
-              copyLastMonth(writer, {
-                month,
-                skipping: [...hiddenCategoryIds(writer), ...unticked],
-              })
+              assignmentChanges.onCopyLastMonth(month, [
+                ...hiddenCategoryIds(writer),
+                ...unticked,
+              ])
             }
-            onMoveMoney={(input) => moveMoney(writer, input)}
+            onMoveMoney={assignmentChanges.onMoveMoney}
           />
         )}
         {place === "activity" && (
