@@ -69,10 +69,12 @@ function readAmount(holds: string, currency: Currency): Money | undefined {
  */
 export function FirstRun({
   keepInFolder,
+  folderChosen = false,
 }: {
   /**
-   * Keeps the Budget in the folder chosen. If the folder already holds one, it
-   * opens instead, reporting the read. Absent where the browser has no folder picker.
+   * Reads the folder chosen. If it holds a Budget, that opens, reporting the
+   * read. Otherwise something else takes over from first run. Absent where the
+   * browser has no folder picker.
    */
   keepInFolder:
     | ((
@@ -80,9 +82,11 @@ export function FirstRun({
         onProgress: (progress: FullReadProgress) => void,
       ) => Promise<void>)
     | undefined;
+  /** The user already answered where it lives, so setup starts at the question after it. */
+  folderChosen?: boolean;
 }) {
   const writer = useChangeLogWriter();
-  const [stepIndex, setStepIndex] = useState(0);
+  const [stepIndex, setStepIndex] = useState(folderChosen ? 2 : 0);
   const [currency, setCurrency] = useState(() =>
     guessCurrency(navigator.language),
   );
@@ -120,7 +124,6 @@ export function FirstRun({
           onChoose={async (folder) => {
             try {
               await keepInFolder(folder, setReading);
-              next();
             } finally {
               setReading(undefined);
             }

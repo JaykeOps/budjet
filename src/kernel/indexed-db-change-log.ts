@@ -64,6 +64,12 @@ export type LocalCopy = ChangeLog & {
    * the files it kept, so a Budget only ever arrives whole.
    */
   finishFullRead(records: readonly ChangeRecord[], stamps: FileStamps): void;
+  /**
+   * Swaps every record for these in one transaction, along with what's unwritten
+   * and what the last checks and reads kept, so a Budget's records never mix
+   * with another's and unchanged files are read again if they need to be.
+   */
+  replaceAll(records: readonly ChangeRecord[], stamps: FileStamps): void;
 };
 
 /** A file a full read got through. With no stamp, it wasn't whole, so it's read again. */
@@ -102,6 +108,10 @@ export async function openLocalCopy(
       transaction.objectStore(RECORDS).put(payload, record.id);
       if (hold) transaction.objectStore(UNWRITTEN).put(payload, record.id);
     }
+    track(transaction);
+  }
+
+  function track(transaction: IDBTransaction) {
     writesUnderway++;
     saveState.set(SAVING);
     transaction.oncomplete = () => {
@@ -138,6 +148,21 @@ export async function openLocalCopy(
       const added = recordsToMerge(inMemory.readAll(), arriving);
       put(added, false, stamps, true);
       if (added.length > 0) inMemory.append(added);
+    },
+    replaceAll(records, stamps) {
+      const transaction = database.transaction(
+        [RECORDS, UNWRITTEN, DEVICE, FILES_READ],
+        "readwrite",
+      );
+      for (const store of [RECORDS, UNWRITTEN, FILES_READ]) {
+        transaction.objectStore(store).clear();
+      }
+      transaction.objectStore(DEVICE).put(stamps, FILE_STAMPS);
+      for (const record of records) {
+        transaction.objectStore(RECORDS).put(toPayload(record), record.id);
+      }
+      track(transaction);
+      inMemory.replaceAll(records);
     },
     readAll: inMemory.readAll,
     subscribe: inMemory.subscribe,
@@ -198,6 +223,19 @@ export function forgetFilesRead(database: IDBDatabase): Promise<void> {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(FILES_READ, "readwrite");
     transaction.objectStore(FILES_READ).clear();
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+/** Marks every record unwritten, so the next write puts the whole Budget in a folder. */
+export async function markAllUnwritten(database: IDBDatabase): Promise<void> {
+  const payloads = await readAllPayloads(database, RECORDS);
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(UNWRITTEN, "readwrite");
+    for (const payload of payloads) {
+      transaction.objectStore(UNWRITTEN).put(payload, JSON.parse(payload).id);
+    }
     transaction.oncomplete = () => resolve();
     transaction.onabort = () => reject(transaction.error);
   });

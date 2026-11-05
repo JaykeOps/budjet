@@ -3,8 +3,10 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./install-offer";
+import { FolderScreen } from "./FolderScreen";
 import { chooseFolder, hasFolderPicker } from "./first-run/browser";
 import { GettingYourBudget } from "./first-run/FirstRun";
+import { type ChosenFolder, createFolderChooser } from "./folder-chooser";
 import { browserFolder, returningFolder } from "./kernel/browser-folder";
 import { createChangeLogWriter, type UnsavedReason } from "./kernel/change-log";
 import {
@@ -22,9 +24,11 @@ import {
 } from "./kernel/indexed-db-change-log";
 import { ReturnToFolder } from "./ReturnToFolder";
 import { budget } from "./slices/budget-setup";
+import { budgetIds } from "./slices/budget-setup/records";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing from index.html");
+const reactRoot = createRoot(root);
 
 // Rendering replaces this message, if it ever had to show.
 await upgradeDatabase({
@@ -53,24 +57,28 @@ const [
   openIndexedDbDeviceId(),
 ]);
 const writer = createChangeLogWriter(changeLog, deviceId);
-const reactRoot = createRoot(root);
+let checksScheduled = false;
 
-function showApp() {
+function showApp({ folderChosen = false } = {}) {
   reactRoot.render(
     <StrictMode>
       <App
         writer={writer}
         keepInFolder={keepInFolder}
+        folderChosen={folderChosen}
         folderConnection={folderConnection}
       />
     </StrictMode>,
   );
   // Only now: a returning user is back in their folder by the time the app shows.
-  if (checkFolder) scheduleFolderChecks(checkFolder);
+  if (checkFolder && !checksScheduled) {
+    checksScheduled = true;
+    scheduleFolderChecks(checkFolder);
+  }
 }
 
 if (returning) {
-  const { folder, keepInIt, keepInChosen } = returning;
+  const { folder, keepInIt, choose } = returning;
   const onReturn = await tryFolderOnReturn(folder);
   if (onReturn === "open") {
     keepInIt();
@@ -85,18 +93,16 @@ if (returning) {
             keepInIt();
             showApp();
           }}
-          onChoose={async (chosen) => {
-            await keepInChosen(chosen);
-            showApp();
-          }}
+          onChoose={choose}
         />
       </StrictMode>,
     );
   }
 } else if (unread) {
-  const { folder, handle, readFolder, underway, keepInChosen } = unread;
+  const { folder, handle, readFolder, underway, choose, showTwoBudgets } =
+    unread;
   const openFrom = async (from: FileSystemDirectoryHandle) => {
-    await readFolder(from, (progress) =>
+    const opened = await readFolder(from, (progress) =>
       reactRoot.render(
         <StrictMode>
           <GettingYourBudget progress={progress} />
@@ -106,7 +112,8 @@ if (returning) {
       // Back to first run, where choosing the folder again picks up from here.
       console.error("Crownkeep could not read the folder", error),
     );
-    showApp();
+    if (opened === "two-budgets") showTwoBudgets(from.name);
+    else showApp();
   };
   const onReturn = await tryFolderOnReturn(folder);
   if (onReturn === "open") {
@@ -118,10 +125,7 @@ if (returning) {
           folder={folder}
           firstShown={onReturn}
           onOpen={() => openFrom(handle)}
-          onChoose={async (chosen) => {
-            await keepInChosen(chosen);
-            await openFrom(chosen);
-          }}
+          onChoose={choose}
         />
       </StrictMode>,
     );
@@ -138,39 +142,63 @@ if (returning) {
  * a read that was left, or a cleared Local Copy. If not, it's first run.
  */
 async function openFolderStorage() {
-  const changeLog = await openDataFolderChangeLog();
+  const changeLog = await openDataFolderChangeLog({
+    budgetIds,
+    onTwoBudgets: () => chooser.showTwoBudgets(current?.name ?? ""),
+  });
   const handle = await rememberedFolderHandle();
   let current = handle;
+  // Other tabs hold the old Budget in memory, so they start over.
+  const budgetChanged = new BroadcastChannel("crownkeep-budget-changed");
+  budgetChanged.onmessage = () => location.reload();
+  const toChosen = (chosen: FileSystemDirectoryHandle): ChosenFolder => ({
+    name: chosen.name,
+    folder: browserFolder(chosen),
+    async remember() {
+      await rememberFolderHandle(chosen);
+      current = chosen;
+    },
+  });
+  const chooser = createFolderChooser({
+    changeLog,
+    hasBudget: () => budget(changeLog.readAll()) !== undefined,
+    pick: (onChoose) => chooseFolder((chosen) => onChoose(toChosen(chosen))),
+    show(screen) {
+      reactRoot.render(
+        <StrictMode>
+          <FolderScreen screen={screen} />
+        </StrictMode>,
+      );
+    },
+    onOpen(opened) {
+      if (opened !== "kept") {
+        budgetChanged.postMessage(null);
+        // The address may name an Account or a Month of the old Budget.
+        history.replaceState(null, "", location.pathname);
+      }
+      showApp({ folderChosen: opened === "new" });
+    },
+  });
   const readFolder = (
     chosen: FileSystemDirectoryHandle,
     onProgress: (progress: FullReadProgress) => void,
-  ) =>
-    changeLog.readFolderInFull(browserFolder(chosen), {
-      holdsBudget: (records) => budget(records) !== undefined,
-      onProgress,
-    });
-  const rememberChosen = async (chosen: FileSystemDirectoryHandle) => {
+  ) => changeLog.readFolderInFull(browserFolder(chosen), { onProgress });
+  const choose = (chosen: FileSystemDirectoryHandle) =>
+    chooser.chosen(toChosen(chosen));
+  const keepInFolder = async (
+    chosen: FileSystemDirectoryHandle,
+    onProgress: (progress: FullReadProgress) => void,
+  ) => {
+    // Remembered before reading, so leaving resumes this read.
     const remembered = await rememberedFolderHandle();
     if (!(await remembered?.isSameEntry(chosen))) {
       await changeLog.forgetFullRead();
     }
     await rememberFolderHandle(chosen);
     current = chosen;
-  };
-  const keepInFolder = async (
-    chosen: FileSystemDirectoryHandle,
-    onProgress: (progress: FullReadProgress) => void,
-  ) => {
-    await rememberChosen(chosen);
-    if (!(await readFolder(chosen, onProgress))) {
-      changeLog.keepInFolder(browserFolder(chosen));
-    }
-  };
-  /** For a Budget already in the Local Copy, which a full read can't open over. */
-  const keepHeldBudgetIn = async (chosen: FileSystemDirectoryHandle) => {
-    await rememberFolderHandle(chosen);
-    current = chosen;
-    changeLog.keepInFolder(browserFolder(chosen));
+    const opened = await readFolder(chosen, onProgress);
+    if (opened === "no-budget") chooser.showNoBudget(toChosen(chosen));
+    if (opened === "two-budgets") chooser.showTwoBudgets(chosen.name);
   };
   const folderConnection = {
     isInFolder: () => current !== undefined,
@@ -183,7 +211,7 @@ async function openFolderStorage() {
           changeLog.returnToFolder(browserFolder(folder));
           void changeLog.checkFolder("full");
         },
-        chooseFolder: () => chooseFolder(keepHeldBudgetIn),
+        chooseFolder: () => chooseFolder(choose),
       });
     },
   };
@@ -197,7 +225,7 @@ async function openFolderStorage() {
         ? {
             folder: returningFolder(handle),
             keepInIt: () => changeLog.returnToFolder(browserFolder(handle)),
-            keepInChosen: keepHeldBudgetIn,
+            choose,
           }
         : undefined,
     unread:
@@ -207,7 +235,8 @@ async function openFolderStorage() {
             handle,
             readFolder,
             underway: changeLog.fullReadUnderway,
-            keepInChosen: rememberChosen,
+            choose,
+            showTwoBudgets: chooser.showTwoBudgets,
           }
         : undefined,
     checkFolder: changeLog.checkFolder,

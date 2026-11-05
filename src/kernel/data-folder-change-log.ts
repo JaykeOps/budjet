@@ -26,6 +26,7 @@ import {
   type FileRead,
   forgetFilesRead,
   keepFileRead,
+  markAllUnwritten,
   markWritten,
   openDatabase,
   openLocalCopy,
@@ -65,25 +66,55 @@ export type DataFolderChangeLog = ChangeLog & {
   /**
    * Merges what the folder holds that this Change Log doesn't. It stops between
    * files once `keepGoing` says so, and says whether it got through the folder.
+   * Finding a different Budget merges nothing, stops using the folder and calls
+   * `onTwoBudgets`.
    */
   checkFolder(scope: CheckScope, keepGoing?: () => boolean): Promise<boolean>;
   /**
    * Opens a Budget by reading all of this folder, for a device with no Budget in
-   * its Local Copy. Says whether it found one, and only then is the Change Log
-   * in this folder. Nothing shows until every file is in: each is kept apart as
+   * its Local Copy. Only if it opens one is the Change Log in this folder. Nothing shows until every file is in: each is kept apart as
    * it's read, so leaving resumes. A file that can't be read yet is tried again
    * after the rest, for as long as it takes. Rejects if the folder can't be listed.
    */
-  readFolderInFull(chosen: Folder, reading: FullRead): Promise<boolean>;
+  readFolderInFull(
+    chosen: Folder,
+    reading: FullRead,
+  ): Promise<"opened" | "no-budget" | "two-budgets">;
   /** Whether a full read left files behind, so there's one to resume. */
   fullReadUnderway(): Promise<boolean>;
   /** Drops those files, because they came from a folder no longer chosen. */
   forgetFullRead(): Promise<void>;
+  /**
+   * What a chosen folder holds, checked before any of it enters the Local Copy.
+   * It reads only as far as the first `BudgetCreated`. A file that can't be read
+   * yet is tried again, because it may be the one that holds it.
+   */
+  whatFolderHolds(
+    chosen: Folder,
+    waitToRetry?: () => Promise<void>,
+  ): Promise<"this-budget" | "another-budget" | "no-budget">;
+  /** Whether any tab has records the folder hasn't got. */
+  hasUnsavedChanges(): Promise<boolean>;
+  /**
+   * Swaps the Budget in the Local Copy for the one in this folder and keeps it
+   * there, once all of it is read. Anything but `replaced` changes nothing, and
+   * a folder that can't be listed rejects. The old Budget stays in its folder.
+   * `unsaved` refuses because of records that would be lost, unless discarding
+   * them was asked for.
+   */
+  replaceWithFolder(
+    chosen: Folder,
+    replacing: Pick<FullRead, "onProgress" | "waitToRetry"> & {
+      discardUnsaved?: boolean;
+    },
+  ): Promise<"replaced" | "unsaved" | "no-budget" | "two-budgets">;
+  /** Keeps the Budget in a folder with none, writing all of it there. */
+  putBudgetIn(chosen: Folder): Promise<void>;
+  /** Empties the Local Copy, ready for setup to write a new Budget to this folder. */
+  startNewBudget(chosen: Folder): void;
 };
 
 export type FullRead = {
-  /** Whether these records, oldest first, are a Budget to open. */
-  holdsBudget(records: readonly ChangeRecord[]): boolean;
   onProgress(progress: FullReadProgress): void;
   /** How long to wait before trying unreadable files again. */
   waitToRetry?: () => Promise<void>;
@@ -98,6 +129,8 @@ export async function openDataFolderChangeLog({
   folder: initialFolder,
   oneTabAtATime = webLock,
   onGaveWay,
+  budgetIds,
+  onTwoBudgets,
 }: {
   indexedDB?: IDBFactory;
   /** Absent for a Budget not in a folder, which stays in browser storage. */
@@ -105,7 +138,11 @@ export async function openDataFolderChangeLog({
   oneTabAtATime?: OneTabAtATime;
   /** What to do after giving way to a newer tab. Reloads the page by default. */
   onGaveWay?: () => void;
-} = {}): Promise<DataFolderChangeLog> {
+  /** The id on each `BudgetCreated` among these records, which is the Budget's identity. */
+  budgetIds: (records: readonly ChangeRecord[]) => readonly string[];
+  /** A check found a different Budget's records in the folder this Budget is kept in. */
+  onTwoBudgets: () => void;
+}): Promise<DataFolderChangeLog> {
   let folder = initialFolder;
   const database = await openDatabase(indexedDB, onGaveWay);
   // Read before the records: a stamp newer than them could hide a file they lack.
@@ -171,6 +208,32 @@ export async function openDataFolderChangeLog({
 
   startWriting();
 
+  /** With a Budget here, any other id is a second one. With none, two ids are. */
+  const bringsSecondBudget = (arriving: readonly ChangeRecord[]) => {
+    const held = budgetIds(localCopy.readAll());
+    const all = new Set([...held, ...budgetIds(arriving)]);
+    return all.size > Math.max(new Set(held).size, 1);
+  };
+
+  /** Reads every file into the kept store, retrying what can't be read yet. */
+  async function readInFull(
+    chosen: Folder,
+    { onProgress, waitToRetry = waitBeforeRetrying }: FullRead,
+  ) {
+    const kept = await readFilesRead(database);
+    let names = await chosen.list();
+    while (names.length > 0) {
+      const unreadable = await readEachFile(chosen, names, kept, onProgress);
+      if (!unreadable) break;
+      await waitToRetry();
+      names = await chosen.list();
+    }
+    return {
+      records: names.flatMap((name) => (kept.get(name) as FileRead).records),
+      stamps: stampsOf(names, kept),
+    };
+  }
+
   return {
     ...localCopy,
     append(records) {
@@ -195,41 +258,98 @@ export async function openDataFolderChangeLog({
       const changes = await readChanges(folder, scope, stamps, keepGoing);
       // The folder changed during the check, so what it found belongs to the old one.
       if (stamps !== before) return false;
+      if (bringsSecondBudget(changes.records)) {
+        // Unstamped, so the next open finds the same and stops again.
+        folder = undefined;
+        onTwoBudgets();
+        return false;
+      }
       stamps = changes.stamps;
       if (changes.records.length > 0 || stamps !== before) {
         localCopy.mergeFromFolder(changes.records, stamps);
       }
       return changes.finished;
     },
-    async readFolderInFull(
-      chosen,
-      { holdsBudget, onProgress, waitToRetry = waitBeforeRetrying },
-    ) {
-      const kept = await readFilesRead(database);
-      let names = await chosen.list();
-      if (names.length === 0) return false;
-      while (true) {
-        const unreadable = await readEachFile(chosen, names, kept, onProgress);
-        if (!unreadable) break;
-        await waitToRetry();
-        names = await chosen.list();
-      }
-      const inFolder = names.map((name) => kept.get(name) as FileRead);
-      const records = inFolder.flatMap((file) => file.records);
-      if (!holdsBudget([...records].sort(compareRecords))) {
+    async readFolderInFull(chosen, reading) {
+      const found = await readInFull(chosen, reading);
+      const held = new Set(budgetIds(found.records));
+      if (held.size !== 1) {
         await forgetFilesRead(database);
-        return false;
+        return held.size === 0 ? "no-budget" : "two-budgets";
       }
       folder = chosen;
-      stamps = stampsOf(names, kept);
-      localCopy.finishFullRead(records, stamps);
+      stamps = found.stamps;
+      localCopy.finishFullRead(found.records, stamps);
       startWriting();
-      return true;
+      return "opened";
     },
     async fullReadUnderway() {
       return (await readFilesRead(database)).size > 0;
     },
     forgetFullRead: () => forgetFilesRead(database),
+    async whatFolderHolds(chosen, waitToRetry = waitBeforeRetrying) {
+      const held = new Set(budgetIds(localCopy.readAll()));
+      while (true) {
+        let unreadable = false;
+        for (const name of await chosen.list()) {
+          try {
+            const { records } = parseRecords(await chosen.read(name));
+            const found = budgetIds(records);
+            if (found.length > 0) {
+              return found.every((id) => held.has(id))
+                ? "this-budget"
+                : "another-budget";
+            }
+          } catch {
+            unreadable = true;
+          }
+        }
+        if (!unreadable) return "no-budget";
+        await waitToRetry();
+      }
+    },
+    async hasUnsavedChanges() {
+      return (await readUnwrittenRecords(database)).length > 0;
+    },
+    async replaceWithFolder(chosen, { discardUnsaved = false, ...reading }) {
+      // Any kept files came from a read this one isn't carrying on with.
+      await forgetFilesRead(database);
+      const found = await readInFull(chosen, reading);
+      const held = new Set(budgetIds(found.records));
+      if (held.size !== 1) {
+        await forgetFilesRead(database);
+        return held.size === 0 ? "no-budget" : "two-budgets";
+      }
+      // Asked again here: another tab may have held a change during the read.
+      if (
+        !discardUnsaved &&
+        (await readUnwrittenRecords(database)).length > 0
+      ) {
+        await forgetFilesRead(database);
+        return "unsaved";
+      }
+      folder = chosen;
+      stamps = found.stamps;
+      failure = undefined;
+      localCopy.replaceAll(found.records, stamps);
+      showSaveState();
+      return "replaced";
+    },
+    async putBudgetIn(chosen) {
+      await markAllUnwritten(database);
+      failure = undefined;
+      folder = chosen;
+      stamps = {};
+      localCopy.mergeFromFolder([], stamps);
+      startWriting();
+    },
+    startNewBudget(chosen) {
+      folder = chosen;
+      stamps = {};
+      failure = undefined;
+      localCopy.replaceAll([], stamps);
+      showSaveState();
+    },
   };
 
   /** Says whether any file couldn't be read this time. */
