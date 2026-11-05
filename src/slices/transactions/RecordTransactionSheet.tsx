@@ -19,6 +19,7 @@ import {
   dayBefore,
   draftAmount,
   draftOf,
+  localDay,
   matchingPayees,
   today,
   withDirection,
@@ -627,8 +628,7 @@ function DateField({
 
 /** A date as a chip shows it, such as "Oct 3". */
 function shortDate(date: string): string {
-  const [year = 0, month = 1, day = 1] = date.split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+  return localDay(date).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
   });

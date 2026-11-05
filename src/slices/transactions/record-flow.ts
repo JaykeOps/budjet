@@ -209,6 +209,13 @@ export function today(): string {
 
 /** The calendar date before this one. */
 export function dayBefore(date: string): string {
+  const day = localDay(date);
+  day.setDate(day.getDate() - 1);
+  return calendarDate(day);
+}
+
+/** A calendar date ("YYYY-MM-DD") as midnight on that day, in this device's time zone. */
+export function localDay(date: string): Date {
   const [year = 0, month = 1, day = 1] = date.split("-").map(Number);
-  return calendarDate(new Date(year, month - 1, day - 1));
+  return new Date(year, month - 1, day);
 }

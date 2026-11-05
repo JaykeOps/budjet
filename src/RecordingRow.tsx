@@ -10,6 +10,7 @@ import { placeAddress, usePlace } from "./place-in-url";
 import { useAccounts } from "./slices/accounts";
 import { RecordRow } from "./slices/transactions";
 import type { TransferDraft } from "./slices/transfers";
+import { railShows } from "./ui/rail";
 import { pushAddress, useUrlParameter } from "./url-parameter";
 import { useRecordCommands } from "./use-record-commands";
 
@@ -25,7 +26,7 @@ type Recording = {
 };
 
 /** Whether the rail shows, at the width the CSS switches it. */
-export const isDesktop = () => window.matchMedia("(min-width: 720px)").matches;
+export const isDesktop = railShows;
 
 /**
  * The row that records on desktop: Record and Alt+N start it, above the history
