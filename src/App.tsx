@@ -29,6 +29,7 @@ import {
 } from "./slices/assignments/commands";
 import { type Budget, useBudget } from "./slices/budget-setup";
 import { CategoryList, categoryGroups } from "./slices/categories";
+import { MoveIntoFolderOffer } from "./slices/data-folder";
 import { MonthBudget } from "./slices/month-budget-view";
 import { TransactionsScreen } from "./slices/transactions";
 import {
@@ -45,17 +46,21 @@ import {
 import { pushAddress, useUrlParameter } from "./url-parameter";
 
 type KeepInFolder = ComponentProps<typeof FirstRun>["keepInFolder"];
+/** Absent where the browser has no folder picker. */
+type FolderOffer = ComponentProps<typeof MoveIntoFolderOffer> | undefined;
 
 export function App({
   writer,
   keepInFolder,
+  folderOffer,
 }: {
   writer: ChangeLogWriter;
   keepInFolder: KeepInFolder;
+  folderOffer: FolderOffer;
 }) {
   return (
     <ChangeLogWriterProvider value={writer}>
-      <Root keepInFolder={keepInFolder} />
+      <Root keepInFolder={keepInFolder} folderOffer={folderOffer} />
     </ChangeLogWriterProvider>
   );
 }
@@ -78,7 +83,13 @@ function Page({
 }
 
 /** First run, which has no navigation, until there's a Budget, then the Budget. */
-function Root({ keepInFolder }: { keepInFolder: KeepInFolder }) {
+function Root({
+  keepInFolder,
+  folderOffer,
+}: {
+  keepInFolder: KeepInFolder;
+  folderOffer: FolderOffer;
+}) {
   const budget = useBudget();
   const hasBudget = budget !== undefined;
 
@@ -88,7 +99,7 @@ function Root({ keepInFolder }: { keepInFolder: KeepInFolder }) {
   }, [hasBudget]);
 
   if (!budget) return <FirstRun keepInFolder={keepInFolder} />;
-  return <Shell budget={budget} />;
+  return <Shell budget={budget} folderOffer={folderOffer} />;
 }
 
 /**
@@ -96,7 +107,13 @@ function Root({ keepInFolder }: { keepInFolder: KeepInFolder }) {
  * Account yet can only come from an older setup, or a page closed while first
  * run was writing, so it asks for one, without navigation.
  */
-function Shell({ budget }: { budget: Budget }) {
+function Shell({
+  budget,
+  folderOffer,
+}: {
+  budget: Budget;
+  folderOffer: FolderOffer;
+}) {
   const writer = useChangeLogWriter();
   const accounts = useAccounts();
   const place = usePlace();
@@ -115,6 +132,7 @@ function Shell({ budget }: { budget: Budget }) {
   return (
     <NavigationShell>
       <Page titled={place !== "budget"}>
+        {folderOffer && <MoveIntoFolderOffer {...folderOffer} />}
         {place === "budget" && (
           <>
             <BudgetMonth

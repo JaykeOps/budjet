@@ -27,6 +27,23 @@ export async function cancelNextFolderPicker(page: Page): Promise<void> {
   });
 }
 
+/** Leaves a record from another device in the picked folder's `Crownkeep` subfolder. */
+export async function putAnotherBudgetInFolder(page: Page): Promise<void> {
+  await page.evaluate(async (name) => {
+    const root = await navigator.storage.getDirectory();
+    const picked = await root.getDirectoryHandle(name, { create: true });
+    const subfolder = await picked.getDirectoryHandle("Crownkeep", {
+      create: true,
+    });
+    const file = await subfolder.getFileHandle("other-device-2026-01.jsonl", {
+      create: true,
+    });
+    const writable = await file.createWritable();
+    await writable.write('{"id":"theirs"}\n');
+    await writable.close();
+  }, PICKED_FOLDER);
+}
+
 /** The name and text of every file in the picked folder's `Crownkeep` subfolder. */
 export function filesInFolder(
   page: Page,

@@ -39,5 +39,10 @@ export function createInMemoryFolder(): InMemoryFolder {
       files.set(fileName, before + text);
       appends++;
     },
+    list: async () => [...files.keys()],
+    read: async (fileName) => files.get(fileName) ?? "",
+    async remove(fileName) {
+      files.delete(fileName);
+    },
   };
 }

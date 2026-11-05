@@ -105,6 +105,44 @@ export async function openLocalCopy(
   };
 }
 
+/** Every record in browser storage, by any tab of this browser. */
+export async function readAllRecords(
+  database: IDBDatabase,
+): Promise<ChangeRecord[]> {
+  const payloads = await readAllPayloads(database, RECORDS);
+  return payloads.map((payload) => JSON.parse(payload));
+}
+
+/**
+ * Remembers the folder a Budget has just been copied to and, in the same
+ * transaction, marks unwritten whatever arrived since, so the switch can't lose it.
+ */
+export function switchToFolder(
+  database: IDBDatabase,
+  handle: FileSystemDirectoryHandle,
+  copiedIds: readonly string[],
+): Promise<void> {
+  const copied = new Set(copiedIds);
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(
+      [DEVICE, RECORDS, UNWRITTEN],
+      "readwrite",
+    );
+    transaction.objectStore(DEVICE).put(handle, FOLDER_HANDLE);
+    const reading = transaction.objectStore(RECORDS).openCursor();
+    reading.onsuccess = () => {
+      const cursor = reading.result;
+      if (!cursor) return;
+      if (!copied.has(String(cursor.key))) {
+        transaction.objectStore(UNWRITTEN).put(cursor.value, cursor.key);
+      }
+      cursor.continue();
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
 /** Records marked unwritten, by any tab of this browser. */
 export async function readUnwrittenRecords(
   database: IDBDatabase,
@@ -167,10 +205,12 @@ export async function rememberFolderHandle(
   database.close();
 }
 
-export async function rememberedFolderHandle(): Promise<
-  FileSystemDirectoryHandle | undefined
-> {
-  const database = await openDatabase(globalThis.indexedDB);
+export async function rememberedFolderHandle({
+  indexedDB = globalThis.indexedDB,
+}: {
+  indexedDB?: IDBFactory;
+} = {}): Promise<FileSystemDirectoryHandle | undefined> {
+  const database = await openDatabase(indexedDB);
   const handle = await new Promise<FileSystemDirectoryHandle | undefined>(
     (resolve, reject) => {
       const reading = database

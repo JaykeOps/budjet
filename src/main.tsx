@@ -27,17 +27,21 @@ await upgradeDatabase({
 
 // Every record is read from browser storage before the first render, so a
 // returning user opens straight into their Budget.
-const [{ changeLog, keepInFolder }, deviceId] = await Promise.all([
+const [{ changeLog, ...folderActions }, deviceId] = await Promise.all([
   hasFolderPicker()
     ? openFolderStorage()
-    : { changeLog: await openIndexedDbChangeLog(), keepInFolder: undefined },
+    : {
+        changeLog: await openIndexedDbChangeLog(),
+        keepInFolder: undefined,
+        folderOffer: undefined,
+      },
   openIndexedDbDeviceId(),
 ]);
 const writer = createChangeLogWriter(changeLog, deviceId);
 
 createRoot(root).render(
   <StrictMode>
-    <App writer={writer} keepInFolder={keepInFolder} />
+    <App writer={writer} {...folderActions} />
   </StrictMode>,
 );
 
@@ -46,11 +50,25 @@ async function openFolderStorage() {
   const changeLog = await openDataFolderChangeLog({
     folder: handle && browserFolder(handle),
   });
+  // A tab still on browser storage would keep writing only there, so it starts over.
+  const moved = new BroadcastChannel("crownkeep-moved-into-folder");
+  moved.onmessage = () => location.reload();
   return {
     changeLog,
     keepInFolder: async (chosen: FileSystemDirectoryHandle) => {
       await rememberFolderHandle(chosen);
       changeLog.keepInFolder(browserFolder(chosen));
+    },
+    folderOffer: {
+      isInFolder: changeLog.inFolder,
+      moveIntoFolder: async (chosen: FileSystemDirectoryHandle) => {
+        const outcome = await changeLog.moveIntoFolder(
+          browserFolder(chosen),
+          chosen,
+        );
+        if (outcome === "moved") moved.postMessage(null);
+        return outcome;
+      },
     },
   };
 }
