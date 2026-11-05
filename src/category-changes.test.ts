@@ -5,6 +5,8 @@ import {
   deleteCategoryGroupWithUndo,
   deleteCategoryWithUndo,
   hideCategoryWithUndo,
+  moveCategoryGroupWithUndo,
+  moveCategoryWithUndo,
   moveOutWithUndo,
   moveThemAndDeleteWithUndo,
   renameCategoryGroupWithUndo,
@@ -25,7 +27,11 @@ import { setAssignment } from "./slices/assignments/commands";
 import { createBudget } from "./slices/budget-setup/commands";
 import { available, readyToAssign } from "./slices/budget-totals";
 import { categoryGroups } from "./slices/categories";
-import { addStarterSet, deleteCategory } from "./slices/categories/commands";
+import {
+  addStarterSet,
+  deleteCategory,
+  deleteCategoryGroup,
+} from "./slices/categories/commands";
 import { recordTransaction } from "./slices/transactions/commands";
 
 let writer: ChangeLogWriter;
@@ -433,5 +439,53 @@ describe("hiding a Category that holds money", () => {
     undo();
     expect(availableIn("Rent")).toBe(1_250);
     expect(category("Rent").hidden).toBe(true);
+  });
+});
+
+describe("undoing a move", () => {
+  it("puts a Category back in its Category Group and place", () => {
+    const undo = moveCategoryWithUndo(writer, category("Rent").id, {
+      groupId: group("Everyday").id,
+      toIndex: 1,
+    });
+    expect(outline()).toEqual([
+      ["Bills", ["Power", "Phone", "Internet"]],
+      ["Everyday", ["Groceries", "Rent", "Transport", "Dining Out"]],
+      ["Savings", ["Emergency Fund"]],
+    ]);
+
+    undo();
+
+    expect(outline()).toEqual(starter);
+  });
+
+  it("puts a Category Group back in its place", () => {
+    const undo = moveCategoryGroupWithUndo(writer, group("Savings").id, {
+      toIndex: 0,
+    });
+    expect(outline().map(([name]) => name)).toEqual([
+      "Savings",
+      "Bills",
+      "Everyday",
+    ]);
+
+    undo();
+
+    expect(outline()).toEqual(starter);
+  });
+
+  it("refuses when another device deleted the Category Group it came from", () => {
+    const { id } = category("Emergency Fund");
+    const undo = moveCategoryWithUndo(writer, id, {
+      groupId: group("Bills").id,
+      toIndex: 0,
+    });
+    deleteCategoryGroup(writer, group("Savings").id);
+
+    expect(undo).toThrow();
+    expect(outline()[0]).toEqual([
+      "Bills",
+      ["Emergency Fund", "Rent", "Power", "Phone", "Internet"],
+    ]);
   });
 });
