@@ -1,0 +1,238 @@
+/* The tab and an Account's page are the screen, not one card holding it. */
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.title:focus {
+  outline: none;
+}
+
+.back {
+  align-self: flex-start;
+  padding: 4px 0;
+  box-shadow: none;
+  color: var(--link);
+}
+
+.graphite {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border-radius: var(--radius-card);
+  background: var(--graphite-card);
+  box-shadow: var(--depth-card);
+  color: var(--graphite-text);
+}
+.graphiteLine {
+  margin: 0;
+  font-weight: 500;
+}
+.graphiteAmount {
+  display: block;
+  font-size: var(--amount-ready-to-assign);
+  font-weight: var(--amount-weight);
+  letter-spacing: var(--amount-tracking);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 16px 18px;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+
+.cardOpen {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-radius: 8px;
+  box-shadow: none;
+  font-weight: 400;
+  text-align: left;
+  white-space: normal;
+}
+.cardName {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.name {
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.cardAmount {
+  flex: none;
+  font-size: 22px;
+  font-weight: 700;
+}
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.check {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.question {
+  margin: 0;
+  font-weight: 500;
+}
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.quiet {
+  box-shadow: none;
+  color: var(--link);
+}
+
+.closed summary {
+  padding: 8px 4px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.closedList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 8px 18px;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+  list-style: none;
+}
+
+.columns,
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.history {
+  min-width: 0;
+  padding: clamp(16px, 4vw, 24px);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+.wide {
+  width: 100%;
+}
+
+.form {
+  flex-flow: column nowrap;
+  align-items: stretch;
+  gap: 12px;
+  margin: 0;
+}
+.field {
+  display: flex;
+}
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.kinds {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kinds legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.kind {
+  position: relative;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  box-shadow: inset 0 0 0 1px var(--control-border);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.kind input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.kind:has(:checked) {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.kind:has(:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* An Account's phone back link gives way to the rail. */
+@media (min-width: 720px) {
+  .back {
+    display: none;
+  }
+}
+
+/* Room for a history beside the fixed column: the rail takes 248px of this. */
+@media (min-width: 1000px) {
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 32px;
+    align-items: start;
+  }
+  .side {
+    position: sticky;
+    top: 24px;
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .history {
+    grid-column: 1;
+    grid-row: 1;
+  }
+}

@@ -14,4 +14,4 @@ export {
 } from "./queries";
 export type { Showing } from "./ShowingPicker";
 export { type Statement, statements } from "./statements";
-export { TransactionsScreen } from "./TransactionsScreen";
+export { AccountHistory, TransactionsScreen } from "./TransactionsScreen";

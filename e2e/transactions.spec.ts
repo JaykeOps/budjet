@@ -1,5 +1,12 @@
 import { expect, type Page, test } from "@playwright/test";
-import { budgetRow, createBudget, goTo, show } from "./helpers";
+import {
+  addAccount,
+  budgetRow,
+  createBudget,
+  expectBalance,
+  goTo,
+  show,
+} from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 test.beforeEach(({ page }) =>
@@ -38,12 +45,7 @@ test("a user records spending and income and sees Available, Ready to Assign and
     await expect(
       page.getByRole("status", { name: "Ready to Assign" }),
     ).toHaveText(/\$2,600\.00/);
-    await goTo(page, "Accounts");
-    await expect(
-      page
-        .getByRole("table", { name: "Accounts" })
-        .getByRole("row", { name: /Checking/ }),
-    ).toContainText("$2,954.50");
+    await expectBalance(page, "Checking", "$2,954.50");
 
     await goTo(page, "Activity");
     const rows = page
@@ -77,12 +79,7 @@ test("money going out without a Category is refused", async ({ page }) => {
   await record.getByRole("button", { name: "Record Transaction" }).click();
 
   await expect(record.getByRole("alert")).toContainText("needs a Category");
-  await goTo(page, "Accounts");
-  await expect(
-    page
-      .getByRole("table", { name: "Accounts" })
-      .getByRole("row", { name: /Checking/ }),
-  ).toContainText("$1,000.00");
+  await expectBalance(page, "Checking", "$1,000.00");
 });
 
 test("a user edits and deletes Transactions and Available, Ready to Assign and the Account balance follow", async ({
@@ -133,12 +130,7 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
     await expect(
       page.getByRole("status", { name: "Ready to Assign" }),
     ).toHaveText(/\$600\.00/);
-    await goTo(page, "Accounts");
-    await expect(
-      page
-        .getByRole("table", { name: "Accounts" })
-        .getByRole("row", { name: /Checking/ }),
-    ).toContainText("$940.00");
+    await expectBalance(page, "Checking", "$940.00");
     await goTo(page, "Activity");
     await expect(transactions.getByRole("row")).toHaveCount(3);
     await expect(transactions.getByRole("row").nth(1)).toContainText(
@@ -156,11 +148,7 @@ test("what's showing stays after a reload and Back returns to what showed before
   page,
 }) => {
   await createBudget(page);
-  await goTo(page, "Accounts");
-  const add = page.getByRole("form", { name: "Add an Account" });
-  await add.getByLabel("Name").fill("Savings");
-  await add.getByLabel("Opening Balance").fill("500");
-  await add.getByRole("button", { name: "Add Account" }).click();
+  await addAccount(page, { name: "Savings", holds: "500" });
   await goTo(page, "Activity");
   const all = page.getByRole("table", { name: "History of All Accounts" });
   const savings = page.getByRole("table", { name: "History of Savings" });
@@ -181,11 +169,7 @@ test("a Transaction is recorded in the Account chosen, starting on the one showi
   page,
 }) => {
   await createBudget(page);
-  await goTo(page, "Accounts");
-  const add = page.getByRole("form", { name: "Add an Account" });
-  await add.getByLabel("Name").fill("Savings");
-  await add.getByLabel("Opening Balance").fill("500");
-  await add.getByRole("button", { name: "Add Account" }).click();
+  await addAccount(page, { name: "Savings", holds: "500" });
   await goTo(page, "Activity");
   const record = page.getByRole("form", { name: "Record a Transaction" });
   await expect(record.getByLabel("Account")).toHaveValue(/.+/);

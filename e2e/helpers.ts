@@ -71,15 +71,15 @@ export async function show(
 
 /**
  * Reaches a place through whichever navigation this device has: tabs on a
- * phone, the rail on desktop. Until the Accounts screen is rebuilt, the rail
- * reaches it through "+ Add Account".
+ * phone, the rail on desktop. Only a phone has an Accounts tab; `openAccount`
+ * and `addAccount` work on both.
  */
 export async function goTo(page: Page, place: Place): Promise<void> {
   const places = page.getByRole("navigation", { name: "Places" });
   const links = {
     Budget: places.getByRole("link", { name: "Budget", exact: true }),
     Activity: places.getByRole("link", { name: /^(Activity|All Accounts)/ }),
-    Accounts: places.getByRole("link", { name: /^(Accounts|\+ Add Account)$/ }),
+    Accounts: places.getByRole("link", { name: "Accounts", exact: true }),
   };
   const landmarks = {
     Budget: page.getByRole("heading", { name: "Budget", exact: true }),
@@ -88,6 +88,94 @@ export async function goTo(page: Page, place: Place): Promise<void> {
   };
   await links[place].click();
   await expect(landmarks[place]).toBeVisible();
+}
+
+/** Whether the rail shows rather than the tabs, at the width the CSS switches them. */
+function hasRail(page: Page): boolean {
+  return (page.viewportSize()?.width ?? 0) >= 720;
+}
+
+/** Opens an Account's page: from the rail on desktop, drilling in from the Accounts tab on a phone. */
+export async function openAccount(page: Page, name: string): Promise<void> {
+  const named = new RegExp(`^${name}\\b`);
+  if (hasRail(page)) {
+    const places = page.getByRole("navigation", { name: "Places" });
+    const closed = places.getByRole("button", { name: /^Closed \(/ });
+    if (
+      (await closed.isVisible()) &&
+      (await closed.getAttribute("aria-expanded")) === "false"
+    ) {
+      await closed.click();
+    }
+    await places.getByRole("link", { name: named }).click();
+  } else {
+    await goTo(page, "Accounts");
+    const account = page.getByRole("button", { name: named });
+    if (!(await account.isVisible())) {
+      await page.getByText(/^Closed Accounts/).click();
+    }
+    await account.click();
+  }
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
+}
+
+/** The balance on the page of the Account open now, where its name is its heading. */
+export function balanceOf(page: Page, name: string): Locator {
+  return page.getByRole("status", { name: `Balance of ${name}` });
+}
+
+/** Opens an Account's page and checks what it holds. */
+export async function expectBalance(
+  page: Page,
+  name: string,
+  amount: string,
+): Promise<void> {
+  await openAccount(page, name);
+  await expect(balanceOf(page, name)).toContainText(amount);
+}
+
+/** Opens Add Account: from the rail on desktop, the Accounts tab on a phone. */
+export async function startAddingAccount(page: Page): Promise<Locator> {
+  if (hasRail(page)) {
+    await page.getByRole("button", { name: "+ Add Account" }).click();
+  } else {
+    await goTo(page, "Accounts");
+    await page.getByRole("button", { name: "Add Account" }).click();
+  }
+  return page.getByRole("dialog", { name: "Add Account" });
+}
+
+/** Adds an Account through its sheet, which then shows the new Account's page. */
+export async function addAccount(
+  page: Page,
+  { name, kind, holds }: { name: string; kind?: string; holds?: string },
+): Promise<void> {
+  const sheet = await startAddingAccount(page);
+  await sheet.getByLabel("Name").fill(name);
+  if (kind) await sheet.getByRole("radio", { name: kind }).check();
+  if (holds) await sheet.getByLabel("What it holds today").fill(holds);
+  await sheet.getByRole("button", { name: "Add Account" }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
+}
+
+/** Moves money from an Account's page, through the Transfer sheet. */
+export async function transfer(
+  page: Page,
+  { from, to, amount }: { from: string; to: string; amount: string },
+): Promise<void> {
+  await openAccount(page, from);
+  await page.getByRole("button", { name: "Transfer money" }).click();
+  const sheet = page.getByRole("dialog", { name: "Transfer money" });
+  await sheet.getByLabel("Amount").fill(amount);
+  await sheet.getByLabel("To").selectOption({ label: to });
+  await sheet.getByRole("button", { name: /^Transfer/ }).click();
+  await expect(sheet).toBeHidden();
+}
+
+/** The toast showing now. */
+export function toast(page: Page): Locator {
+  return page.getByRole("status", { name: "Notification" });
 }
 
 /** A Category's or Category Group's row on the Budget: a list item on a phone, a table row on desktop. */

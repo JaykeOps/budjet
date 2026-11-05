@@ -145,10 +145,7 @@
 }
 
 .addAccount {
+  box-shadow: none;
   color: var(--link);
   font-weight: 600;
-  text-decoration: none;
-}
-.addAccount[aria-current="page"] {
-  text-decoration: underline;
 }
