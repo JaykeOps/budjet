@@ -197,6 +197,7 @@ test.describe("a Budget already in browser storage", () => {
     expect((await recordIdsInFolder(page)).length).toBeGreaterThan(0);
 
     await button(page, "Done").click();
+    await goTo(page, "Accounts");
     await addAccount(page, "Savings");
     await folderWritesFinished(page);
     const copied = (await filesInFolder(page)).map(({ text }) => text).join("");
