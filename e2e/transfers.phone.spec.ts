@@ -90,7 +90,7 @@ test("with one Account there's nowhere to move money to, and the sheet says so",
   await sheet.getByLabel("Amount").fill("10");
 
   await expect(
-    sheet.getByText("There's no other Account to move money to yet."),
+    sheet.getByText("There's no other Account to transfer to yet."),
   ).toBeVisible();
   await expect(sheet.getByRole("button", { name: /^Transfer/ })).toBeDisabled();
 });

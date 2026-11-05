@@ -705,7 +705,7 @@ test("with one Account there's nowhere to Transfer to, and the row says so", asy
   await amount(page).fill("10");
 
   await expect(row(page)).toContainText(
-    "There's no other Account to move money to yet.",
+    "There's no other Account to transfer to yet.",
   );
   await amount(page).press("Enter");
 

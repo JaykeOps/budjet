@@ -44,6 +44,10 @@ test("(+) opens a menu of two: Record a Transaction and Make a Transfer", async 
   await expect(items).toHaveCount(2);
   await expect(items.nth(0)).toHaveAccessibleName(/^Record a Transaction/);
   await expect(items.nth(1)).toHaveAccessibleName(/^Make a Transfer/);
+  // The Glossary keeps "move" for money between Categories.
+  await expect(items.nth(1)).toContainText(
+    "Money from one of your Accounts to another",
+  );
 
   await page.keyboard.press("Escape");
   await expect(items).toHaveCount(0);
