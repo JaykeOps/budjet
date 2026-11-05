@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createBudget, goTo } from "./helpers";
+import { budgetRow, createBudget, goTo } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 test("a user assigns money to Categories and sees Ready to Assign change", async ({
@@ -71,10 +71,12 @@ test("a user copies last Month's Assignments and moves money between Categories"
   }
 
   await page.getByRole("button", { name: "Next Month" }).click();
-  const november = page.getByRole("table", { name: "November 2026" });
-  const rent = november.getByLabel("Assignment for Rent");
-  const groceries = november.getByLabel("Assignment for Groceries");
-  const power = november.getByLabel("Assignment for Power");
+  await expect(
+    page.getByRole("heading", { name: "November 2026" }),
+  ).toBeVisible();
+  const rent = page.getByLabel("Assignment for Rent");
+  const groceries = page.getByLabel("Assignment for Groceries");
+  const power = page.getByLabel("Assignment for Power");
   await groceries.fill("250");
   await groceries.press("Enter");
 
@@ -110,7 +112,7 @@ test("moving more than a Category's Assignment takes the rest back from what it 
   await createBudget(page, { firstAccount: { openingBalance: "1000" } });
   await goTo(page, "Budget");
 
-  const rent = page.getByRole("row", { name: /^Rent/ });
+  const rent = budgetRow(page, "Rent");
   await page.getByLabel("Assignment for Rent").fill("600");
   await page.getByLabel("Assignment for Rent").press("Enter");
   await page.getByRole("button", { name: "Next Month" }).click();

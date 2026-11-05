@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { createBudget, goTo } from "./helpers";
+import { budgetOutline, budgetRow, createBudget, goTo } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 /** Each Category Group's name followed by its Categories' names, in order. */
@@ -74,7 +74,6 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
 
   const categories = page.getByRole("region", { name: "Categories" });
   const alert = categories.getByRole("alert");
-  const month = page.getByRole("table", { name: "October 2026" });
   const picker = page
     .getByRole("form", { name: "Record a Transaction" })
     .getByLabel("Category");
@@ -96,9 +95,8 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
   await record.getByLabel("Category").selectOption({ label: "Rent" });
   await record.getByRole("button", { name: "Record Transaction" }).click();
   await goTo(page, "Budget");
-  await expect(month.getByRole("row", { name: /Rent/ })).toContainText(
-    /\$50\.00.*\$0\.00/,
-  );
+  await expect(budgetRow(page, "Rent")).toContainText("$50.00");
+  await expect(budgetRow(page, "Rent")).toContainText("$0.00");
   await categories.getByRole("button", { name: "Delete Rent" }).click();
   await expect(alert).toContainText("can't be deleted");
   await alert.getByRole("button", { name: "Hide Rent instead" }).click();
@@ -117,15 +115,17 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
 
   const expectRentHidden = async () => {
     await goTo(page, "Budget");
-    await expect(month.getByRole("rowheader")).toHaveText([
-      "Bills",
-      "Power",
-      "Phone",
-      "Everyday",
-      "Groceries",
-      "Transport",
-      "Dining Out",
-    ]);
+    await expect
+      .poll(() => budgetOutline(page))
+      .toEqual([
+        "Bills",
+        "Power",
+        "Phone",
+        "Everyday",
+        "Groceries",
+        "Transport",
+        "Dining Out",
+      ]);
     await goTo(page, "Activity");
     await expect(picker.getByRole("option", { name: "Rent" })).toHaveCount(0);
     await goTo(page, "Budget");
@@ -146,16 +146,18 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
 
   const expectRentBack = async () => {
     await goTo(page, "Budget");
-    await expect(month.getByRole("rowheader")).toHaveText([
-      "Bills",
-      "Rent",
-      "Power",
-      "Phone",
-      "Everyday",
-      "Groceries",
-      "Transport",
-      "Dining Out",
-    ]);
+    await expect
+      .poll(() => budgetOutline(page))
+      .toEqual([
+        "Bills",
+        "Rent",
+        "Power",
+        "Phone",
+        "Everyday",
+        "Groceries",
+        "Transport",
+        "Dining Out",
+      ]);
     await goTo(page, "Activity");
     await expect(picker.getByRole("option", { name: "Rent" })).toHaveCount(1);
   };

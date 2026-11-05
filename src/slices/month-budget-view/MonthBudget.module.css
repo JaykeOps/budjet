@@ -1,33 +1,436 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---------- Header ---------- */
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.title {
+  margin: 0;
+}
+.monthSelector {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-control);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+.monthName {
+  margin: 0;
+  padding-inline: 2px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+.monthStep {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  box-shadow: none;
+  font-size: 18px;
+  line-height: 1;
+}
+.headerAction {
+  padding: 8px 14px;
+}
+
+/* ---------- Layout ---------- */
+
+.columns,
+.summary,
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Same width as use-wide.ts, where rows become a table. */
+@media (min-width: 1180px) {
+  .columns {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  .summary {
+    position: sticky;
+    top: 24px;
+  }
+  .header {
+    gap: 12px 16px;
+  }
+  .headerAction {
+    margin-inline-start: auto;
+  }
+}
+
+/* ---------- Shared bits ---------- */
+
+.small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+.name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--size-tile);
+  height: var(--size-tile);
+  border-radius: var(--radius-control);
+  background: var(--raised);
+  font-weight: 600;
+}
+
+.pill {
+  display: inline-block;
+  flex: none;
+  padding: 2px 10px;
+  border-radius: var(--radius-control);
+  background: var(--available-tint);
+  color: var(--on-available-tint);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pill[data-state="zero"] {
+  background: var(--raised);
+  color: var(--muted);
+}
+.pill[data-state="overspent"] {
+  background: var(--overspent-tint);
+  color: var(--on-overspent-tint);
+}
+
+.meter {
+  position: relative;
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--meter-track);
+}
+.meter i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--meter-fill);
+}
+.meter[data-over="true"] i {
+  background: var(--meter-over);
+}
+
+.overspentNote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--on-overspent-tint);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ---------- Hints ---------- */
+
+.hintButton {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-control);
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.hintBubble {
+  max-width: min(300px, calc(100vw - 32px));
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--depth-card);
+  color: var(--text);
+}
+.hintText {
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  outline: none;
+}
+
+/* ---------- Ready to Assign ---------- */
+
 .readyToAssign {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-block: 12px;
-  padding: 24px;
+  padding: 20px;
   border-radius: var(--radius-card);
   background: var(--graphite-card);
   box-shadow: var(--depth-card);
   color: var(--graphite-text);
 }
-
-/* Below zero: the card stops being calm, in the pair that holds in both schemes. */
-.overassigned {
-  background: var(--overspent-tint);
-  color: var(--on-overspent-tint);
-}
-
-.label {
+.readyToAssignLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
   font-weight: 500;
 }
-
-.amount {
+.readyToAssignAmount {
+  display: block;
   font-size: var(--amount-ready-to-assign);
   font-weight: var(--amount-weight);
   letter-spacing: var(--amount-tracking);
-  line-height: 1;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+.readyToAssignLine {
+  margin: 8px 0 0;
+  font-size: 13px;
 }
 
-.overspent {
-  color: var(--overspent);
+/* ---------- Spent this Month ---------- */
+
+.spent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+.spentHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  margin: 0;
+  font-weight: 500;
+}
+.spentFigures {
+  font-weight: 600;
+}
+.chart {
+  display: block;
+  width: 100%;
+  height: 64px;
+}
+.chartArea {
+  fill: color-mix(in srgb, var(--meter-fill) 8%, transparent);
+}
+.chartZero {
+  stroke: var(--edge);
+  fill: none;
+}
+.chartPace {
+  stroke: var(--muted);
+  stroke-dasharray: 4 5;
+  fill: none;
+}
+.chartLine {
+  stroke: var(--meter-fill);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  fill: none;
+}
+.chartDot {
+  fill: var(--meter-fill);
+}
+
+/* ---------- Category Groups on a phone ---------- */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.groupHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding-inline: 4px;
+}
+.groupName {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+.groupAvailable {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.list {
+  margin: 0;
+  padding: 4px 0;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+  list-style: none;
+}
+.row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.row + .row {
+  border-top: 1px solid var(--edge);
+}
+.row[data-state="overspent"],
+.tableRow[data-state="overspent"] {
+  background: color-mix(in srgb, var(--overspent-tint) 60%, transparent);
+}
+.rowBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.rowTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.standInAssign {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.assignmentForm {
+  margin: 0;
+}
+.standInAssign .assignmentForm {
+  width: 112px;
+}
+
+/* ---------- Category Groups on desktop ---------- */
+
+.tableCard {
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+.table {
+  table-layout: fixed;
+}
+.assignedColumn {
+  width: 112px;
+}
+.spendingColumn {
+  width: 168px;
+}
+.availableColumn {
+  width: 116px;
+}
+.table th,
+.table td {
+  padding: 10px 8px;
+  vertical-align: middle;
+}
+.table tr > :first-child {
+  padding-inline-start: 20px;
+}
+.table tr > :last-child {
+  padding-inline-end: 20px;
+  text-align: right;
+}
+.table tr > :nth-child(2) {
+  text-align: right;
+}
+.table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+.tableHead th {
   white-space: nowrap;
+}
+/* Every table keeps its headings for a screen reader; only the first shows them. */
+.tableHeadForReaders th {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.groupRow td {
+  color: var(--muted);
+  font-size: 13px;
+}
+.groupRow td:nth-child(3) {
+  text-align: right;
+}
+.tableName {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 400;
+}
+.tableName .tile {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+}
+.carried {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+.tableSpending {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.assignment {
+  width: 100%;
+  padding-block: 4px;
+  text-align: right;
+}
+
+.standIn {
+  padding: clamp(16px, 4vw, 24px);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+.standIn form {
+  margin: 0;
 }

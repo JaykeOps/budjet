@@ -62,3 +62,9 @@ function parts(of: Month): [number, number] {
   const [year, monthNumber] = of.split("-").map(Number);
   return [year, monthNumber];
 }
+
+/** How many days a Month has. */
+export function daysInMonth(of: Month): number {
+  const [year, monthNumber] = parts(of);
+  return new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+}
