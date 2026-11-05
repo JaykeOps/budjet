@@ -1,4 +1,11 @@
-import { type ComponentProps, type ReactNode, useEffect } from "react";
+import {
+  type ComponentProps,
+  type ReactNode,
+  useEffect,
+  useState,
+} from "react";
+import { AccountsPlace } from "./AccountsPlace";
+import { FolderBanner, type FolderConnection } from "./FolderBanner";
 import { FirstRun } from "./first-run/FirstRun";
 import type { ChangeLogWriter } from "./kernel/change-log";
 import { parseMonth } from "./kernel/month";
@@ -11,16 +18,13 @@ import { NavigationShell } from "./NavigationShell";
 import { requestPersistentStorage } from "./persistent-storage";
 import { placeAddress, usePlace } from "./place-in-url";
 import {
-  AccountsScreen,
+  AddAccountSheet,
   OpenAccountForm,
   useAccounts,
 } from "./slices/accounts";
 import {
-  closeAccount,
   deleteRedeclaredBalance,
   openAccount,
-  redeclareBalance,
-  renameAccount,
 } from "./slices/accounts/commands";
 import {
   copyLastMonth,
@@ -36,12 +40,8 @@ import {
   editTransaction,
   recordTransaction,
 } from "./slices/transactions/commands";
-import { TransfersScreen } from "./slices/transfers";
-import {
-  deleteTransfer,
-  editTransfer,
-  makeTransfer,
-} from "./slices/transfers/commands";
+import { deleteTransfer, editTransfer } from "./slices/transfers/commands";
+import { Toasts, useToast } from "./ui/Toast";
 import { pushAddress, useUrlParameter } from "./url-parameter";
 
 type KeepInFolder = ComponentProps<typeof FirstRun>["keepInFolder"];
@@ -49,13 +49,16 @@ type KeepInFolder = ComponentProps<typeof FirstRun>["keepInFolder"];
 export function App({
   writer,
   keepInFolder,
+  folderConnection,
 }: {
   writer: ChangeLogWriter;
   keepInFolder: KeepInFolder;
+  /** Absent where a Budget can only live in Browser storage. */
+  folderConnection?: FolderConnection;
 }) {
   return (
     <ChangeLogWriterProvider value={writer}>
-      <Root keepInFolder={keepInFolder} />
+      <Root keepInFolder={keepInFolder} folderConnection={folderConnection} />
     </ChangeLogWriterProvider>
   );
 }
@@ -63,13 +66,16 @@ export function App({
 /** `titled` is false for a screen with its own top-level heading. */
 function Page({
   titled = true,
+  folderConnection,
   children,
 }: {
   titled?: boolean;
+  folderConnection?: FolderConnection;
   children: ReactNode;
 }) {
   return (
     <main>
+      {folderConnection && <FolderBanner connection={folderConnection} />}
       {titled && <h1>budjet</h1>}
       {children}
       <p>Version {__APP_VERSION__}</p>
@@ -78,7 +84,13 @@ function Page({
 }
 
 /** First run, which has no navigation, until there's a Budget, then the Budget. */
-function Root({ keepInFolder }: { keepInFolder: KeepInFolder }) {
+function Root({
+  keepInFolder,
+  folderConnection,
+}: {
+  keepInFolder: KeepInFolder;
+  folderConnection?: FolderConnection;
+}) {
   const budget = useBudget();
   const hasBudget = budget !== undefined;
 
@@ -88,7 +100,11 @@ function Root({ keepInFolder }: { keepInFolder: KeepInFolder }) {
   }, [hasBudget]);
 
   if (!budget) return <FirstRun keepInFolder={keepInFolder} />;
-  return <Shell budget={budget} />;
+  return (
+    <Toasts>
+      <Shell budget={budget} folderConnection={folderConnection} />
+    </Toasts>
+  );
 }
 
 /**
@@ -96,16 +112,24 @@ function Root({ keepInFolder }: { keepInFolder: KeepInFolder }) {
  * Account yet can only come from an older setup, or a page closed while first
  * run was writing, so it asks for one, without navigation.
  */
-function Shell({ budget }: { budget: Budget }) {
+function Shell({
+  budget,
+  folderConnection,
+}: {
+  budget: Budget;
+  folderConnection?: FolderConnection;
+}) {
   const writer = useChangeLogWriter();
   const accounts = useAccounts();
   const place = usePlace();
+  const toast = useToast();
+  const [addingAccount, setAddingAccount] = useState(false);
 
   if (accounts.length === 0) {
     return (
-      <Page>
+      <Page folderConnection={folderConnection}>
         <OpenAccountForm
-          heading="Add your first Account"
+          label="Add your first Account"
           currency={budget.currency}
           onOpen={(input) => openAccount(writer, input)}
         />
@@ -113,8 +137,8 @@ function Shell({ budget }: { budget: Budget }) {
     );
   }
   return (
-    <NavigationShell>
-      <Page titled={place !== "budget"}>
+    <NavigationShell onAddAccount={() => setAddingAccount(true)}>
+      <Page titled={place === "activity"} folderConnection={folderConnection}>
         {place === "budget" && (
           <>
             <BudgetMonth
@@ -144,30 +168,29 @@ function Shell({ budget }: { budget: Budget }) {
             onDeleteRedeclaredBalance={(id) =>
               deleteRedeclaredBalance(writer, id)
             }
+            onEditTransfer={(id, input) => editTransfer(writer, id, input)}
+            onDeleteTransfer={(id) => deleteTransfer(writer, id)}
           />
         )}
         {place === "accounts" && (
-          <>
-            <AccountsScreen
-              currency={budget.currency}
-              onOpenAccount={(input) => openAccount(writer, input)}
-              onRedeclareBalance={(accountId, balance) =>
-                redeclareBalance(writer, accountId, { balance })
-              }
-              onRename={(accountId, name) =>
-                renameAccount(writer, accountId, { name })
-              }
-              onClose={(accountId) => closeAccount(writer, accountId)}
-            />
-            <TransfersScreen
-              currency={budget.currency}
-              onMake={(input) => makeTransfer(writer, input)}
-              onEdit={(id, input) => editTransfer(writer, id, input)}
-              onDelete={(id) => deleteTransfer(writer, id)}
-            />
-          </>
+          <AccountsPlace
+            currency={budget.currency}
+            onAddAccount={() => setAddingAccount(true)}
+          />
         )}
       </Page>
+      <AddAccountSheet
+        isOpen={addingAccount}
+        onClose={() => setAddingAccount(false)}
+        currency={budget.currency}
+        onOpen={(input) => {
+          const id = openAccount(writer, input);
+          setAddingAccount(false);
+          toast({ text: `Added ${input.name.trim()}` });
+          pushAddress(placeAddress("accounts", id));
+          window.scrollTo(0, 0);
+        }}
+      />
     </NavigationShell>
   );
 }

@@ -234,6 +234,70 @@ describe("writing to the Data Folder", () => {
     ]);
   });
 
+  it.each([
+    ["NotAllowedError", "access-lapsed"],
+    ["NotFoundError", "folder-gone"],
+  ])(
+    "is still unsaved after a reopen following %s, holding the change",
+    async (errorName, reason) => {
+      const { folder, openTab } = aBrowser();
+      const changeLog = await openTab();
+      folder.failWith(errorName);
+      changeLog.append([record("a")]);
+      await settled(changeLog);
+
+      const reopened = await openTab();
+
+      expect(await settled(reopened)).toEqual({ status: "unsaved", reason });
+      expect(reopened.readAll()).toEqual([record("a")]);
+      expect(folder.files.size).toBe(0);
+    },
+  );
+
+  it("says saved only after the held write finishes, staying unsaved until then", async () => {
+    const { folder, openTab } = aBrowser();
+    const changeLog = await openTab();
+    folder.failWith("NotFoundError");
+    changeLog.append([record("a")]);
+    await settled(changeLog);
+    const filesWhenSaved: number[] = [];
+    const states = saveStates(changeLog);
+    changeLog.subscribeToSaveState(() => {
+      if (changeLog.saveState().status === "saved") {
+        filesWhenSaved.push(folder.files.size);
+      }
+    });
+
+    folder.failWith(undefined);
+    changeLog.keepInFolder(folder);
+    expect(changeLog.saveState().status).toBe("unsaved");
+    await vi.waitFor(() =>
+      expect(changeLog.saveState()).toEqual({ status: "saved" }),
+    );
+
+    expect(states.map(({ status }) => status)).toEqual(["unsaved", "saved"]);
+    expect(filesWhenSaved).toEqual([1]);
+  });
+
+  it("writes held changes to a folder given while a write to the lost one is failing", async () => {
+    const { folder: lost, openTab } = aBrowser();
+    const changeLog = await openTab();
+    lost.failWith("NotFoundError");
+    changeLog.append([record("a")]);
+    await settled(changeLog);
+    const found = createInMemoryFolder();
+
+    changeLog.append([record("b", OCT_31 + 1)]);
+    changeLog.keepInFolder(found);
+
+    await vi.waitFor(() =>
+      expect(changeLog.saveState()).toEqual({ status: "saved" }),
+    );
+    expect(
+      lines(found.files.get("phone-2026-10.jsonl")).map(({ id }) => id),
+    ).toEqual(["a", "b"]);
+  });
+
   it("writes a record once, not again on every later open", async () => {
     const { folder, openTab } = aBrowser();
     const changeLog = await openTab();

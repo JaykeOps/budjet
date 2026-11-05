@@ -40,12 +40,13 @@ export function openAccount(
  * Records an Account's real balance. budjet keeps the difference from its
  * balance just before as an Adjustment, which goes into or comes out of
  * Ready to Assign. With no difference it is a Balance check, and nothing moves.
+ * Returns the id of the record, which is what `deleteRedeclaredBalance` takes.
  */
 export function redeclareBalance(
   writer: ChangeLogWriter,
   accountId: string,
   { balance }: { balance: Money },
-): void {
+): string {
   const records = writer.changeLog.readAll();
   const currency = budgetCurrency(records);
   openAccountWith(records, accountId);
@@ -54,11 +55,11 @@ export function redeclareBalance(
       `A balance must be in ${currency}, the Budget's currency`,
     );
   }
-  writer.write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+  return writer.write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
     accountId,
     "BalanceRedeclared",
     { version: 1, balance },
-  );
+  ).id;
 }
 
 /**

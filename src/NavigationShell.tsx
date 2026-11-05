@@ -14,7 +14,13 @@ import { pushAddress, useUrlParameter, useUrlSearch } from "./url-parameter";
  * Recording isn't rebuilt yet, so (+) and Record stand in by opening Activity,
  * where the Record a Transaction form is.
  */
-export function NavigationShell({ children }: { children: ReactNode }) {
+export function NavigationShell({
+  onAddAccount,
+  children,
+}: {
+  onAddAccount: () => void;
+  children: ReactNode;
+}) {
   // Links are built from the address, so they have to follow it.
   useUrlSearch();
   const place = usePlace();
@@ -22,7 +28,7 @@ export function NavigationShell({ children }: { children: ReactNode }) {
   const here = { place, accountId: accountId ?? undefined };
   return (
     <div className={styles.shell}>
-      <Rail here={here} />
+      <Rail here={here} onAddAccount={onAddAccount} />
       {children}
       <TabBar here={here} />
     </div>
@@ -31,14 +37,20 @@ export function NavigationShell({ children }: { children: ReactNode }) {
 
 type Here = { place: Place; accountId?: string };
 
-function Rail({ here }: { here: Here }) {
+function Rail({
+  here,
+  onAddAccount,
+}: {
+  here: Here;
+  onAddAccount: () => void;
+}) {
   const accounts = useAccounts();
   const total = useChangeLogQuery(accountsTotal);
   const [showClosed, setShowClosed] = useState(false);
   const open = accounts.filter(({ closed }) => !closed);
   const closed = accounts.filter(({ closed }) => closed);
   const atAccount = (id: string) =>
-    here.place === "activity" && here.accountId === id;
+    here.place === "accounts" && here.accountId === id;
 
   return (
     <nav className={styles.rail} aria-label="Places">
@@ -60,7 +72,7 @@ function Rail({ here }: { here: Here }) {
       <PlaceLink
         className={styles.railItem}
         to={placeAddress("activity")}
-        current={here.place === "activity" && !here.accountId}
+        current={here.place === "activity"}
       >
         <span className={styles.name}>All Accounts</span>{" "}
         {total && <span className={styles.amount}>{formatMoney(total)}</span>}
@@ -69,7 +81,7 @@ function Rail({ here }: { here: Here }) {
         <PlaceLink
           key={id}
           className={styles.railItem}
-          to={placeAddress("activity", id)}
+          to={placeAddress("accounts", id)}
           current={atAccount(id)}
         >
           <span className={styles.name}>{name}</span>{" "}
@@ -91,19 +103,19 @@ function Rail({ here }: { here: Here }) {
           <PlaceLink
             key={id}
             className={styles.railItem}
-            to={placeAddress("activity", id)}
+            to={placeAddress("accounts", id)}
             current={atAccount(id)}
           >
             <span className={styles.name}>{name}</span>
           </PlaceLink>
         ))}
-      <PlaceLink
+      <button
+        type="button"
         className={styles.addAccount}
-        to={placeAddress("accounts")}
-        current={here.place === "accounts"}
+        onClick={onAddAccount}
       >
         + Add Account
-      </PlaceLink>
+      </button>
     </nav>
   );
 }

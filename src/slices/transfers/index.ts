@@ -4,7 +4,7 @@ import { type Transfer, transfers } from "./queries";
 
 export type { TransferInput } from "./commands";
 export type { TransferDetails } from "./records";
-export { TransfersScreen } from "./TransfersScreen";
+export { type TransferDraft, TransferSheet } from "./TransferSheet";
 export { type Transfer, transfers };
 
 /** Every Transfer in the Budget, newest first. */
