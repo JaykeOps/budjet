@@ -7,13 +7,6 @@ import {
   useState,
 } from "react";
 import {
-  Button,
-  Dialog,
-  Heading,
-  Modal,
-  ModalOverlay,
-} from "react-aria-components";
-import {
   addMoney,
   type Currency,
   formatMoney,
@@ -24,6 +17,7 @@ import {
   typedMoney,
 } from "../../kernel/money";
 import { type Month, monthNameAlone } from "../../kernel/month";
+import { SheetClose, SheetShell, SheetTitle } from "../../ui/Sheet";
 import styles from "./CategorySheet.module.css";
 import {
   assignPreview,
@@ -103,28 +97,20 @@ export function SheetFrame({
   children: ReactNode;
 }) {
   return (
-    <ModalOverlay
-      isOpen
-      isDismissable
-      onOpenChange={(open) => {
-        if (!open) onClose();
+    <SheetShell
+      onClose={onClose}
+      classNames={{
+        overlay: styles.overlay,
+        sheet: styles.sheet,
+        dialog: styles.dialog,
       }}
-      className={styles.overlay}
     >
-      <Modal className={styles.sheet}>
-        <Dialog className={styles.dialog}>
-          <div className={styles.head}>
-            <Button className={styles.close} slot="close">
-              Close
-            </Button>
-            <Heading slot="title" className={styles.title}>
-              {title}
-            </Heading>
-          </div>
-          {children}
-        </Dialog>
-      </Modal>
-    </ModalOverlay>
+      <div className={styles.head}>
+        <SheetClose className={styles.close} />
+        <SheetTitle className={styles.title}>{title}</SheetTitle>
+      </div>
+      {children}
+    </SheetShell>
   );
 }
 

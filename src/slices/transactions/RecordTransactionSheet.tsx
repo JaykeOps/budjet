@@ -1,18 +1,12 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
-  Button,
-  Dialog,
-  Heading,
-  Modal,
-  ModalOverlay,
-} from "react-aria-components";
-import {
   type Currency,
   formatMoney,
   type Money,
   money,
 } from "../../kernel/money";
 import { monthOf } from "../../kernel/month";
+import { SheetClose, SheetShell, SheetTitle } from "../../ui/Sheet";
 import { type Account, useAccounts } from "../accounts";
 import type { TransactionInput } from "./commands";
 import { useCategoryChoices, useKnownPayees } from "./hooks";
@@ -108,87 +102,80 @@ export function RecordTransactionSheet({
   const goTo = (to: Step) => setPath((walked) => [...walked, to]);
 
   return (
-    <ModalOverlay
-      isOpen
-      isDismissable
-      onOpenChange={(isOpen) => {
-        if (!isOpen) onClose();
+    <SheetShell
+      onClose={onClose}
+      classNames={{
+        overlay: styles.overlay,
+        sheet: styles.sheet,
+        dialog: styles.dialog,
       }}
-      className={styles.overlay}
+      dialogRef={dialog}
     >
-      <Modal className={styles.sheet}>
-        <Dialog ref={dialog} className={styles.dialog}>
-          <div className={styles.head}>
-            {path.length > 1 ? (
-              <button
-                type="button"
-                className={styles.link}
-                onClick={() => setPath(path.slice(0, -1))}
-              >
-                ‹ Back
-              </button>
-            ) : (
-              <span />
-            )}
-            <div className={styles.titled}>
-              <Heading slot="title" className={styles.title}>
-                {editing && step === "review"
-                  ? "Edit Transaction"
-                  : STEPS[step].title(draft.direction)}
-              </Heading>
-              {!editing && (
-                <p className={styles.step}>{STEPS[step].number} of 3</p>
-              )}
-            </div>
-            <Button className={styles.close} slot="close">
-              Close
-            </Button>
-          </div>
-          {step === "amount" && (
-            <AmountStep
-              draft={draft}
-              currency={currency}
-              canContinue={amount !== undefined}
-              onChange={setDraft}
-              onNext={() => finish("category")}
-            />
-          )}
-          {step === "category" && amount && (
-            <CategoryStep
-              draft={draft}
-              amount={amount}
-              editing={editing}
-              onPick={(categoryId) => {
-                setDraft({ ...draft, categoryId });
-                finish("review");
-              }}
-            />
-          )}
-          {step === "review" && amount && (
-            <ReviewStep
-              draft={draft}
-              amount={amount}
-              accounts={open}
-              editing={editing}
-              onChange={setDraft}
-              onAmount={() => goTo("amount")}
-              onCategory={() => goTo("category")}
-              onRecord={(input) => {
-                onRecord(input);
-                onClose();
-              }}
-              onDelete={
-                onDelete &&
-                (() => {
-                  onDelete();
-                  onClose();
-                })
-              }
-            />
-          )}
-        </Dialog>
-      </Modal>
-    </ModalOverlay>
+      <div className={styles.head}>
+        {path.length > 1 ? (
+          <button
+            type="button"
+            className={styles.link}
+            onClick={() => setPath(path.slice(0, -1))}
+          >
+            ‹ Back
+          </button>
+        ) : (
+          <span />
+        )}
+        <div className={styles.titled}>
+          <SheetTitle className={styles.title}>
+            {editing && step === "review"
+              ? "Edit Transaction"
+              : STEPS[step].title(draft.direction)}
+          </SheetTitle>
+          {!editing && <p className={styles.step}>{STEPS[step].number} of 3</p>}
+        </div>
+        <SheetClose className={styles.close} />
+      </div>
+      {step === "amount" && (
+        <AmountStep
+          draft={draft}
+          currency={currency}
+          canContinue={amount !== undefined}
+          onChange={setDraft}
+          onNext={() => finish("category")}
+        />
+      )}
+      {step === "category" && amount && (
+        <CategoryStep
+          draft={draft}
+          amount={amount}
+          editing={editing}
+          onPick={(categoryId) => {
+            setDraft({ ...draft, categoryId });
+            finish("review");
+          }}
+        />
+      )}
+      {step === "review" && amount && (
+        <ReviewStep
+          draft={draft}
+          amount={amount}
+          accounts={open}
+          editing={editing}
+          onChange={setDraft}
+          onAmount={() => goTo("amount")}
+          onCategory={() => goTo("category")}
+          onRecord={(input) => {
+            onRecord(input);
+            onClose();
+          }}
+          onDelete={
+            onDelete &&
+            (() => {
+              onDelete();
+              onClose();
+            })
+          }
+        />
+      )}
+    </SheetShell>
   );
 }
 
