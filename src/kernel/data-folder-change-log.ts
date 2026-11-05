@@ -14,12 +14,23 @@ import {
   SAVING,
   type UnsavedReason,
 } from "./change-log";
-import { type CheckScope, type FileStamp, readChanges } from "./folder-checks";
 import {
+  type CheckScope,
+  type FileStamp,
+  type FileStamps,
+  parseRecords,
+  readChanges,
+  sameStamp,
+} from "./folder-checks";
+import {
+  type FileRead,
+  forgetFilesRead,
+  keepFileRead,
   markWritten,
   openDatabase,
   openLocalCopy,
   readFileStamps,
+  readFilesRead,
   readUnwrittenRecords,
 } from "./indexed-db-change-log";
 
@@ -56,7 +67,31 @@ export type DataFolderChangeLog = ChangeLog & {
    * files once `keepGoing` says so, and says whether it got through the folder.
    */
   checkFolder(scope: CheckScope, keepGoing?: () => boolean): Promise<boolean>;
+  /**
+   * Opens a Budget by reading all of this folder, for a device with no Budget in
+   * its Local Copy. Says whether it found one, and only then is the Change Log
+   * in this folder. Nothing shows until every file is in: each is kept apart as
+   * it's read, so leaving resumes. A file that can't be read yet is tried again
+   * after the rest, for as long as it takes. Rejects if the folder can't be listed.
+   */
+  readFolderInFull(chosen: Folder, reading: FullRead): Promise<boolean>;
+  /** Whether a full read left files behind, so there's one to resume. */
+  fullReadUnderway(): Promise<boolean>;
+  /** Drops those files, because they came from a folder no longer chosen. */
+  forgetFullRead(): Promise<void>;
 };
+
+export type FullRead = {
+  /** Whether these records, oldest first, are a Budget to open. */
+  holdsBudget(records: readonly ChangeRecord[]): boolean;
+  onProgress(progress: FullReadProgress): void;
+  /** How long to wait before trying unreadable files again. */
+  waitToRetry?: () => Promise<void>;
+};
+
+export type FullReadProgress = { read: number; of: number };
+
+const FULL_READ_RETRY_AFTER = 5000;
 
 export async function openDataFolderChangeLog({
   indexedDB = globalThis.indexedDB,
@@ -161,7 +196,86 @@ export async function openDataFolderChangeLog({
       }
       return changes.finished;
     },
+    async readFolderInFull(
+      chosen,
+      { holdsBudget, onProgress, waitToRetry = waitBeforeRetrying },
+    ) {
+      const kept = await readFilesRead(database);
+      let names = await chosen.list();
+      if (names.length === 0) return false;
+      while (true) {
+        const unreadable = await readEachFile(chosen, names, kept, onProgress);
+        if (!unreadable) break;
+        await waitToRetry();
+        names = await chosen.list();
+      }
+      const inFolder = names.map((name) => kept.get(name) as FileRead);
+      const records = inFolder.flatMap((file) => file.records);
+      if (!holdsBudget([...records].sort(compareRecords))) {
+        await forgetFilesRead(database);
+        return false;
+      }
+      folder = chosen;
+      stamps = stampsOf(names, kept);
+      localCopy.finishFullRead(records, stamps);
+      startWriting();
+      return true;
+    },
+    async fullReadUnderway() {
+      return (await readFilesRead(database)).size > 0;
+    },
+    forgetFullRead: () => forgetFilesRead(database),
   };
+
+  /** Says whether any file couldn't be read this time. */
+  async function readEachFile(
+    from: Folder,
+    names: readonly string[],
+    kept: Map<string, FileRead>,
+    onProgress: FullRead["onProgress"],
+  ) {
+    let unreadable = false;
+    const showCount = () =>
+      onProgress({
+        read: names.filter((name) => kept.has(name)).length,
+        of: names.length,
+      });
+    showCount();
+    for (const name of names) {
+      try {
+        // Stamped before reading: a change in between only means another read.
+        const stamp = await from.stamp(name);
+        const known = kept.get(name)?.stamp;
+        if (known && sameStamp(known, stamp)) continue;
+        const file = parseRecords(await from.read(name));
+        const fileRead = {
+          stamp: file.whole ? stamp : undefined,
+          records: file.records,
+        };
+        await keepFileRead(database, name, fileRead);
+        kept.set(name, fileRead);
+        showCount();
+      } catch {
+        unreadable = true;
+      }
+    }
+    return unreadable;
+  }
+}
+
+function stampsOf(names: readonly string[], kept: Map<string, FileRead>) {
+  const found: FileStamps = {};
+  for (const name of names) {
+    const stamp = kept.get(name)?.stamp;
+    if (stamp) found[name] = stamp;
+  }
+  return found;
+}
+
+function waitBeforeRetrying() {
+  return new Promise<void>((resolve) =>
+    setTimeout(resolve, FULL_READ_RETRY_AFTER),
+  );
 }
 
 /** One file per device per Month, the Month coming from the record's own wall time. */

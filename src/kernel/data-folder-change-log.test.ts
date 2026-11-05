@@ -1,7 +1,10 @@
 import { IDBFactory } from "fake-indexeddb";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ChangeLog, ChangeRecord, SaveState } from "./change-log";
-import { openDataFolderChangeLog } from "./data-folder-change-log";
+import {
+  type DataFolderChangeLog,
+  openDataFolderChangeLog,
+} from "./data-folder-change-log";
 import { createInMemoryFolder, type InMemoryFolder } from "./in-memory-folder";
 
 /** One browser: storage shared by its tabs, and the folder it was given. */
@@ -522,4 +525,226 @@ describe("checking the Data Folder for other devices' changes", () => {
 
     expect(changeLog.readAll()).toEqual([]);
   });
+});
+
+describe("reading a whole Budget from a folder", () => {
+  const created = (id: string) => ({ ...record(id), type: "BudgetCreated" });
+  const holdsBudget = (records: readonly ChangeRecord[]) =>
+    records.some(({ type }) => type === "BudgetCreated");
+
+  it("fills the Local Copy from every file, counting as it goes", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    deliver(folder, "laptop.jsonl", [created("a")]);
+    deliver(folder, "any name.txt", [record("b", OCT_31 + 1)]);
+    const changeLog = await openTabWithoutItsFolder();
+    const counts: string[] = [];
+
+    const opened = await changeLog.readFolderInFull(folder, {
+      holdsBudget,
+      onProgress: ({ read, of }) => counts.push(`${read} of ${of}`),
+    });
+
+    expect(opened).toBe(true);
+    expect(ids(changeLog)).toEqual(["a", "b"]);
+    expect(counts).toEqual(["0 of 2", "1 of 2", "2 of 2"]);
+    expect(ids(await openTabWithoutItsFolder())).toEqual(["a", "b"]);
+  });
+
+  it("doesn't read a folder with no files, and leaves the Local Copy as it was", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    const changeLog = await openTabWithoutItsFolder();
+    const onProgress = vi.fn();
+
+    const opened = await changeLog.readFolderInFull(folder, {
+      holdsBudget,
+      onProgress,
+    });
+
+    expect(opened).toBe(false);
+    expect(onProgress).not.toHaveBeenCalled();
+  });
+
+  it("shows nothing until the last file is in, even after leaving", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    deliver(folder, "first", [created("a")]);
+    deliver(folder, "stuck", [record("b")]);
+    folder.failReading("stuck", "NotReadableError");
+
+    const changeLog = await openTabWithoutItsFolder();
+    await leaveWhenStuck(changeLog, folder);
+
+    expect(changeLog.readAll()).toEqual([]);
+    expect((await openTabWithoutItsFolder()).readAll()).toEqual([]);
+  });
+
+  it("resumes after leaving, reading only the files it hasn't got", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    deliver(folder, "first", [created("a")]);
+    deliver(folder, "second", [record("b", OCT_31 + 1)]);
+    deliver(folder, "stuck", [record("c", OCT_31 + 2)]);
+    folder.failReading("stuck", "NotReadableError");
+    await leaveWhenStuck(await openTabWithoutItsFolder(), folder);
+
+    folder.failReading("stuck", undefined);
+    folder.clearReads();
+    const counts: string[] = [];
+    const back = await openTabWithoutItsFolder();
+    expect(await back.fullReadUnderway()).toBe(true);
+    await back.readFolderInFull(folder, {
+      holdsBudget,
+      onProgress: ({ read, of }) => counts.push(`${read} of ${of}`),
+    });
+
+    expect(folder.reads()).toEqual(["stuck"]);
+    expect(counts).toEqual(["2 of 3", "3 of 3"]);
+    expect(ids(back)).toEqual(["a", "b", "c"]);
+    expect(await back.fullReadUnderway()).toBe(false);
+    expect(ids(await openTabWithoutItsFolder())).toEqual(["a", "b", "c"]);
+  });
+
+  it("on resuming, reads a file again if it changed and drops one that's gone", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    deliver(folder, "grows", [created("a")], 1000);
+    deliver(folder, "goes", [record("gone")]);
+    deliver(folder, "stuck", [record("c")]);
+    folder.failReading("stuck", "NotReadableError");
+    await leaveWhenStuck(await openTabWithoutItsFolder(), folder);
+
+    folder.failReading("stuck", undefined);
+    deliver(folder, "grows", [created("a"), record("b")], 2000);
+    folder.files.delete("goes");
+    const back = await openTabWithoutItsFolder();
+    await back.readFolderInFull(folder, { holdsBudget, onProgress() {} });
+
+    expect(ids(back).sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("takes nothing from another folder once told to forget it", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    deliver(folder, "same name", [created("theirs")], 1000);
+    deliver(folder, "stuck", [record("b")]);
+    folder.failReading("stuck", "NotReadableError");
+    await leaveWhenStuck(await openTabWithoutItsFolder(), folder);
+
+    const back = await openTabWithoutItsFolder();
+    await back.forgetFullRead();
+    const chosen = createInMemoryFolder();
+    deliver(chosen, "same name", [created("ours")], 1000);
+    await back.readFolderInFull(chosen, { holdsBudget, onProgress() {} });
+
+    expect(ids(back)).toEqual(["ours"]);
+  });
+
+  it("tries a file it couldn't read again, without stopping at it", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    deliver(folder, "stuck", [record("b", OCT_31 + 1)]);
+    deliver(folder, "second", [created("a")]);
+    folder.failReading("stuck", "NotReadableError");
+    const changeLog = await openTabWithoutItsFolder();
+    const counts: string[] = [];
+
+    const opened = await changeLog.readFolderInFull(folder, {
+      holdsBudget,
+      onProgress: ({ read, of }) => counts.push(`${read} of ${of}`),
+      waitToRetry: async () => folder.failReading("stuck", undefined),
+    });
+
+    expect(opened).toBe(true);
+    expect(counts).toEqual(["0 of 2", "1 of 2", "1 of 2", "2 of 2"]);
+    expect(ids(changeLog)).toEqual(["a", "b"]);
+  });
+
+  it("keeps the good lines of a torn file, and reads it again on the next check", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    const whole = JSON.stringify(created("a"));
+    folder.deliver("torn", `${whole}\n{"id":"cut o`);
+    const changeLog = await openTabWithoutItsFolder();
+
+    await changeLog.readFolderInFull(folder, { holdsBudget, onProgress() {} });
+    expect(ids(changeLog)).toEqual(["a"]);
+
+    folder.deliver("torn", `${whole}\n${JSON.stringify(record("b"))}\n`);
+    await changeLog.checkFolder("full");
+    expect(ids(changeLog).sort()).toEqual(["a", "b"]);
+  });
+
+  it("opens nothing from files with no Budget, and keeps none of them", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    deliver(folder, "laptop", [record("a")]);
+    const changeLog = await openTabWithoutItsFolder();
+
+    const opened = await changeLog.readFolderInFull(folder, {
+      holdsBudget,
+      onProgress() {},
+    });
+
+    expect(opened).toBe(false);
+    expect(changeLog.readAll()).toEqual([]);
+    expect(await changeLog.fullReadUnderway()).toBe(false);
+  });
+
+  it("stays out of the folder while reading, so a check can't bring in part of it", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    deliver(folder, "first", [created("a")]);
+    deliver(folder, "stuck", [record("b")]);
+    folder.failReading("stuck", "NotReadableError");
+    const changeLog = await openTabWithoutItsFolder();
+
+    await leaveWhenStuck(changeLog, folder);
+    await changeLog.checkFolder("full");
+
+    expect(changeLog.readAll()).toEqual([]);
+  });
+
+  it("is in the folder afterwards: it writes there and won't read it all again", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    deliver(folder, "laptop", [created("a")]);
+    const changeLog = await openTabWithoutItsFolder();
+    await changeLog.readFolderInFull(folder, { holdsBudget, onProgress() {} });
+    folder.clearReads();
+
+    await changeLog.checkFolder("full");
+    expect(folder.reads()).toEqual([]);
+
+    changeLog.append([record("b", NOV_1)]);
+    await settled(changeLog);
+    expect(lines(folder.files.get("phone-2026-11.jsonl"))).toHaveLength(1);
+    expect(lines(folder.files.get("laptop"))).toHaveLength(1);
+  });
+
+  it("rejects when the folder can't be listed, keeping what it read", async () => {
+    const { folder, openTabWithoutItsFolder } = aBrowser();
+    deliver(folder, "first", [created("a")]);
+    deliver(folder, "stuck", [record("b")]);
+    folder.failReading("stuck", "NotReadableError");
+    const changeLog = await openTabWithoutItsFolder();
+
+    await expect(
+      changeLog.readFolderInFull(folder, {
+        holdsBudget,
+        onProgress() {},
+        waitToRetry: async () => folder.failWith("NotFoundError"),
+      }),
+    ).rejects.toThrow();
+
+    expect(changeLog.readAll()).toEqual([]);
+    expect(await changeLog.fullReadUnderway()).toBe(true);
+  });
+
+  /** Reads as far as the one stuck file, then waits forever, as a tab being left does. */
+  async function leaveWhenStuck(
+    changeLog: DataFolderChangeLog,
+    folder: InMemoryFolder,
+  ) {
+    await new Promise<void>((left) => {
+      void changeLog.readFolderInFull(folder, {
+        holdsBudget,
+        onProgress() {},
+        waitToRetry: () => {
+          left();
+          return new Promise(() => {});
+        },
+      });
+    });
+  }
 });
