@@ -4,11 +4,12 @@ import {
   type Money,
   money,
   parseMoney,
+  typedMoney,
 } from "../../kernel/money";
-import type { Month } from "../../kernel/month";
+import { type Month, monthOf } from "../../kernel/month";
 import { available, readyToAssign } from "../budget-totals";
 import { categoryGroups } from "../categories";
-import type { KnownPayee } from "./queries";
+import type { KnownPayee, Transaction } from "./queries";
 
 export type Direction = "out" | "in";
 
@@ -22,7 +23,29 @@ export type Draft = {
   payee: string;
   date: string;
   accountId: string;
+  /** The phone doesn't show a memo, but editing keeps one. */
+  memo?: string;
 };
+
+/** A Draft saying what this Transaction says, to edit it. */
+export function draftOf({
+  amount,
+  categoryId,
+  payee,
+  memo,
+  date,
+  accountId,
+}: Transaction): Draft {
+  return {
+    direction: amount.minorUnits > 0 ? "in" : "out",
+    typed: typedMoney(money(Math.abs(amount.minorUnits), amount.currency)),
+    ...(categoryId && { categoryId }),
+    payee: payee ?? "",
+    ...(memo && { memo }),
+    date,
+    accountId,
+  };
+}
 
 /** Changing direction forgets the Category: money in starts at Ready to Assign, and money out must choose. */
 export function withDirection(draft: Draft, direction: Direction): Draft {
@@ -83,25 +106,42 @@ export type CategoryChoices = {
   groups: { id: string; name: string; categories: CategoryChoice[] }[];
 };
 
-/** What money can be recorded against in a Month: every visible Category by Group, and Ready to Assign. */
+/**
+ * What money can be recorded against in a Month: every visible Category by
+ * Group, and Ready to Assign. When `editing` a Transaction, its own money is left
+ * out, since saving replaces it, and its Category stays offered if now hidden.
+ */
 export function categoryChoices(
   records: readonly ChangeRecord[],
   of: Month,
   currency: Currency,
+  editing?: Transaction,
 ): CategoryChoices {
   const zero = money(0, currency);
+  const without = (from: Money, counted: boolean) =>
+    editing && counted
+      ? money(from.minorUnits - editing.amount.minorUnits, currency)
+      : from;
   return {
-    readyToAssign: readyToAssign(records) ?? zero,
+    readyToAssign: without(
+      readyToAssign(records) ?? zero,
+      editing?.categoryId === undefined,
+    ),
     groups: categoryGroups(records)
       .map(({ id, name, categories }) => ({
         id,
         name,
         categories: categories
-          .filter(({ hidden }) => !hidden)
+          .filter(({ id, hidden }) => !hidden || id === editing?.categoryId)
           .map((category) => ({
             id: category.id,
             name: category.name,
-            available: available(records, category.id, of) ?? zero,
+            // Available carries forward, so it holds this money from its Month on.
+            available: without(
+              available(records, category.id, of) ?? zero,
+              editing?.categoryId === category.id &&
+                monthOf(editing.date) <= of,
+            ),
           })),
       }))
       .filter(({ categories }) => categories.length > 0),

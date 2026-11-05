@@ -6,6 +6,7 @@ import {
   openDataFolderChangeLog,
 } from "./data-folder-change-log";
 import { createInMemoryFolder, type InMemoryFolder } from "./in-memory-folder";
+import { rememberedFolderHandle } from "./indexed-db-change-log";
 
 /** One browser: storage shared by its tabs, and the folder it was given. */
 function aBrowser(folder: InMemoryFolder = createInMemoryFolder()) {
@@ -104,6 +105,18 @@ describe("writing to the Data Folder", () => {
     ]);
   });
 
+  it("files a record written at an earlier place by when it was written, where a quick check will find it", async () => {
+    const { folder, openTab } = aBrowser();
+    const changeLog = await openTab();
+    const placed = { ...record("a", OCT_31), writtenAt: NOV_1 };
+
+    changeLog.append([placed]);
+    await settled(changeLog);
+
+    expect([...folder.files.keys()]).toEqual(["phone-2026-11.jsonl"]);
+    expect(lines(folder.files.get("phone-2026-11.jsonl"))).toEqual([placed]);
+  });
+
   it("writes a burst of changes together", async () => {
     const { folder, openTab } = aBrowser();
     const changeLog = await openTab();
@@ -191,10 +204,11 @@ describe("writing to the Data Folder", () => {
 
     folder.failWith(undefined);
     changeLog.append([record("c", OCT_31 + 2)]);
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    await settled(changeLog);
 
-    expect(changeLog.saveState()).toEqual({ status: "saved" });
+    // Not `settled`: unsaved stays up until a write succeeds, so it can resolve before the retry runs.
+    await vi.waitFor(() =>
+      expect(changeLog.saveState()).toEqual({ status: "saved" }),
+    );
     expect(
       lines(folder.files.get("phone-2026-10.jsonl")).map(({ id }) => id),
     ).toEqual(["a", "b", "c"]);
@@ -351,6 +365,189 @@ describe("a Budget not in a folder yet", () => {
       record("after", OCT_31 + 1),
     ]);
     expect((await open()).readAll()).toHaveLength(2);
+  });
+});
+
+describe("moving a Budget from browser storage into a folder", () => {
+  const HANDLE = { name: "Budgets" } as FileSystemDirectoryHandle;
+
+  /** A Budget in browser storage with records in two files once it's moved. */
+  async function aBudgetInBrowserStorage() {
+    const indexedDB = new IDBFactory();
+    const chosen = createInMemoryFolder();
+    const openTab = () =>
+      openDataFolderChangeLog({
+        indexedDB,
+        oneTabAtATime: chosen.oneTabAtATime,
+        budgetIds,
+        onTwoBudgets: () => {},
+      });
+    const changeLog = await openTab();
+    changeLog.append([record("a", OCT_31), record("b", NOV_1)]);
+    await settled(changeLog);
+    return { indexedDB, chosen, openTab, changeLog };
+  }
+
+  /** The Budget is where it was: same records, not in a folder, nothing waiting to be written. */
+  async function expectNothingChanged({
+    indexedDB,
+    changeLog,
+    chosen,
+  }: Awaited<ReturnType<typeof aBudgetInBrowserStorage>>) {
+    const appendsSoFar = chosen.appends();
+    expect(changeLog.inFolder()).toBe(false);
+    expect(changeLog.saveState()).toEqual({ status: "saved" });
+    expect(changeLog.readAll().map(({ id }) => id)).toEqual(["a", "b"]);
+    expect(await rememberedFolderHandle({ indexedDB })).toBeUndefined();
+
+    changeLog.append([record("after", NOV_1 + 1)]);
+    await settled(changeLog);
+    expect(chosen.appends()).toBe(appendsSoFar);
+
+    const elsewhere = createInMemoryFolder();
+    const reopened = await openDataFolderChangeLog({
+      indexedDB,
+      folder: elsewhere,
+      oneTabAtATime: elsewhere.oneTabAtATime,
+      budgetIds,
+      onTwoBudgets: () => {},
+    });
+    await settled(reopened);
+    expect(elsewhere.files.size).toBe(0);
+  }
+
+  it("copies every record, then keeps later changes in the folder and remembers it", async () => {
+    const { indexedDB, chosen, changeLog } = await aBudgetInBrowserStorage();
+
+    expect(await changeLog.moveIntoFolder(chosen, HANDLE)).toBe("moved");
+    changeLog.append([record("c", NOV_1 + 1)]);
+    await settled(changeLog);
+
+    expect(lines(chosen.files.get("phone-2026-10.jsonl"))).toEqual([
+      record("a", OCT_31),
+    ]);
+    expect(lines(chosen.files.get("phone-2026-11.jsonl"))).toEqual([
+      record("b", NOV_1),
+      record("c", NOV_1 + 1),
+    ]);
+    expect(changeLog.inFolder()).toBe(true);
+    expect(await rememberedFolderHandle({ indexedDB })).toEqual(HANDLE);
+  });
+
+  it("keeps the browser's records as the Local Copy", async () => {
+    const { chosen, openTab, changeLog } = await aBudgetInBrowserStorage();
+
+    await changeLog.moveIntoFolder(chosen, HANDLE);
+    chosen.files.clear();
+
+    expect((await openTab()).readAll().map(({ id }) => id)).toEqual(["a", "b"]);
+  });
+
+  it("copies records another tab added, which this one hasn't seen", async () => {
+    const { chosen, openTab, changeLog } = await aBudgetInBrowserStorage();
+    const other = await openTab();
+    other.append([record("from-the-other-tab", OCT_31 + 1)]);
+    await settled(other);
+
+    await changeLog.moveIntoFolder(chosen, HANDLE);
+
+    expect(
+      lines(chosen.files.get("phone-2026-10.jsonl")).map(({ id }) => id),
+    ).toContain("from-the-other-tab");
+  });
+
+  it("writes a change made while the copy was running", async () => {
+    const { chosen, changeLog } = await aBudgetInBrowserStorage();
+
+    const moving = changeLog.moveIntoFolder(chosen, HANDLE);
+    await new Promise((resolve) => setTimeout(resolve));
+    changeLog.append([record("during", NOV_1 + 1)]);
+    expect(await moving).toBe("moved");
+    await settled(changeLog);
+
+    expect(
+      lines(chosen.files.get("phone-2026-11.jsonl")).map(({ id }) => id),
+    ).toContain("during");
+  });
+
+  it("changes nothing when a write fails partway, and leaves no part of the Budget in the folder", async () => {
+    const budget = await aBudgetInBrowserStorage();
+    const { chosen, changeLog } = budget;
+    const failing = {
+      ...chosen,
+      append: async (fileName: string, text: string) => {
+        if (fileName.includes("2026-11")) {
+          throw new DOMException("Disk full", "QuotaExceededError");
+        }
+        await chosen.append(fileName, text);
+      },
+    };
+
+    expect(await changeLog.moveIntoFolder(failing, HANDLE)).toBe("failed");
+
+    expect(chosen.files.size).toBe(0);
+    await expectNothingChanged(budget);
+  });
+
+  it("changes nothing when reading back doesn't show every record", async () => {
+    const budget = await aBudgetInBrowserStorage();
+    const { chosen, changeLog } = budget;
+    const losing = { ...chosen, read: async () => "" };
+
+    expect(await changeLog.moveIntoFolder(losing, HANDLE)).toBe("failed");
+
+    expect(chosen.files.size).toBe(0);
+    await expectNothingChanged(budget);
+  });
+
+  it("changes nothing when the folder can't be listed", async () => {
+    const budget = await aBudgetInBrowserStorage();
+    const { chosen, changeLog } = budget;
+    const refusing = {
+      ...chosen,
+      list: async () => {
+        throw new DOMException("Lapsed", "NotAllowedError");
+      },
+    };
+
+    expect(await changeLog.moveIntoFolder(refusing, HANDLE)).toBe("failed");
+
+    await expectNothingChanged(budget);
+  });
+
+  it("can try again when a failed or interrupted move left part of this Budget behind", async () => {
+    const { chosen, changeLog } = await aBudgetInBrowserStorage();
+    chosen.files.set(
+      "phone-2026-10.jsonl",
+      `${JSON.stringify(record("a", OCT_31))}\n`,
+    );
+
+    expect(await changeLog.moveIntoFolder(chosen, HANDLE)).toBe("moved");
+
+    expect(lines(chosen.files.get("phone-2026-11.jsonl"))).toEqual([
+      record("b", NOV_1),
+    ]);
+  });
+
+  it("refuses a folder that already holds a Budget, adding nothing to it", async () => {
+    const budget = await aBudgetInBrowserStorage();
+    const { chosen, changeLog } = budget;
+    const theirs = `${JSON.stringify(record("theirs", OCT_31, "laptop"))}\n`;
+    chosen.files.set("laptop-2026-10.jsonl", theirs);
+
+    expect(await changeLog.moveIntoFolder(chosen, HANDLE)).toBe(
+      "holds-a-budget",
+    );
+
+    expect([...chosen.files]).toEqual([["laptop-2026-10.jsonl", theirs]]);
+    await expectNothingChanged(budget);
+  });
+
+  it("takes a folder whose subfolder holds no records", async () => {
+    const { chosen, changeLog } = await aBudgetInBrowserStorage();
+    chosen.files.set("empty.jsonl", "");
+
+    expect(await changeLog.moveIntoFolder(chosen, HANDLE)).toBe("moved");
   });
 });
 

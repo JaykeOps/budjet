@@ -1,5 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
-import { cancelNextFolderPicker, deliverFile, filesInFolder } from "./folder";
+import {
+  cancelNextFolderPicker,
+  deliverFile,
+  fakeFolderPicker,
+  filesInFolder,
+  putAnotherBudgetInFolder,
+} from "./folder";
 import { addAccount, createBudget, goTo, hasRail, openApp } from "./helpers";
 import { folderWritesFinished, reloadWhenSaved } from "./reload";
 
@@ -158,4 +164,112 @@ test("an open tab reloads to give way to a newer version of the database", async
     indexedDB.open("budjet", 99);
   });
   await reloaded;
+});
+
+test.describe("a Budget already in browser storage", () => {
+  const offer = (page: Page) =>
+    page.getByRole("heading", { name: "Move your Budget into a folder" });
+
+  /** A browser with no picker makes the Budget, then gains one, as a later version might. */
+  async function aBudgetFromBeforeThePicker(page: Page) {
+    await page.addInitScript(() => {
+      if (!localStorage.getItem("gained-picker")) {
+        Reflect.deleteProperty(window, "showDirectoryPicker");
+      }
+    });
+    await page.goto("/");
+    await button(page, "Get started").click();
+    await button(page, "Next").click();
+    await button(page, "Start blank").click();
+    await page.getByLabel("Name").fill("Checking");
+    await page.getByLabel("What it holds today").fill("250");
+    await button(page, "Add Account").click();
+    await button(page, "Open my Budget").click();
+    await goTo(page, "Budget");
+    await expect(offer(page)).toHaveCount(0);
+
+    await page.evaluate(() => localStorage.setItem("gained-picker", "yes"));
+    await fakeFolderPicker(page);
+    await reloadWhenSaved(page);
+    await expect(offer(page)).toBeVisible();
+  }
+
+  test("Not now hides the offer, and it returns on the next open", async ({
+    page,
+  }) => {
+    await aBudgetFromBeforeThePicker(page);
+
+    await button(page, "Not now").click();
+    await expect(offer(page)).toHaveCount(0);
+
+    await page.reload();
+    await expect(offer(page)).toBeVisible();
+  });
+
+  test("cancelling the picker leaves the offer as it was", async ({ page }) => {
+    await aBudgetFromBeforeThePicker(page);
+
+    await cancelNextFolderPicker(page);
+    await button(page, "Choose a folder").click();
+
+    await expect(offer(page)).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+  });
+
+  test("moving copies the records, and the Budget stays in the folder after a reload", async ({
+    page,
+  }) => {
+    await aBudgetFromBeforeThePicker(page);
+
+    await button(page, "Choose a folder").click();
+    await expect(
+      page.getByText("Your Budget is now in picked-folder."),
+    ).toBeVisible();
+    expect((await recordIdsInFolder(page)).length).toBeGreaterThan(0);
+
+    await button(page, "Done").click();
+    await addAccount(page, { name: "Savings", holds: "1" });
+    await folderWritesFinished(page);
+    const copied = (await filesInFolder(page)).map(({ text }) => text).join("");
+    expect(copied).toContain("Savings");
+
+    await reloadWhenSaved(page);
+    await expect(offer(page)).toHaveCount(0);
+    await goTo(page, "Budget");
+    await expect(
+      page.getByRole("heading", { name: "Budget", exact: true }),
+    ).toBeVisible();
+  });
+
+  test("a folder already holding a Budget is refused, and the offer stays", async ({
+    page,
+  }) => {
+    await aBudgetFromBeforeThePicker(page);
+    await putAnotherBudgetInFolder(page);
+
+    await button(page, "Choose a folder").click();
+
+    await expect(page.getByRole("alert")).toHaveText(
+      "This folder already holds a Budget, so yours can't go there. Choose another folder.",
+    );
+    expect((await filesInFolder(page)).map(({ name }) => name)).toEqual([
+      "other-device-2026-01.jsonl",
+    ]);
+    await page.reload();
+    await expect(offer(page)).toBeVisible();
+  });
+
+  test("another open tab follows the move", async ({ page, context }) => {
+    await aBudgetFromBeforeThePicker(page);
+    const other = await context.newPage();
+    await other.goto("/");
+    await expect(offer(other)).toBeVisible();
+
+    await button(page, "Choose a folder").click();
+    await expect(
+      page.getByText("Your Budget is now in picked-folder."),
+    ).toBeVisible();
+
+    await expect(offer(other)).toHaveCount(0);
+  });
 });

@@ -19,6 +19,7 @@ import {
   type Draft,
   dayBefore,
   draftAmount,
+  draftOf,
   matchingPayees,
   missingField,
   nextDraft,
@@ -273,6 +274,117 @@ describe("categoryChoices", () => {
     writer.write("dining", "CategoryHidden", { version: 1 });
 
     expect(categoryChoices(records(), "2026-10", "USD").groups).toEqual([]);
+  });
+});
+
+describe("categoryChoices while editing a Transaction", () => {
+  const lunch = {
+    id: "lunch",
+    accountId: "checking",
+    date: "2026-10-12",
+    amount: money(-1850, "USD"),
+    categoryId: "groceries",
+  };
+  const availableIn = (
+    choices: ReturnType<typeof categoryChoices>,
+    id: string,
+  ) =>
+    choices.groups
+      .flatMap(({ categories }) => categories)
+      .find((category) => category.id === id)?.available;
+
+  it("leaves that Transaction's money out of its Category, in its Month and later ones", () => {
+    const { writer, records } = budget();
+    recordTransaction(writer, lunch);
+
+    for (const month of ["2026-10", "2026-11"] as const) {
+      expect(
+        availableIn(
+          categoryChoices(records(), month, "USD", lunch),
+          "groceries",
+        ),
+      ).toEqual(money(0, "USD"));
+    }
+    expect(
+      availableIn(
+        categoryChoices(records(), "2026-09", "USD", lunch),
+        "groceries",
+      ),
+    ).toEqual(money(0, "USD"));
+    expect(
+      availableIn(categoryChoices(records(), "2026-10", "USD"), "groceries"),
+    ).toEqual(money(-1850, "USD"));
+  });
+
+  it("leaves money that came in to Ready to Assign out of Ready to Assign", () => {
+    const { writer, records } = budget();
+    const paycheck = {
+      id: "paycheck",
+      accountId: "checking",
+      date: "2026-10-12",
+      amount: money(5000, "USD"),
+    };
+    recordTransaction(writer, paycheck);
+
+    expect(
+      categoryChoices(records(), "2026-10", "USD", paycheck).readyToAssign,
+    ).toEqual(money(200000, "USD"));
+  });
+
+  it("still offers its Category if that has since been hidden", () => {
+    const { writer, records } = budget();
+    recordTransaction(writer, lunch);
+    writer.write("groceries", "CategoryHidden", { version: 1 });
+
+    expect(
+      categoryChoices(
+        records(),
+        "2026-10",
+        "USD",
+        lunch,
+      ).groups[0]?.categories.map(({ id }) => id),
+    ).toEqual(["groceries", "dining"]);
+  });
+});
+
+describe("draftOf", () => {
+  it("starts from what the Transaction says, keeping the memo the phone doesn't show", () => {
+    expect(
+      draftOf({
+        id: "lunch",
+        accountId: "checking",
+        date: "2026-10-12",
+        amount: money(-1850, "USD"),
+        categoryId: "groceries",
+        payee: "Corner Bistro",
+        memo: "With Sam",
+      }),
+    ).toEqual({
+      direction: "out",
+      typed: "18.50",
+      categoryId: "groceries",
+      payee: "Corner Bistro",
+      memo: "With Sam",
+      date: "2026-10-12",
+      accountId: "checking",
+    });
+  });
+
+  it("reads money coming in, with no Payee or Category", () => {
+    expect(
+      draftOf({
+        id: "paycheck",
+        accountId: "checking",
+        date: "2026-10-12",
+        amount: money(5000, "USD"),
+      }),
+    ).toEqual({
+      direction: "in",
+      typed: "50.00",
+      payee: "",
+      date: "2026-10-12",
+      accountId: "checking",
+    });
   });
 });
 

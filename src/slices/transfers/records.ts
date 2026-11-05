@@ -26,7 +26,14 @@ export type TransferDetails = {
  */
 export type TransferMade = ChangeRecord<
   "TransferMade",
-  { version: 1 } & TransferDetails
+  {
+    version: 1;
+    /**
+     * The deleted Transfer that Undo brought back as this new one, whose place
+     * in a list it takes. Its money counts from now, as any record's does.
+     */
+    restores?: string;
+  } & TransferDetails
 >;
 
 /** A Transfer's details replaced as a whole. Its subject is the Transfer's id. */
@@ -56,27 +63,33 @@ export function isTransferDeleted(
 
 /**
  * Every Transfer still in the Budget, by id, with its latest details: the most
- * recent of its records wins, and a deleted Transfer is left out. This is how
- * these records are read, so every slice that reads them agrees. Expects
- * records oldest first, as `readAll` returns them.
+ * recent of its records wins (docs/adr/0004), and a deleted Transfer is left
+ * out whatever else is written about it (docs/adr/0006). This is how these
+ * records are read, so every slice that reads them agrees. Expects records
+ * oldest first, as `readAll` returns them.
  */
 export const currentTransfers = perSnapshot(
   (records: readonly ChangeRecord[]): ReadonlyMap<string, TransferDetails> => {
+    const deleted = new Set(
+      records.filter(isTransferDeleted).map(({ subjectId }) => subjectId),
+    );
     const latest = latestBySubject(
       records.filter(
-        (record) =>
-          isTransferMade(record) ||
-          isTransferEdited(record) ||
-          isTransferDeleted(record),
+        (record): record is TransferMade | TransferEdited =>
+          isTransferMade(record) || isTransferEdited(record),
       ),
     );
     const transfers = new Map<string, TransferDetails>();
-    for (const [id, record] of latest) {
-      if (isTransferDeleted(record)) continue;
-      const { version: _, ...details } = (
-        record as TransferMade | TransferEdited
-      ).payload;
-      transfers.set(id, details);
+    for (const [id, { payload }] of latest) {
+      if (deleted.has(id)) continue;
+      const { fromAccountId, toAccountId, date, amount, memo } = payload;
+      transfers.set(id, {
+        fromAccountId,
+        toAccountId,
+        date,
+        amount,
+        ...(memo !== undefined && { memo }),
+      });
     }
     return transfers;
   },

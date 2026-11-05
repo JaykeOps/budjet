@@ -4,6 +4,7 @@ import {
   addAccount,
   balanceOf,
   createBudget,
+  deleteEntry,
   goTo,
   openAccount,
   show,
@@ -180,16 +181,14 @@ test("a user deletes a mistaken Adjustment and Balance check, and the balance an
   await openAccount(page, "Everyday");
   const history = page.getByRole("table", { name: "History of Everyday" });
   const deleteRow = async (name: RegExp) => {
-    await history
-      .getByRole("row", { name })
-      .getByRole("button", { name: /^More/ })
-      .click();
-    await page.getByRole("menuitem", { name: "Delete" }).click();
+    await deleteEntry(page, history.getByRole("row", { name }));
   };
 
   // No row offers a way to delete the Opening Balance.
   await expect(
-    history.getByRole("row", { name: /Opening Balance/ }).getByRole("button"),
+    history
+      .getByRole("row", { name: /Opening Balance/ })
+      .getByRole("button", { name: /^More/ }),
   ).toHaveCount(0);
 
   await page.clock.setFixedTime(new Date("2026-10-18T12:00:00"));

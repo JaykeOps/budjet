@@ -5,6 +5,7 @@ import {
   createBudget,
   expectBalance,
   goTo,
+  hasRail,
   show,
   toast,
   transfer,
@@ -34,6 +35,7 @@ test("Undo takes a Transfer back", async ({ page }) => {
 test("a user edits and deletes a Transfer from the history", async ({
   page,
 }) => {
+  test.skip(!hasRail(page), "edit.phone.spec.ts covers a phone.");
   await createBudgetWithSavings(page);
   await transfer(page, { from: "Checking", to: "Savings", amount: "200" });
   await expect(balanceOf(page, "Checking")).toContainText("$800.00");
@@ -50,7 +52,7 @@ test("a user edits and deletes a Transfer from the history", async ({
   await expect(
     edit.getByText("Checking goes to $950.00. Savings goes to $550.00."),
   ).toBeVisible();
-  await edit.getByRole("button", { name: "Save Transfer" }).click();
+  await edit.getByRole("button", { name: "Save changes" }).click();
 
   await expect(edit).toBeHidden();
   await expect(balanceOf(page, "Checking")).toContainText("$950.00");
@@ -79,7 +81,7 @@ test("a Transfer touching a closed Account stays as it is", async ({
     page
       .getByRole("table", { name: "History of Savings" })
       .getByRole("row", { name: /^To Checking/ })
-      .getByRole("button"),
+      .getByRole("button", { name: /^More/ }),
   ).toHaveCount(0);
 
   await goTo(page, "Activity");
@@ -88,11 +90,12 @@ test("a Transfer touching a closed Account stays as it is", async ({
     page
       .getByRole("table", { name: "History of Checking" })
       .getByRole("row", { name: /^From Savings/ })
-      .getByRole("button"),
+      .getByRole("button", { name: /^More/ }),
   ).toHaveCount(0);
 });
 
 test("a Transfer's More menu works from the keyboard", async ({ page }) => {
+  test.skip(!hasRail(page), "A phone's rows open by tapping.");
   await createBudgetWithSavings(page);
   await transfer(page, { from: "Checking", to: "Savings", amount: "200" });
 

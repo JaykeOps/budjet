@@ -5,6 +5,7 @@ import { accounts } from "../accounts";
 import { isBudgetCreated } from "../budget-setup/records";
 import { categoryGroups } from "../categories";
 import {
+  type CurrentTransaction,
   currentTransactions,
   type TransactionDeleted,
   type TransactionEdited,
@@ -66,6 +67,24 @@ export function deleteTransaction(writer: ChangeLogWriter, id: string): void {
     "TransactionDeleted",
     { version: 1 },
   );
+}
+
+/**
+ * Undoes `deleteTransaction`: a new Transaction with a fresh id, because a deleted
+ * one stays deleted (docs/adr/0006), saying the same and listed in the same place.
+ * Returns its id.
+ */
+export function restoreTransaction(
+  writer: ChangeLogWriter,
+  { id: restores, ...input }: CurrentTransaction,
+): string {
+  const id = crypto.randomUUID();
+  writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+    id,
+    "TransactionRecorded",
+    { ...checkedPayload(writer.changeLog.readAll(), input), restores },
+  );
+  return id;
 }
 
 /**

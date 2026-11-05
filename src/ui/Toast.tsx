@@ -11,7 +11,10 @@ import styles from "./Toast.module.css";
 
 export type Toast = {
   text: string;
-  /** Without one the toast only says what happened. */
+  /**
+   * Without one the toast only says what happened. If it throws, because a
+   * change from another device has ruled it out, the toast says so instead.
+   */
   onUndo?: () => void;
 };
 
@@ -46,8 +49,12 @@ export function Toasts({ children }: { children: ReactNode }) {
   }, [toast, held]);
 
   function undo() {
-    toast?.onUndo?.();
-    setToast(undefined);
+    try {
+      toast?.onUndo?.();
+      setToast(undefined);
+    } catch {
+      setToast({ text: "Can't undo that: it changed on another device." });
+    }
     if (focusBefore.current instanceof HTMLElement) focusBefore.current.focus();
   }
 

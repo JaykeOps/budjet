@@ -7,6 +7,7 @@ import {
   enterTransaction,
   expectBalance,
   goTo,
+  hasRail,
   show,
 } from "./helpers";
 import { reloadWhenSaved } from "./reload";
@@ -71,6 +72,7 @@ test("a user records spending and income and sees Available, Ready to Assign and
 test("a user edits and deletes Transactions and Available, Ready to Assign and the Account balance follow", async ({
   page,
 }) => {
+  test.skip(!hasRail(page), "edit.phone.spec.ts covers a phone.");
   await createBudget(page);
   await goTo(page, "Budget");
   await assign(page, "Groceries", "400");

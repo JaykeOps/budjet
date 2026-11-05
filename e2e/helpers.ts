@@ -198,6 +198,24 @@ export function toast(page: Page): Locator {
   return page.getByRole("status", { name: "Notification" });
 }
 
+/**
+ * Deletes a row of a history: from its More menu on desktop, or by tapping it
+ * and choosing Delete in the sheet it opens on a phone.
+ */
+export async function deleteEntry(page: Page, row: Locator): Promise<void> {
+  if (hasRail(page)) {
+    await row.getByRole("button", { name: /^More/ }).click();
+    await page.getByRole("menuitem", { name: "Delete" }).click();
+    return;
+  }
+  await row.getByRole("button", { name: /^Open/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+}
+
 /** A Category's or Category Group's row on the Budget: a list item on a phone, a table row on desktop. */
 export function budgetRow(page: Page, name: string): Locator {
   return page
