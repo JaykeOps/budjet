@@ -3,6 +3,7 @@ import {
   currentMonth,
   month,
   monthName,
+  monthNameAlone,
   monthOf,
   nextMonth,
   parseMonth,
@@ -40,5 +41,11 @@ describe("Month", () => {
   it("rejects something that is not a calendar month", () => {
     expect(() => month(2026, 13)).toThrow(RangeError);
     expect(() => monthOf("25/10/2026")).toThrow(RangeError);
+  });
+});
+
+describe("monthNameAlone", () => {
+  it("names a Month without its year", () => {
+    expect(monthNameAlone(month(2026, 10), "en-US")).toBe("October");
   });
 });

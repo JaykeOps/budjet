@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { budgetRow, createBudget, goTo } from "./helpers";
+import {
+  assign,
+  budgetRow,
+  categorySheet,
+  createBudget,
+  expectAssigned,
+  goTo,
+  openCategory,
+} from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 test("a user assigns money to Categories and sees Ready to Assign change", async ({
@@ -12,41 +20,41 @@ test("a user assigns money to Categories and sees Ready to Assign change", async
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
   await expect(readyToAssign).toHaveText(/\$2,500\.00/);
 
-  const rent = page.getByLabel("Assignment for Rent");
-  await rent.fill("1200");
-  await rent.press("Enter");
+  await assign(page, "Rent", "1200");
   await expect(readyToAssign).toHaveText(/\$1,300\.00/);
 
-  const groceries = page.getByLabel("Assignment for Groceries");
-  await groceries.fill("350.50");
-  await groceries.blur();
+  await assign(page, "Groceries", "350.50");
   await expect(readyToAssign).toHaveText(/\$949\.50/);
 
-  await rent.fill("1100");
-  await rent.press("Enter");
+  await assign(page, "Rent", "1100");
 
-  const expectAssigned = async () => {
+  const expectAssignments = async () => {
     await expect(readyToAssign).toHaveText(/\$1,049\.50/);
-    await expect(rent).toHaveValue("1100.00");
-    await expect(groceries).toHaveValue("350.50");
-    await expect(page.getByLabel("Assignment for Power")).toHaveValue("0.00");
+    await expectAssigned(page, "Rent", "$1,100.00");
+    await expectAssigned(page, "Groceries", "$350.50");
+    await expectAssigned(page, "Power", "$0.00");
   };
-  await expectAssigned();
+  await expectAssignments();
 
   await reloadWhenSaved(page);
 
-  await expectAssigned();
+  await expectAssignments();
 });
 
 test("an Assignment that isn't an amount is refused", async ({ page }) => {
   await createBudget(page, { firstAccount: { openingBalance: "100" } });
   await goTo(page, "Budget");
 
-  const rent = page.getByLabel("Assignment for Rent");
-  await rent.fill("lots");
-  await rent.press("Enter");
+  const sheet = await openCategory(page, "Rent");
+  const field = sheet.getByRole("textbox", { name: /^Assigned in / });
+  await field.fill("lots");
+  await field.press("Enter");
 
-  await expect(page.getByRole("alert")).toContainText("isn't an amount");
+  await expect(sheet.getByRole("alert")).toContainText("isn't an amount");
+  await expect(sheet).toContainText("Rent");
+  await expect(sheet).toContainText("1 of");
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(categorySheet(page)).toHaveCount(0);
   await expect(
     page.getByRole("status", { name: "Ready to Assign" }),
   ).toHaveText(/\$100\.00/);
@@ -62,28 +70,19 @@ test("a user copies last Month's Assignments and moves money between Categories"
   await expect(
     page.getByRole("button", { name: "Copy last Month" }),
   ).toHaveCount(0);
-  for (const [category, amount] of [
-    ["Rent", "1200"],
-    ["Groceries", "300"],
-  ]) {
-    await page.getByLabel(`Assignment for ${category}`).fill(amount);
-    await page.getByLabel(`Assignment for ${category}`).press("Enter");
-  }
+  await assign(page, "Rent", "1200");
+  await assign(page, "Groceries", "300");
 
   await page.getByRole("button", { name: "Next Month" }).click();
   await expect(
     page.getByRole("heading", { name: "November 2026" }),
   ).toBeVisible();
-  const rent = page.getByLabel("Assignment for Rent");
-  const groceries = page.getByLabel("Assignment for Groceries");
-  const power = page.getByLabel("Assignment for Power");
-  await groceries.fill("250");
-  await groceries.press("Enter");
+  await assign(page, "Groceries", "250");
 
   await page.getByRole("button", { name: "Copy last Month" }).click();
-  await expect(rent).toHaveValue("1200.00");
-  await expect(groceries).toHaveValue("250.00");
-  await expect(power).toHaveValue("0.00");
+  await expectAssigned(page, "Rent", "$1,200.00");
+  await expectAssigned(page, "Groceries", "$250.00");
+  await expectAssigned(page, "Power", "$0.00");
 
   const move = page.getByRole("form", { name: "Move money" });
   await move.getByLabel("From").selectOption("Rent");
@@ -93,9 +92,9 @@ test("a user copies last Month's Assignments and moves money between Categories"
 
   const readyToAssign = page.getByRole("status", { name: "Ready to Assign" });
   const expectNovember = async () => {
-    await expect(rent).toHaveValue("1100.00");
-    await expect(groceries).toHaveValue("350.00");
-    await expect(power).toHaveValue("0.00");
+    await expectAssigned(page, "Rent", "$1,100.00");
+    await expectAssigned(page, "Groceries", "$350.00");
+    await expectAssigned(page, "Power", "$0.00");
     await expect(readyToAssign).toHaveText(/\$2,050\.00/);
   };
   await expectNovember();
@@ -113,11 +112,9 @@ test("moving more than a Category's Assignment takes the rest back from what it 
   await goTo(page, "Budget");
 
   const rent = budgetRow(page, "Rent");
-  await page.getByLabel("Assignment for Rent").fill("600");
-  await page.getByLabel("Assignment for Rent").press("Enter");
+  await assign(page, "Rent", "600");
   await page.getByRole("button", { name: "Next Month" }).click();
-  await page.getByLabel("Assignment for Rent").fill("10");
-  await page.getByLabel("Assignment for Rent").press("Enter");
+  await assign(page, "Rent", "10");
 
   const move = page.getByRole("form", { name: "Move money" });
   await move.getByLabel("From").selectOption("Rent");
@@ -126,7 +123,7 @@ test("moving more than a Category's Assignment takes the rest back from what it 
   await move.getByRole("button", { name: "Move" }).click();
 
   const expectTakenBack = async () => {
-    await expect(page.getByLabel("Assignment for Rent")).toHaveValue("0.00");
+    await expectAssigned(page, "Rent", "$0.00");
     await expect(rent).toContainText("$42.50 taken back");
     await expect(rent).toContainText("$557.50");
     await expect(
@@ -153,5 +150,5 @@ test("moving money to the same Category is refused", async ({ page }) => {
   await expect(page.getByRole("alert")).toContainText(
     "two different Categories",
   );
-  await expect(page.getByLabel("Assignment for Rent")).toHaveValue("0.00");
+  await expectAssigned(page, "Rent", "$0.00");
 });
