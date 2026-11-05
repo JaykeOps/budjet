@@ -461,6 +461,31 @@ describe("moving a Budget from browser storage into a folder", () => {
     ).toContain("from-the-other-tab");
   });
 
+  it("writes a change another tab made after the switch, before it reloaded", async () => {
+    const { indexedDB, chosen, openTab, changeLog } =
+      await aBudgetInBrowserStorage();
+    const other = await openTab();
+
+    await changeLog.moveIntoFolder(chosen, HANDLE);
+    other.append([record("around-the-move", NOV_1 + 1)]);
+    await settled(other);
+
+    const reloaded = await openDataFolderChangeLog({
+      indexedDB,
+      oneTabAtATime: chosen.oneTabAtATime,
+      budgetIds,
+      onTwoBudgets: () => {},
+    });
+    reloaded.returnToFolder(chosen);
+    await vi.waitFor(async () =>
+      expect(await reloaded.hasUnsavedChanges()).toBe(false),
+    );
+
+    expect(
+      lines(chosen.files.get("phone-2026-11.jsonl")).map(({ id }) => id),
+    ).toContain("around-the-move");
+  });
+
   it("writes a change made while the copy was running", async () => {
     const { chosen, changeLog } = await aBudgetInBrowserStorage();
 
