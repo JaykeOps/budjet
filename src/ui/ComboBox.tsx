@@ -74,7 +74,12 @@ export function ComboBox({
             inputValue: value,
             onInputChange: onValue,
           }
-        : { menuTrigger: "focus" as const, defaultItems: options })}
+        : {
+            menuTrigger: "focus" as const,
+            defaultItems: options,
+            defaultInputValue:
+              options.find(({ id }) => id === selectedId)?.name ?? "",
+          })}
     >
       <Label className={styles.label}>{label}</Label>
       <ComboBoxInput
