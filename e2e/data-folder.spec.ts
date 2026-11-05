@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { cancelNextFolderPicker, filesInFolder } from "./folder";
+import { cancelNextFolderPicker, deliverFile, filesInFolder } from "./folder";
 import { createBudget, goTo, openApp } from "./helpers";
 import { folderWritesFinished, reloadWhenSaved } from "./reload";
 
@@ -115,6 +115,43 @@ test("two tabs writing at once keep every record in the folder", async ({
       }),
   );
   expect(ids.sort()).toEqual(localIds.sort());
+});
+
+test("another device's changes appear on opening and on regaining focus", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await createBudget(page);
+  await goTo(page, "Accounts");
+  await folderWritesFinished(page);
+
+  const accountOpened = (await filesInFolder(page))
+    .flatMap(({ text }) => text.split("\n").filter(Boolean))
+    .map((line) => JSON.parse(line))
+    .find(({ type }) => type === "AccountOpened");
+  const fromLaptop = (name: string) =>
+    `${JSON.stringify({
+      ...accountOpened,
+      id: `record-of-${name}`,
+      subjectId: `account-${name}`,
+      deviceId: "laptop",
+      payload: { ...accountOpened.payload, name },
+    })}\n`;
+  const accountRow = (name: string) =>
+    page
+      .getByRole("table", { name: "Accounts" })
+      .getByRole("row", { name: new RegExp(name) });
+
+  await deliverFile(page, "any name at all", fromLaptop("Laptop savings"));
+  await page.reload();
+  await goTo(page, "Accounts");
+  await expect(accountRow("Laptop savings")).toBeVisible();
+
+  await deliverFile(page, "another name", fromLaptop("Laptop holiday"));
+  await page.clock.fastForward(31_000);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(accountRow("Laptop holiday")).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
 test("an open tab reloads to give way to a newer version of the database", async ({

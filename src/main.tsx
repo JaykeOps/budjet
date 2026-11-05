@@ -6,6 +6,7 @@ import { hasFolderPicker } from "./first-run/browser";
 import { browserFolder } from "./kernel/browser-folder";
 import { createChangeLogWriter } from "./kernel/change-log";
 import { openDataFolderChangeLog } from "./kernel/data-folder-change-log";
+import { scheduleFolderChecks } from "./kernel/folder-checks";
 import {
   openIndexedDbChangeLog,
   openIndexedDbDeviceId,
@@ -46,6 +47,7 @@ async function openFolderStorage() {
   const changeLog = await openDataFolderChangeLog({
     folder: handle && browserFolder(handle),
   });
+  scheduleFolderChecks(changeLog.checkFolder);
   return {
     changeLog,
     keepInFolder: async (chosen: FileSystemDirectoryHandle) => {
