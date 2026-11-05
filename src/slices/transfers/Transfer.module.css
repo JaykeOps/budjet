@@ -16,3 +16,15 @@
 .note p {
   margin: 0;
 }
+
+.save {
+  display: flex;
+  gap: 8px;
+}
+.save button[type="submit"] {
+  flex: 1;
+}
+
+.delete {
+  color: var(--overspent);
+}

@@ -23,10 +23,7 @@ import {
   OpenAccountForm,
   useAccounts,
 } from "./slices/accounts";
-import {
-  deleteRedeclaredBalance,
-  openAccount,
-} from "./slices/accounts/commands";
+import { openAccount } from "./slices/accounts/commands";
 import {
   copyLastMonth,
   moveMoney,
@@ -36,13 +33,9 @@ import { type Budget, useBudget } from "./slices/budget-setup";
 import { CategoryList, categoryGroups } from "./slices/categories";
 import { MonthBudget } from "./slices/month-budget-view";
 import { TransactionsScreen } from "./slices/transactions";
-import {
-  deleteTransaction,
-  editTransaction,
-  recordTransaction,
-} from "./slices/transactions/commands";
-import { deleteTransfer, editTransfer } from "./slices/transfers/commands";
+import { recordTransaction } from "./slices/transactions/commands";
 import { Toasts, useToast } from "./ui/Toast";
+import { useHistoryChanges } from "./undo";
 import { pushAddress, useUrlParameter } from "./url-parameter";
 
 type KeepInFolder = ComponentProps<typeof FirstRun>["keepInFolder"];
@@ -124,6 +117,7 @@ function Shell({
   const accounts = useAccounts();
   const place = usePlace();
   const toast = useToast();
+  const historyChanges = useHistoryChanges();
   const [addingAccount, setAddingAccount] = useState(false);
 
   if (accounts.length === 0) {
@@ -167,13 +161,7 @@ function Shell({
           <AccountTransactions
             currency={budget.currency}
             onRecord={(input) => recordTransaction(writer, input)}
-            onEdit={(id, input) => editTransaction(writer, id, input)}
-            onDelete={(id) => deleteTransaction(writer, id)}
-            onDeleteRedeclaredBalance={(id) =>
-              deleteRedeclaredBalance(writer, id)
-            }
-            onEditTransfer={(id, input) => editTransfer(writer, id, input)}
-            onDeleteTransfer={(id) => deleteTransfer(writer, id)}
+            {...historyChanges}
           />
         )}
         {place === "accounts" && (

@@ -283,11 +283,18 @@ function waitBeforeRetrying() {
   );
 }
 
-/** One file per device per Month, the Month coming from the record's own wall time. */
+/**
+ * One file per device per Month, the Month coming from the record's own wall
+ * time. A record placed earlier in the log goes by when it was written instead:
+ * other devices' quick checks skip a file that has gone quiet, so a new line in
+ * an old Month's file would sit unread.
+ */
 function byFile(records: readonly ChangeRecord[]) {
   const files = new Map<string, ChangeRecord[]>();
   for (const record of [...records].sort(compareRecords)) {
-    const month = new Date(record.timestamp.wallTime).toISOString().slice(0, 7);
+    const month = new Date(record.writtenAt ?? record.timestamp.wallTime)
+      .toISOString()
+      .slice(0, 7);
     const fileName = `${record.deviceId}-${month}.jsonl`;
     files.set(fileName, [...(files.get(fileName) ?? []), record]);
   }

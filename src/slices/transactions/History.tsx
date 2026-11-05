@@ -29,6 +29,7 @@ export function History({
   accountId,
   askedMonth,
   actionsFor,
+  onOpen,
 }: {
   label: string;
   statements: Statement[];
@@ -36,6 +37,8 @@ export function History({
   accountId?: string;
   askedMonth?: Month;
   actionsFor: (entry: TransactionListEntry) => MenuAction[];
+  /** What tapping a row does on a phone, where it stands in for the More menu. */
+  onOpen: (entry: TransactionListEntry) => void;
 }) {
   const [folding, setFolding] = useState<ReadonlyMap<Month, boolean>>(
     new Map(),
@@ -92,6 +95,7 @@ export function History({
                 {...describe(row.entry)}
                 date={shortDate(row.entry.date)}
                 actions={actionsFor(row.entry)}
+                onOpen={() => onOpen(row.entry)}
               />
             ),
           )}
@@ -153,7 +157,7 @@ function StatementRow({
   );
 }
 
-type Described = {
+export type Described = {
   title: string;
   detail: string;
   /** What the row shows moved, signed unless `unsigned`. */
@@ -169,14 +173,20 @@ function EntryRow({
   unsigned = false,
   date,
   actions,
+  onOpen,
 }: Described & {
   rowIndex: number;
   date: string;
   actions: MenuAction[];
+  onOpen: () => void;
 }) {
   const cameIn = !unsigned && amount && amount.minorUnits > 0;
   return (
-    <tr aria-rowindex={rowIndex} style={{ height: ROW_HEIGHT }}>
+    <tr
+      aria-rowindex={rowIndex}
+      className={styles.entry}
+      style={{ height: ROW_HEIGHT }}
+    >
       <td>
         <span className={styles.title}>{title}</span>{" "}
         <span className={styles.detail}>{detail}</span>
@@ -192,15 +202,23 @@ function EntryRow({
       </td>
       <td className={styles.actions}>
         {actions.length > 0 && (
-          <Menu label={`More for ${title} on ${date}`} actions={actions} />
+          <span className={styles.more}>
+            <Menu label={`More for ${title} on ${date}`} actions={actions} />
+          </span>
         )}
+        <button
+          type="button"
+          className={styles.open}
+          aria-label={`Open ${title} on ${date}`}
+          onClick={onOpen}
+        />
       </td>
     </tr>
   );
 }
 
 /** How to read each entry, seen from one Account or, each naming its own, across all. */
-function useDescribe(accountId?: string) {
+export function useDescribe(accountId?: string) {
   const accountNames = new Map(useAccounts().map(({ id, name }) => [id, name]));
   const categoryNames = new Map(
     useCategoryGroups().flatMap(({ categories }) =>
@@ -271,7 +289,7 @@ function useDescribe(accountId?: string) {
 }
 
 /** A calendar date as people read it in a list, such as "Oct 18". */
-function shortDate(date: string): string {
+export function shortDate(date: string): string {
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",

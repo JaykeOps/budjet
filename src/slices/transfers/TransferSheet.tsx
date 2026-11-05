@@ -31,6 +31,7 @@ export function TransferSheet({
   draft,
   editing,
   onSubmit,
+  onDelete,
 }: {
   title: string;
   isOpen: boolean;
@@ -39,6 +40,7 @@ export function TransferSheet({
   draft: TransferDraft;
   editing?: TransferInput;
   onSubmit: (input: TransferInput) => void;
+  onDelete?: () => void;
 }) {
   return (
     <OpenableSheet title={title} isOpen={isOpen} onClose={onClose}>
@@ -51,6 +53,13 @@ export function TransferSheet({
             onSubmit(input);
             close();
           }}
+          onDelete={
+            onDelete &&
+            (() => {
+              onDelete();
+              close();
+            })
+          }
         />
       )}
     </OpenableSheet>
@@ -62,11 +71,13 @@ function TransferForm({
   draft,
   editing,
   onSubmit,
+  onDelete,
 }: {
   currency: Currency;
   draft: TransferDraft;
   editing?: TransferInput;
   onSubmit: (input: TransferInput) => void;
+  onDelete?: () => void;
 }) {
   const open = useAccounts().filter(({ closed }) => !closed);
   const firstOther = (id?: string) =>
@@ -166,11 +177,18 @@ function TransferForm({
         </p>
       </div>
       {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={!amount || !to}>
-        {editing
-          ? "Save Transfer"
-          : `Transfer${amount ? ` ${formatMoney(amount)}` : ""}`}
-      </button>
+      <div className={styles.save}>
+        {onDelete && (
+          <button type="button" className={styles.delete} onClick={onDelete}>
+            Delete
+          </button>
+        )}
+        <button type="submit" disabled={!amount || !to}>
+          {editing
+            ? "Save changes"
+            : `Transfer${amount ? ` ${formatMoney(amount)}` : ""}`}
+        </button>
+      </div>
     </form>
   );
 }

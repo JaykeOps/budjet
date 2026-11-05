@@ -94,6 +94,25 @@
   font-size: 16px;
 }
 
+.save {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.save .main {
+  flex: 1;
+  width: auto;
+  margin-top: 0;
+}
+
+.delete {
+  padding: 12px 16px;
+  color: var(--overspent);
+  font-size: 16px;
+}
+
 .choices {
   display: grid;
   grid-template-columns: 1fr 1fr;
