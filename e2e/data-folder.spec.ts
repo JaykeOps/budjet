@@ -146,7 +146,6 @@ test.describe("a Budget already in browser storage", () => {
         Reflect.deleteProperty(window, "showDirectoryPicker");
       }
     });
-    await fakeFolderPicker(page);
     await page.goto("/");
     await button(page, "Get started").click();
     await button(page, "Next").click();
@@ -159,6 +158,7 @@ test.describe("a Budget already in browser storage", () => {
     await expect(offer(page)).toHaveCount(0);
 
     await page.evaluate(() => localStorage.setItem("gained-picker", "yes"));
+    await fakeFolderPicker(page);
     await reloadWhenSaved(page);
     await expect(offer(page)).toBeVisible();
   }
