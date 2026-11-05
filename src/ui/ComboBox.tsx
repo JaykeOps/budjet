@@ -31,7 +31,7 @@ export type ComboBoxOption = {
  * type or show more than a name. Arrows and Enter choose, Esc closes the list.
  *
  * With `selectedId` it chooses one of its options, offers them all on focus and
- * narrows to what's typed, with the first one ready for Enter or Tab. With
+ * narrows to what's typed, with the best match ready for Enter or Tab. With
  * `value` it keeps whatever's typed, and its options are only suggestions.
  */
 export function ComboBox({
@@ -58,6 +58,7 @@ export function ComboBox({
 }) {
   const tabbing = useRef(false);
   const free = value !== undefined;
+  const { contains } = useFilter({ sensitivity: "base" });
   return (
     <AriaComboBox
       className={styles.field}
@@ -77,6 +78,9 @@ export function ComboBox({
         : {
             menuTrigger: "focus" as const,
             defaultItems: options,
+            // Matches what Enter goes by, so a stray space narrows the same way.
+            defaultFilter: (name: string, typed: string) =>
+              contains(name, typed.trim()),
             defaultInputValue:
               options.find(({ id }) => id === selectedId)?.name ?? "",
           })}
@@ -109,7 +113,7 @@ export function ComboBox({
 /**
  * With no option highlighted, Enter would keep the field's old choice, whatever's
  * typed: submitting the form if the list is closed, and putting the old choice
- * back if it's open. When what's typed isn't that choice, Enter chooses the first
+ * back if it's open. When what's typed isn't that choice, Enter chooses the best
  * match, or stays here if nothing matches. When it is that choice, an open list
  * closes and Enter still reaches the form.
  */
@@ -159,10 +163,21 @@ function ComboBoxInput({
   );
 }
 
-/** What narrowing leaves first in the list, going by the list's own matching. */
+const sameName = new Intl.Collator(undefined, { sensitivity: "base" });
+
+/**
+ * What Enter chooses and the list highlights, going by the list's own matching:
+ * the option with exactly that name, wherever it's listed, or else the first left.
+ */
 function useFirstMatch(options: readonly ComboBoxOption[]) {
   const { contains } = useFilter({ sensitivity: "base" });
-  return (typed: string) => options.find(({ name }) => contains(name, typed));
+  return (typed: string) => {
+    const wanted = typed.trim();
+    return (
+      options.find(({ name }) => sameName.compare(name, wanted) === 0) ??
+      options.find(({ name }) => contains(name, wanted))
+    );
+  };
 }
 
 /** Narrowing leaves the best match ready, so typing a few letters and Enter chooses it. */
