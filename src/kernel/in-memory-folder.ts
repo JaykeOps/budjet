@@ -85,5 +85,9 @@ export function createInMemoryFolder(): InMemoryFolder {
       files.set(fileName, text);
       modified.set(fileName, lastModified);
     },
+    async remove(fileName) {
+      files.delete(fileName);
+      modified.delete(fileName);
+    },
   };
 }
