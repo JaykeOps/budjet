@@ -37,9 +37,18 @@ function storedRecords(page: Page) {
   );
 }
 
+/** This browser's own picker never counts: the page opens without one. */
+async function withoutAFolderPicker(page: Page) {
+  await page.addInitScript(() =>
+    Reflect.deleteProperty(window, "showDirectoryPicker"),
+  );
+  await page.goto("/");
+}
+
 async function walkToAccounts(page: Page, currency = "USD") {
   await openApp(page);
   await button(page, "Get started").click();
+  await button(page, "Choose a folder").click();
   await page.getByLabel("Currency").selectOption(currency);
   await button(page, "Next").click();
   await button(page, "Use the starter set").click();
@@ -66,9 +75,15 @@ test("a new user answers one question per screen and opens their Budget", async 
   await button(page, "Get started").click();
 
   await expect(
+    page.getByRole("heading", { name: "Where should your Budget live?" }),
+  ).toBeFocused();
+  await expect(page.getByText("1 of 4")).toBeVisible();
+  await button(page, "Choose a folder").click();
+
+  await expect(
     page.getByRole("heading", { name: "What currency is your Budget in?" }),
   ).toBeFocused();
-  await expect(page.getByText("1 of 3")).toBeVisible();
+  await expect(page.getByText("2 of 4")).toBeVisible();
   await expect(page.getByText("you can't change it later")).toBeVisible();
   await page.getByLabel("Currency").selectOption("SEK");
   await button(page, "Next").click();
@@ -76,13 +91,13 @@ test("a new user answers one question per screen and opens their Budget", async 
   await expect(
     page.getByRole("heading", { name: "Start with some Categories?" }),
   ).toBeVisible();
-  await expect(page.getByText("2 of 3")).toBeVisible();
+  await expect(page.getByText("3 of 4")).toBeVisible();
   await button(page, "Use the starter set").click();
 
   await expect(
     page.getByRole("heading", { name: "Where's your money now?" }),
   ).toBeVisible();
-  await expect(page.getByText("3 of 3")).toBeVisible();
+  await expect(page.getByText("4 of 4")).toBeVisible();
 
   // At least one Account is required, and it needs a name.
   await expect(button(page, "Open my Budget")).toBeHidden();
@@ -201,6 +216,7 @@ test.describe("with a Swedish browser", () => {
   test("the currency starts from the locale", async ({ page }) => {
     await openApp(page);
     await button(page, "Get started").click();
+    await button(page, "Choose a folder").click();
     await expect(page.getByLabel("Currency")).toHaveValue("SEK");
   });
 });
@@ -210,11 +226,30 @@ test.describe("where the browser can't pick a folder", () => {
     "Your Budget stays in this browser, on this device. Clearing this browser's data erases it. This browser can't keep your Budget in a folder, so it can't sync to your other devices.";
 
   test("Welcome says what that means", async ({ page }) => {
-    await page.addInitScript(() =>
-      Reflect.deleteProperty(window, "showDirectoryPicker"),
-    );
-    await openApp(page);
+    await withoutAFolderPicker(page);
     await expect(page.getByText(honestWording)).toBeVisible();
+  });
+
+  test("first run has no Data Folder step, and the Budget stays in this browser", async ({
+    page,
+  }) => {
+    await withoutAFolderPicker(page);
+    await button(page, "Get started").click();
+
+    await expect(page.getByText("1 of 3")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "What currency is your Budget in?" }),
+    ).toBeVisible();
+    await button(page, "Next").click();
+    await button(page, "Start blank").click();
+    await addAccount(page, "Checking", "100");
+    await button(page, "Open my Budget").click();
+    await goTo(page, "Budget");
+
+    await reloadWhenSaved(page);
+
+    await goTo(page, "Budget");
+    await expect(welcome(page)).toBeHidden();
   });
 
   test("Welcome doesn't say it where the browser can", async ({ page }) => {

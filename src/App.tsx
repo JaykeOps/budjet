@@ -43,10 +43,18 @@ import { deleteTransfer, editTransfer } from "./slices/transfers/commands";
 import { Toasts, useToast } from "./ui/Toast";
 import { pushAddress, useUrlParameter } from "./url-parameter";
 
-export function App({ writer }: { writer: ChangeLogWriter }) {
+type KeepInFolder = ComponentProps<typeof FirstRun>["keepInFolder"];
+
+export function App({
+  writer,
+  keepInFolder,
+}: {
+  writer: ChangeLogWriter;
+  keepInFolder: KeepInFolder;
+}) {
   return (
     <ChangeLogWriterProvider value={writer}>
-      <Root />
+      <Root keepInFolder={keepInFolder} />
     </ChangeLogWriterProvider>
   );
 }
@@ -69,7 +77,7 @@ function Page({
 }
 
 /** First run, which has no navigation, until there's a Budget, then the Budget. */
-function Root() {
+function Root({ keepInFolder }: { keepInFolder: KeepInFolder }) {
   const budget = useBudget();
   const hasBudget = budget !== undefined;
 
@@ -78,7 +86,7 @@ function Root() {
     if (hasBudget) requestPersistentStorage();
   }, [hasBudget]);
 
-  if (!budget) return <FirstRun />;
+  if (!budget) return <FirstRun keepInFolder={keepInFolder} />;
   return (
     <Toasts>
       <Shell budget={budget} />
