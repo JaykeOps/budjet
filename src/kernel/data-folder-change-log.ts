@@ -83,18 +83,23 @@ export async function openDataFolderChangeLog({
     }
   }
 
-  /** Only ever one running per tab: changes arriving meanwhile wait for the next pass. */
-  async function writeWhileThereIsMore(to: Folder) {
+  /**
+   * Only ever one running per tab: changes arriving meanwhile wait for the next
+   * pass, as does a folder given meanwhile, even if this pass fails.
+   */
+  async function writeWhileThereIsMore() {
     writing = true;
     showSaveState();
-    try {
-      do {
-        writeAgain = false;
+    writeAgain = true;
+    while (writeAgain && folder) {
+      writeAgain = false;
+      const to = folder;
+      try {
         await oneTabAtATime(() => writeUnwritten(to));
         failure = undefined;
-      } while (writeAgain);
-    } catch (error) {
-      failure = unsavedReason(error);
+      } catch (error) {
+        failure = unsavedReason(error);
+      }
     }
     writing = false;
     showSaveState();
@@ -103,7 +108,7 @@ export async function openDataFolderChangeLog({
   function startWriting() {
     if (!folder) return;
     if (writing) writeAgain = true;
-    else void writeWhileThereIsMore(folder);
+    else void writeWhileThereIsMore();
   }
 
   startWriting();

@@ -86,3 +86,23 @@ export function filesInFolder(
     return files;
   }, PICKED_FOLDER);
 }
+
+/**
+ * Makes folder access lapse while the app is open, which the private file system
+ * never does: touching the folder fails, and asking gives access back.
+ */
+export async function lapseFolderAccessNow(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const prototype = FileSystemDirectoryHandle.prototype;
+    const getDirectoryHandle = prototype.getDirectoryHandle;
+    prototype.getDirectoryHandle = async () => {
+      throw new DOMException("Access lapsed", "NotAllowedError");
+    };
+    FileSystemHandle.prototype.queryPermission = async () => "prompt";
+    FileSystemHandle.prototype.requestPermission = async () => {
+      prototype.getDirectoryHandle = getDirectoryHandle;
+      FileSystemHandle.prototype.queryPermission = async () => "granted";
+      return "granted";
+    };
+  });
+}

@@ -4,6 +4,8 @@
  * the folder gone.
  */
 
+import type { UnsavedReason } from "./change-log";
+
 /** A remembered Data Folder, as far as coming back to it goes. Failures reject with the browser's `DOMException`s. */
 export type ReturningFolder = {
   readonly name: string;
@@ -40,4 +42,26 @@ export async function askToOpen(folder: ReturningFolder): Promise<OnReturn> {
     return "lapsed";
   }
   return tryFolderOnReturn(folder);
+}
+
+/**
+ * Gets a Budget that's open back to its folder, which needs a tap. A folder that
+ * turns out to be gone as well shows in the save state when the retry fails, so
+ * the next tap offers the picker: the browser may not allow two prompts in one.
+ */
+export async function reconnect(
+  reason: UnsavedReason,
+  {
+    folder,
+    retry,
+    chooseFolder,
+  }: {
+    folder: ReturningFolder;
+    /** Writes what's held to the same folder. */
+    retry: () => void;
+    chooseFolder: () => Promise<void>;
+  },
+): Promise<void> {
+  if (reason === "folder-gone") return chooseFolder();
+  if ((await askToOpen(folder)) !== "lapsed") retry();
 }
