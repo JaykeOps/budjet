@@ -36,6 +36,11 @@ export type CategoryRow = CategoryAmounts & {
 /**
  * How a Category reads on the Budget. Overspent always wins, even over negative
  * Spending, whose meter is otherwise empty.
+ *
+ * It adds up Available from its amounts, beside `available()` in Budget Totals
+ * (docs/adr/0005), because the assign panel shows a row for an amount that's
+ * only typed, which no record holds yet. For saved amounts, `categoryRowIn`
+ * agrees with `available()`, and a test holds the two together.
  */
 export function categoryRow(amounts: CategoryAmounts): CategoryRow {
   const { carriedForward, takenBack, assigned, spending } = amounts;

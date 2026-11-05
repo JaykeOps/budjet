@@ -50,6 +50,8 @@ export function statements(
   }
 
   // Each Month ends at the balance before it plus what it moved, so add up from the oldest.
+  // Accounts' ledger can't serve this: it replays records in the order they
+  // were written, so it knows only the balance now, never the balance by a date.
   let balance = 0;
   return [...byMonth]
     .reverse()
