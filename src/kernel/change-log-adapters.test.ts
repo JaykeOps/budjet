@@ -5,6 +5,8 @@ import {
   type ChangeRecord,
   createInMemoryChangeLog,
 } from "./change-log";
+import { openDataFolderChangeLog } from "./data-folder-change-log";
+import { createInMemoryFolder } from "./in-memory-folder";
 import {
   openIndexedDbChangeLog,
   openIndexedDbDeviceId,
@@ -29,6 +31,21 @@ const adapters: Adapter[] = [
     storage() {
       const indexedDB = new IDBFactory();
       return { open: () => openIndexedDbChangeLog({ indexedDB }) };
+    },
+  },
+  {
+    name: "Data Folder",
+    storage() {
+      const indexedDB = new IDBFactory();
+      const folder = createInMemoryFolder();
+      return {
+        open: () =>
+          openDataFolderChangeLog({
+            indexedDB,
+            folder,
+            oneTabAtATime: folder.oneTabAtATime,
+          }),
+      };
     },
   },
 ];
@@ -70,6 +87,42 @@ describe.each(adapters)("Change Log adapter: $name", ({ storage }) => {
     const reopened = await store.open();
 
     expect(reopened.readAll()).toEqual([earlier, later, latest]);
+  });
+
+  it("merges records it doesn't have, ignoring ids it does", async () => {
+    const store = storage();
+    const changeLog = await store.open();
+    changeLog.append([earlier]);
+
+    changeLog.merge([later, { ...earlier, payload: "a repeat" }, later]);
+
+    const expected = [earlier, later];
+    expect(changeLog.readAll()).toEqual(expected);
+    expect((await store.open()).readAll()).toEqual(expected);
+  });
+
+  it("notifies subscribers of a merge only when it adds something", async () => {
+    const changeLog = await storage().open();
+    changeLog.append([earlier]);
+    let notifications = 0;
+    changeLog.subscribe(() => {
+      notifications++;
+    });
+
+    changeLog.merge([earlier]);
+    expect(notifications).toBe(0);
+
+    changeLog.merge([later]);
+    expect(notifications).toBe(1);
+  });
+
+  it("settles as saved after an append", async () => {
+    const changeLog = await storage().open();
+    changeLog.append([earlier]);
+
+    await saved(changeLog);
+
+    expect(changeLog.saveState()).toEqual({ status: "saved" });
   });
 });
 
@@ -116,6 +169,16 @@ describe("this device's id in IndexedDB", () => {
     expect(changeLog.readAll()).toEqual([earlier, later]);
   });
 });
+
+function saved(changeLog: ChangeLog): Promise<void> {
+  return new Promise((resolve) => {
+    const check = () => {
+      if (changeLog.saveState().status === "saved") resolve();
+    };
+    changeLog.subscribeToSaveState(check);
+    check();
+  });
+}
 
 /** Saves records as the first version of the database did: one store, keyed by record id. */
 function saveRecordsTheFirstWay(

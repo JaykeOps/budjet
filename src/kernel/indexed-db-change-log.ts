@@ -9,36 +9,103 @@ import {
   type ChangeLog,
   type ChangeRecord,
   createInMemoryChangeLog,
+  createSaveStateStore,
+  recordsToMerge,
+  SAVED,
+  SAVING,
 } from "./change-log";
 
 const DATABASE = "budjet";
 const RECORDS = "records";
+/** A copy of each record not yet written to the Data Folder, so a reload keeps trying. */
+const UNWRITTEN = "unwritten";
 const DEVICE = "device";
 const DEVICE_ID = "id";
+const FOLDER_HANDLE = "folder";
 
 export async function openIndexedDbChangeLog({
   indexedDB = globalThis.indexedDB,
 }: {
   indexedDB?: IDBFactory;
 } = {}): Promise<ChangeLog> {
-  const database = await openDatabase(indexedDB);
-  const stored = await readAllPayloads(database);
+  return openLocalCopy(await openDatabase(indexedDB));
+}
+
+/**
+ * The records in browser storage, served from memory. Appended records are also
+ * marked unwritten, in the same transaction, while `holdForFolder` says so.
+ */
+export async function openLocalCopy(
+  database: IDBDatabase,
+  holdForFolder: () => boolean = () => false,
+): Promise<ChangeLog> {
+  const stored = await readAllPayloads(database, RECORDS);
 
   const inMemory = createInMemoryChangeLog();
   inMemory.append(stored.map((payload) => JSON.parse(payload)));
 
+  const saveState = createSaveStateStore();
+  let writesUnderway = 0;
+
+  function put(records: readonly ChangeRecord[], hold: boolean) {
+    const transaction = database.transaction([RECORDS, UNWRITTEN], "readwrite");
+    for (const record of records) {
+      const payload = toPayload(record);
+      transaction.objectStore(RECORDS).put(payload, record.id);
+      if (hold) transaction.objectStore(UNWRITTEN).put(payload, record.id);
+    }
+    writesUnderway++;
+    saveState.set(SAVING);
+    transaction.oncomplete = () => {
+      writesUnderway--;
+      if (writesUnderway === 0 && saveState.get() === SAVING) {
+        saveState.set(SAVED);
+      }
+    };
+    // An abort means the writes are gone, so this stays until the next open.
+    transaction.onabort = () => {
+      writesUnderway--;
+      console.error("budjet could not save a change", transaction.error);
+      saveState.set({ status: "unsaved", reason: "write-failed" });
+    };
+  }
+
   return {
     append(records) {
-      const transaction = database.transaction(RECORDS, "readwrite");
-      const store = transaction.objectStore(RECORDS);
-      for (const record of records) store.put(toPayload(record), record.id);
-      transaction.onerror = () =>
-        console.error("budjet could not save a change", transaction.error);
+      put(records, holdForFolder());
       inMemory.append(records);
+    },
+    merge(arriving) {
+      const added = recordsToMerge(inMemory.readAll(), arriving);
+      if (added.length === 0) return;
+      put(added, false);
+      inMemory.append(added);
     },
     readAll: inMemory.readAll,
     subscribe: inMemory.subscribe,
+    saveState: saveState.get,
+    subscribeToSaveState: saveState.subscribe,
   };
+}
+
+/** Records marked unwritten, by any tab of this browser. */
+export async function readUnwrittenRecords(
+  database: IDBDatabase,
+): Promise<ChangeRecord[]> {
+  const payloads = await readAllPayloads(database, UNWRITTEN);
+  return payloads.map((payload) => JSON.parse(payload));
+}
+
+export function markWritten(
+  database: IDBDatabase,
+  ids: readonly string[],
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(UNWRITTEN, "readwrite");
+    for (const id of ids) transaction.objectStore(UNWRITTEN).delete(id);
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = () => reject(transaction.error);
+  });
 }
 
 /**
@@ -69,13 +136,45 @@ export async function openIndexedDbDeviceId({
   });
 }
 
+/** Remembers the chosen Data Folder for later visits. */
+export async function rememberFolderHandle(
+  handle: FileSystemDirectoryHandle,
+): Promise<void> {
+  const database = await openDatabase(globalThis.indexedDB);
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(DEVICE, "readwrite");
+    transaction.objectStore(DEVICE).put(handle, FOLDER_HANDLE);
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = () => reject(transaction.error);
+  });
+  database.close();
+}
+
+export async function rememberedFolderHandle(): Promise<
+  FileSystemDirectoryHandle | undefined
+> {
+  const database = await openDatabase(globalThis.indexedDB);
+  const handle = await new Promise<FileSystemDirectoryHandle | undefined>(
+    (resolve, reject) => {
+      const reading = database
+        .transaction(DEVICE)
+        .objectStore(DEVICE)
+        .get(FOLDER_HANDLE);
+      reading.onsuccess = () => resolve(reading.result);
+      reading.onerror = () => reject(reading.error);
+    },
+  );
+  database.close();
+  return handle;
+}
+
 function toPayload(record: ChangeRecord): string {
   return JSON.stringify(record);
 }
 
-function openDatabase(indexedDB: IDBFactory): Promise<IDBDatabase> {
+export function openDatabase(indexedDB: IDBFactory): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE, 2);
+    const request = indexedDB.open(DATABASE, 3);
     request.onupgradeneeded = ({ oldVersion }) => {
       // Each step builds on what earlier versions made, so saved records stay.
       if (oldVersion < 1) {
@@ -83,15 +182,22 @@ function openDatabase(indexedDB: IDBFactory): Promise<IDBDatabase> {
         request.result.createObjectStore(RECORDS);
       }
       if (oldVersion < 2) request.result.createObjectStore(DEVICE);
+      if (oldVersion < 3) request.result.createObjectStore(UNWRITTEN);
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 }
 
-function readAllPayloads(database: IDBDatabase): Promise<string[]> {
+function readAllPayloads(
+  database: IDBDatabase,
+  storeName: string,
+): Promise<string[]> {
   return new Promise((resolve, reject) => {
-    const request = database.transaction(RECORDS).objectStore(RECORDS).getAll();
+    const request = database
+      .transaction(storeName)
+      .objectStore(storeName)
+      .getAll();
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });

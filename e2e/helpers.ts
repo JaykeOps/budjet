@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { fakeFolderPicker } from "./folder";
 
 type FirstAccount = {
   name?: string;
@@ -9,11 +10,13 @@ type FirstAccount = {
 type Place = "Budget" | "Activity" | "Accounts";
 
 /**
- * Opens the app unless this test already has. Before a Budget exists the app
- * is only setup, so there is no place to `goTo`.
+ * Opens the app unless this test already has, with a folder picker that can't
+ * open a dialog. Before a Budget exists the app is only setup, so there is no
+ * place to `goTo`.
  */
 export async function openApp(page: Page): Promise<void> {
   if (page.url() === "about:blank") {
+    await fakeFolderPicker(page);
     await page.goto("/");
   }
 }
@@ -36,6 +39,7 @@ export async function createBudget(
 ): Promise<void> {
   await openApp(page);
   await page.getByRole("button", { name: "Get started" }).click();
+  await page.getByRole("button", { name: "Choose a folder" }).click();
   await page.getByLabel("Currency").selectOption(currency);
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: categories }).click();
