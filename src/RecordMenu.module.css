@@ -1,0 +1,47 @@
+/* (+) sits inside the bar, not raised above it. */
+.plus {
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  background: var(--primary);
+  box-shadow: var(--depth-primary);
+  color: var(--on-primary);
+}
+
+.popover {
+  width: calc(100vw - 32px);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  outline: none;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  outline: none;
+}
+.item[data-focused] {
+  background: var(--raised);
+}
+
+.label {
+  font-weight: 600;
+}
+
+.description {
+  color: var(--muted);
+  font-size: 13px;
+}

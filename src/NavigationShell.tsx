@@ -11,14 +11,17 @@ import { pushAddress, useUrlParameter, useUrlSearch } from "./url-parameter";
  * bar on a phone and a left rail on desktop. Which one shows is decided by
  * width alone, so both lead to the same places.
  *
- * Recording isn't rebuilt yet, so (+) and Record stand in by opening Activity,
- * where the Record a Transaction form is.
+ * Recording on desktop isn't rebuilt yet, so Record stands in by opening
+ * Activity, where the Record a Transaction form is.
  */
 export function NavigationShell({
   onAddAccount,
+  plus,
   children,
 }: {
   onAddAccount: () => void;
+  /** The tab bar's (+). */
+  plus: ReactNode;
   children: ReactNode;
 }) {
   // Links are built from the address, so they have to follow it.
@@ -30,7 +33,7 @@ export function NavigationShell({
     <div className={styles.shell}>
       <Rail here={here} onAddAccount={onAddAccount} />
       {children}
-      <TabBar here={here} />
+      <TabBar here={here} plus={plus} />
     </div>
   );
 }
@@ -120,7 +123,7 @@ function Rail({
   );
 }
 
-function TabBar({ here }: { here: Here }) {
+function TabBar({ here, plus }: { here: Here; plus: ReactNode }) {
   return (
     <nav className={styles.tabBar} aria-label="Places">
       <PlaceLink
@@ -139,13 +142,7 @@ function TabBar({ here }: { here: Here }) {
         <TabIcon d="M4 7h16M4 12h16M4 17h10" />
         Activity
       </PlaceLink>
-      <PlaceLink
-        className={styles.plus}
-        to={placeAddress("activity", here.accountId)}
-        label="Record"
-      >
-        <PlusIcon />
-      </PlaceLink>
+      {plus}
       <PlaceLink
         className={styles.tab}
         to={placeAddress("accounts")}
@@ -162,13 +159,11 @@ function TabBar({ here }: { here: Here }) {
 function PlaceLink({
   to,
   current = false,
-  label,
   className,
   children,
 }: {
   to: string;
   current?: boolean;
-  label?: string;
   className: string | undefined;
   children: ReactNode;
 }) {
@@ -184,7 +179,6 @@ function PlaceLink({
     <a
       className={className}
       href={to}
-      aria-label={label}
       aria-current={current ? "page" : undefined}
       onClick={follow}
     >
@@ -211,7 +205,7 @@ function TabIcon({ d }: { d: string }) {
   );
 }
 
-function PlusIcon() {
+export function PlusIcon() {
   return (
     <svg
       width="20"

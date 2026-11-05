@@ -4,6 +4,7 @@ import {
   activity,
   addAccount,
   createBudget,
+  enterTransaction,
   goTo,
   show,
   transfer,
@@ -19,14 +20,8 @@ async function budgetWithHistory(page: Page) {
   await transfer(page, { from: "Everyday", to: "Wallet", amount: "20" });
 
   await goTo(page, "Activity");
-  const record = page.getByRole("form", { name: "Record a Transaction" });
-  const income = async (date: string, payee: string, amount: string) => {
-    await record.getByLabel("Date").fill(date);
-    await record.getByLabel("Money").selectOption("in");
-    await record.getByLabel("Amount").fill(amount);
-    await record.getByLabel("Payee").fill(payee);
-    await record.getByRole("button", { name: "Record Transaction" }).click();
-  };
+  const income = (date: string, payee: string, amount: string) =>
+    enterTransaction(page, { date, money: "in", amount, payee });
   await income("2026-09-30", "Employer", "300");
   await income("2026-10-03", "Refund", "12.50");
 }

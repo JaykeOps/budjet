@@ -17,6 +17,7 @@ import { useMonthInUrl } from "./month-in-url";
 import { NavigationShell } from "./NavigationShell";
 import { requestPersistentStorage } from "./persistent-storage";
 import { placeAddress, usePlace } from "./place-in-url";
+import { RecordMenu } from "./RecordMenu";
 import {
   AddAccountSheet,
   OpenAccountForm,
@@ -148,7 +149,10 @@ function Shell({
     );
   }
   return (
-    <NavigationShell onAddAccount={() => setAddingAccount(true)}>
+    <NavigationShell
+      onAddAccount={() => setAddingAccount(true)}
+      plus={<RecordMenu currency={budget.currency} />}
+    >
       <Page titled={place === "activity"} folderConnection={folderConnection}>
         {place === "budget" && (
           <>
@@ -156,10 +160,10 @@ function Shell({
               firstMonth={budget.firstMonth}
               currency={budget.currency}
               onAssign={(input) => setAssignment(writer, input)}
-              onCopyLastMonth={(month) =>
+              onCopyLastMonth={(month, unticked) =>
                 copyLastMonth(writer, {
                   month,
-                  skipping: hiddenCategoryIds(writer),
+                  skipping: [...hiddenCategoryIds(writer), ...unticked],
                 })
               }
               onMoveMoney={(input) => moveMoney(writer, input)}
