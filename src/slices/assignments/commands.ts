@@ -31,8 +31,9 @@ export function setAssignment(
 }
 
 /**
- * Copies last Month's Assignments into `month`, but only for Categories that
- * have no Assignment in `month` yet: one set there is never overwritten.
+ * Copies last Month's Assignments above zero into `month`, but only for
+ * Categories that have no Assignment in `month` yet: one set there is never
+ * overwritten.
  * Categories in `skipping` (the app shell passes the hidden ones; Assignments
  * doesn't know which those are) are left out.
  */
@@ -44,7 +45,7 @@ export function copyLastMonth(
   const lastMonth = previousMonth(month);
   const skipped = new Set(skipping);
   for (const { categoryId, month: of, assigned } of current.values()) {
-    if (of !== lastMonth || !assigned) continue;
+    if (of !== lastMonth || !assigned?.minorUnits) continue;
     if (skipped.has(categoryId)) continue;
     if (current.get(assignmentSubject(categoryId, month))?.assigned) continue;
     setAssignment(writer, { categoryId, month, amount: assigned });

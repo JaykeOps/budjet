@@ -127,6 +127,31 @@ describe("Change Log", () => {
   });
 });
 
+describe("writing at an earlier record's place", () => {
+  it("sorts the new record where that record is, not last, and keeps the clock moving forward", () => {
+    const log = createInMemoryChangeLog();
+    let clock = 1_000;
+    const phone = createChangeLogWriter(log, "phone", { now: () => clock++ });
+    const earlier = phone.write("thing", "Named", { name: "a" });
+    const next = phone.write("thing", "Named", { name: "b" });
+
+    const placed = phone.writeAt(earlier.timestamp, "thing", "Named", {
+      name: "c",
+    });
+    const after = phone.write("thing", "Named", { name: "d" });
+
+    expect(placed.id).not.toBe(earlier.id);
+    expect(placed.timestamp).toEqual(earlier.timestamp);
+    expect(placed.writtenAt).toBe(1_002);
+    expect(log.readAll().map(({ id }) => id)).toEqual([
+      ...[earlier.id, placed.id].sort(),
+      next.id,
+      after.id,
+    ]);
+    expect(after.timestamp.wallTime).toBe(1_003);
+  });
+});
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 

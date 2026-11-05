@@ -3,6 +3,7 @@ import {
   assign,
   budgetRow,
   categorySheet,
+  copyLastMonth,
   createBudget,
   expectAssigned,
   goTo,
@@ -80,7 +81,7 @@ test("a user copies last Month's Assignments and moves money between Categories"
   ).toBeVisible();
   await assign(page, "Groceries", "250");
 
-  await page.getByRole("button", { name: "Copy last Month" }).click();
+  await copyLastMonth(page);
   await expectAssigned(page, "Rent", "$1,200.00");
   await expectAssigned(page, "Groceries", "$250.00");
   await expectAssigned(page, "Power", "$0.00");

@@ -151,7 +151,7 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
-:where(button[type="submit"]) {
+:where(button[type="submit"], button[data-primary]) {
   background: linear-gradient(
     180deg,
     color-mix(in oklab, var(--primary-top) 55%, var(--primary)),
@@ -161,12 +161,15 @@
   color: var(--on-primary);
 }
 @media (prefers-reduced-motion: no-preference) {
-  :where(button[type="submit"]) {
+  :where(button[type="submit"], button[data-primary]) {
     transition:
       transform 120ms ease-out,
       filter 120ms ease-out;
   }
-  :where(button[type="submit"]:active:not(:disabled)) {
+  :where(
+    button[type="submit"]:active:not(:disabled),
+    button[data-primary]:active:not(:disabled)
+  ) {
     transform: scale(0.97);
     filter: brightness(0.94);
   }

@@ -263,7 +263,7 @@ describe("Transactions", () => {
     ]);
   });
 
-  describe("when two devices change the same Transaction, the most recent change wins", () => {
+  describe("when two devices change the same Transaction, the most recent change wins, unless it's deleted", () => {
     function edit(deviceId: string, wallTime: number): TransactionEdited {
       return {
         id: `edit-${deviceId}`,
@@ -294,12 +294,12 @@ describe("Transactions", () => {
 
     it.each<[string, ChangeRecord[], string[]]>([
       [
-        "a later edit beats an earlier deletion",
+        "a deletion beats a later edit",
         [deletion("phone", 2_000), edit("laptop", 3_000)],
-        ["Edited on laptop"],
+        [],
       ],
       [
-        "a later deletion beats an earlier edit",
+        "a deletion beats an earlier edit",
         [edit("laptop", 2_000), deletion("phone", 3_000)],
         [],
       ],

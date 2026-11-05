@@ -8,78 +8,59 @@ import {
 import type { MenuAction } from "../../ui/Menu";
 import { type Account, useAccounts } from "../accounts";
 import { type CategoryGroup, useCategoryGroups } from "../categories";
+import { type TransferInput, TransferSheet } from "../transfers";
 import type { TransactionInput } from "./commands";
+import { EntrySheet } from "./EntrySheet";
 import { History } from "./History";
 import styles from "./History.module.css";
 import { usePayees, useStatements } from "./hooks";
-import type { Transaction, TransactionListEntry } from "./queries";
+import type {
+  Transaction,
+  TransactionListEntry,
+  TransferEntry,
+} from "./queries";
+import { RecordTransactionSheet } from "./RecordTransactionSheet";
+import { today } from "./record-flow";
 import { type Showing, ShowingPicker } from "./ShowingPicker";
+
+/** What the app shell does with the rows of a history. */
+type HistoryActions = {
+  currency: Currency;
+  onEdit: (id: string, input: TransactionInput) => void;
+  onDelete: (id: string) => void;
+  /** `what` names it for a toast: "Adjustment" or "Balance check". */
+  onDeleteRedeclaredBalance: (recordId: string, what: string) => void;
+  onEditTransfer: (id: string, input: TransferInput) => void;
+  onDeleteTransfer: (id: string) => void;
+};
 
 /**
  * History as Month Statements, of every Account or the one the app shell says
- * it is showing, with a form to record a Transaction, a way to edit or delete
- * each one, and to delete an Adjustment or Balance check, unless its Account is
- * closed. The app shell keeps what's showing and decides what recording,
- * editing and deleting do; an error it throws is shown on the form.
+ * it is showing, with a form to record a Transaction and a way to change each
+ * row, unless a closed Account is involved. The app shell keeps what's showing
+ * and decides what recording, editing and deleting do; an error it throws is
+ * shown on the form.
  */
 export function TransactionsScreen({
-  currency,
   showing,
   onShow,
   onRecord,
-  onEdit,
-  onDelete,
-  onDeleteRedeclaredBalance,
-}: {
-  currency: Currency;
+  ...actions
+}: HistoryActions & {
   showing: Showing;
   onShow: (showing: Showing) => void;
   onRecord: (input: TransactionInput) => void;
-  onEdit: (id: string, input: TransactionInput) => void;
-  onDelete: (id: string) => void;
-  onDeleteRedeclaredBalance: (recordId: string) => void;
 }) {
+  const { currency } = actions;
   const headingId = useId();
   const accounts = useAccounts();
   const openAccounts = accounts.filter(({ closed }) => !closed);
-  const closedIds = new Set(
-    accounts.filter(({ closed }) => closed).map(({ id }) => id),
-  );
-  const [editing, setEditing] = useState<Transaction>();
   const account = accounts.find(({ id }) => id === showing.accountId);
   const all = useStatements(account?.id);
   const statements = showing.month
     ? all.filter(({ month }) => month === showing.month)
     : all;
-
-  function actionsFor(entry: TransactionListEntry): MenuAction[] {
-    if (
-      entry.kind === "transfer" ||
-      entry.kind === "opening-balance" ||
-      closedIds.has(entry.accountId)
-    ) {
-      return [];
-    }
-    if (entry.kind !== "transaction") {
-      return [
-        {
-          label: "Delete",
-          onAction: () => onDeleteRedeclaredBalance(entry.id),
-        },
-      ];
-    }
-    const { kind: _, ...transaction } = entry;
-    return [
-      { label: "Edit", onAction: () => setEditing(transaction) },
-      {
-        label: "Delete",
-        onAction: () => {
-          if (editing?.id === entry.id) setEditing(undefined);
-          onDelete(entry.id);
-        },
-      },
-    ];
-  }
+  const rows = useRowChanges(actions);
 
   const recordInto = account ?? openAccounts.at(0);
   return (
@@ -99,37 +80,28 @@ export function TransactionsScreen({
           Closed. Its history stays here, and it takes no new Transactions or
           Transfers.
         </p>
-      ) : editing ? (
-        <TransactionForm
-          key={editing.id}
-          heading="Edit Transaction"
-          submitLabel="Save Transaction"
-          defaultAccountId={editing.accountId}
-          currency={currency}
-          initial={editing}
-          onSubmit={(input) => {
-            onEdit(editing.id, input);
-            setEditing(undefined);
-          }}
-          onCancel={() => setEditing(undefined)}
-        />
+      ) : rows.editing ? (
+        rows.editing
       ) : (
         recordInto && (
-          <TransactionForm
-            key={recordInto.id}
-            heading="Record a Transaction"
-            submitLabel="Record Transaction"
-            defaultAccountId={recordInto.id}
-            accounts={openAccounts}
-            currency={currency}
-            onSubmit={onRecord}
-          />
+          // A phone records from (+).
+          <div className={styles.recordForm}>
+            <TransactionForm
+              key={recordInto.id}
+              heading="Record a Transaction"
+              submitLabel="Record Transaction"
+              defaultAccountId={recordInto.id}
+              accounts={openAccounts}
+              currency={currency}
+              onSubmit={onRecord}
+            />
+          </div>
         )
       )}
       <ShowingPicker
         showing={{ accountId: account?.id, month: showing.month }}
         onShow={(to) => {
-          setEditing(undefined);
+          rows.stopEditing();
           onShow(to);
         }}
       />
@@ -141,11 +113,172 @@ export function TransactionsScreen({
           statements={statements}
           accountId={account?.id}
           askedMonth={showing.month}
-          actionsFor={actionsFor}
+          actionsFor={rows.actionsFor}
+          onOpen={rows.open}
         />
       )}
+      {rows.sheets}
     </section>
   );
+}
+
+/** One open or closed Account's Statements, for its page, with each row's changes. */
+export function AccountHistory({
+  account,
+  ...actions
+}: HistoryActions & { account: Account }) {
+  const statements = useStatements(account.id);
+  const rows = useRowChanges(actions);
+  return (
+    <>
+      {rows.editing}
+      <History
+        label={`History of ${account.name}`}
+        statements={statements}
+        accountId={account.id}
+        actionsFor={rows.actionsFor}
+        onOpen={rows.open}
+      />
+      {rows.sheets}
+    </>
+  );
+}
+
+/**
+ * What each history row leads to: on a phone a sheet, reached by tapping it; on
+ * desktop the More menu, and the form or sheet that leads to.
+ */
+function useRowChanges({
+  currency,
+  onEdit,
+  onDelete,
+  onDeleteRedeclaredBalance,
+  onEditTransfer,
+  onDeleteTransfer,
+}: HistoryActions) {
+  const closed = useAccounts().filter(({ closed }) => closed);
+  const closedIds = new Set(closed.map(({ id }) => id));
+  const [editing, setEditing] = useState<Transaction>();
+  const [editingTransfer, setEditingTransfer] = useState<TransferEntry>();
+  const [opened, setOpened] = useState<TransactionListEntry>();
+  /** The closed Account a row touches, whose history stays as it is. */
+  const closedAccount = (entry: TransactionListEntry) =>
+    closed.find(({ id }) =>
+      entry.kind === "transfer"
+        ? id === entry.fromAccountId || id === entry.toAccountId
+        : id === entry.accountId,
+    );
+  const deleteRedeclared = (entry: TransactionListEntry) =>
+    onDeleteRedeclaredBalance(
+      entry.id,
+      entry.kind === "adjustment" ? "Adjustment" : "Balance check",
+    );
+
+  function open(entry: TransactionListEntry) {
+    if (entry.kind === "transfer" && !closedAccount(entry)) {
+      setEditingTransfer(entry);
+    } else {
+      setOpened(entry);
+    }
+  }
+
+  function actionsFor(entry: TransactionListEntry): MenuAction[] {
+    if (entry.kind === "transfer") {
+      if (
+        closedIds.has(entry.fromAccountId) ||
+        closedIds.has(entry.toAccountId)
+      ) {
+        return [];
+      }
+      return [
+        { label: "Edit", onAction: () => setEditingTransfer(entry) },
+        { label: "Delete", onAction: () => onDeleteTransfer(entry.id) },
+      ];
+    }
+    if (entry.kind === "opening-balance" || closedIds.has(entry.accountId)) {
+      return [];
+    }
+    if (entry.kind !== "transaction") {
+      return [
+        {
+          label: "Delete",
+          onAction: () => deleteRedeclared(entry),
+        },
+      ];
+    }
+    const { kind: _, ...transaction } = entry;
+    return [
+      { label: "Edit", onAction: () => setEditing(transaction) },
+      {
+        label: "Delete",
+        onAction: () => {
+          if (editing?.id === entry.id) setEditing(undefined);
+          onDelete(entry.id);
+        },
+      },
+    ];
+  }
+
+  const editingOnPhone =
+    opened?.kind === "transaction" && !closedAccount(opened)
+      ? opened
+      : undefined;
+  const readOnly = opened && !editingOnPhone ? opened : undefined;
+
+  return {
+    actionsFor,
+    open,
+    stopEditing: () => setEditing(undefined),
+    editing: editing && (
+      <TransactionForm
+        key={editing.id}
+        heading="Edit Transaction"
+        submitLabel="Save Transaction"
+        defaultAccountId={editing.accountId}
+        currency={currency}
+        initial={editing}
+        onSubmit={(input) => {
+          onEdit(editing.id, input);
+          setEditing(undefined);
+        }}
+        onCancel={() => setEditing(undefined)}
+      />
+    ),
+    sheets: (
+      <>
+        <TransferSheet
+          title="Edit Transfer"
+          isOpen={editingTransfer !== undefined}
+          onClose={() => setEditingTransfer(undefined)}
+          currency={currency}
+          draft={editingTransfer ?? {}}
+          editing={editingTransfer}
+          onSubmit={(input) => {
+            if (editingTransfer) onEditTransfer(editingTransfer.id, input);
+          }}
+          onDelete={() => {
+            if (editingTransfer) onDeleteTransfer(editingTransfer.id);
+          }}
+        />
+        {editingOnPhone && (
+          <RecordTransactionSheet
+            key={editingOnPhone.id}
+            currency={currency}
+            editing={editingOnPhone}
+            onRecord={(input) => onEdit(editingOnPhone.id, input)}
+            onDelete={() => onDelete(editingOnPhone.id)}
+            onClose={() => setOpened(undefined)}
+          />
+        )}
+        <EntrySheet
+          entry={readOnly}
+          closedAccountName={readOnly && closedAccount(readOnly)?.name}
+          onClose={() => setOpened(undefined)}
+          onDelete={deleteRedeclared}
+        />
+      </>
+    ),
+  };
 }
 
 type Direction = "out" | "in";
@@ -352,11 +485,4 @@ function CategoryPicker({
       ))}
     </select>
   );
-}
-
-/** This device's local date, "YYYY-MM-DD". */
-function today(): string {
-  const now = new Date();
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }

@@ -1,6 +1,14 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { activity, createBudget, goTo, show } from "./helpers";
+import {
+  activity,
+  addAccount,
+  createBudget,
+  enterTransaction,
+  goTo,
+  show,
+  transfer,
+} from "./helpers";
 
 /** On 15 October 2026: Everyday and Wallet, with a little history behind them. */
 async function budgetWithHistory(page: Page) {
@@ -8,27 +16,12 @@ async function budgetWithHistory(page: Page) {
   await createBudget(page, {
     firstAccount: { name: "Everyday", openingBalance: "1000" },
   });
-  await goTo(page, "Accounts");
-  const add = page.getByRole("form", { name: "Add an Account" });
-  await add.getByLabel("Name").fill("Wallet");
-  await add.getByLabel("Opening Balance").fill("50");
-  await add.getByRole("button", { name: "Add Account" }).click();
-
-  const transfer = page.getByRole("form", { name: "Make a Transfer" });
-  await transfer.getByLabel("From").selectOption({ label: "Everyday" });
-  await transfer.getByLabel("To").selectOption({ label: "Wallet" });
-  await transfer.getByLabel("Amount").fill("20");
-  await transfer.getByRole("button", { name: "Make Transfer" }).click();
+  await addAccount(page, { name: "Wallet", holds: "50" });
+  await transfer(page, { from: "Everyday", to: "Wallet", amount: "20" });
 
   await goTo(page, "Activity");
-  const record = page.getByRole("form", { name: "Record a Transaction" });
-  const income = async (date: string, payee: string, amount: string) => {
-    await record.getByLabel("Date").fill(date);
-    await record.getByLabel("Money").selectOption("in");
-    await record.getByLabel("Amount").fill(amount);
-    await record.getByLabel("Payee").fill(payee);
-    await record.getByRole("button", { name: "Record Transaction" }).click();
-  };
+  const income = (date: string, payee: string, amount: string) =>
+    enterTransaction(page, { date, money: "in", amount, payee });
   await income("2026-09-30", "Employer", "300");
   await income("2026-10-03", "Refund", "12.50");
 }
@@ -146,11 +139,9 @@ test("the picker includes a closed Account, whose history stays readable", async
 }) => {
   await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
   await createBudget(page);
-  await goTo(page, "Accounts");
-  const add = page.getByRole("form", { name: "Add an Account" });
-  await add.getByLabel("Name").fill("Old");
-  await add.getByLabel("Opening Balance").fill("0");
-  await add.getByRole("button", { name: "Add Account" }).click();
+  await addAccount(page, { name: "Old" });
+  await page.getByRole("button", { name: /^More for Old/ }).click();
+  await page.getByRole("menuitem", { name: "Close Account" }).click();
   await page.getByRole("button", { name: "Close Old" }).click();
 
   await goTo(page, "Activity");

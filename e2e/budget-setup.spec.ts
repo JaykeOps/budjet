@@ -1,5 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
-import { createBudget, goTo, openApp } from "./helpers";
+import {
+  addAccount as addAnotherAccount,
+  createBudget,
+  expectBalance,
+  expectCurrency,
+  goTo,
+  openAccount,
+  openApp,
+} from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 const welcome = (page: Page) =>
@@ -42,6 +50,7 @@ async function walkToAccounts(page: Page, currency = "USD") {
   await openApp(page);
   await button(page, "Get started").click();
   await button(page, "Choose a folder").click();
+  await button(page, "Start a new Budget").click();
   await page.getByLabel("Currency").selectOption(currency);
   await button(page, "Next").click();
   await button(page, "Use the starter set").click();
@@ -72,6 +81,7 @@ test("a new user answers one question per screen and opens their Budget", async 
   ).toBeFocused();
   await expect(page.getByText("1 of 4")).toBeVisible();
   await button(page, "Choose a folder").click();
+  await button(page, "Start a new Budget").click();
 
   await expect(
     page.getByRole("heading", { name: "What currency is your Budget in?" }),
@@ -129,16 +139,11 @@ test("a new user answers one question per screen and opens their Budget", async 
 
   const expectBudget = async () => {
     await goTo(page, "Budget");
-    await expect(page.getByText("Kept in SEK")).toBeVisible();
+    await expectCurrency(page, "SEK");
     await expect(page.getByText("Rent")).not.toHaveCount(0);
-    await goTo(page, "Accounts");
-    const accounts = page.getByRole("table", { name: "Accounts" });
-    await expect(accounts.getByRole("row", { name: /Checking/ })).toContainText(
-      "1,500.00",
-    );
-    await expect(
-      accounts.getByRole("row", { name: /Rainy day/ }),
-    ).toContainText("Savings");
+    await expectBalance(page, "Checking", "1,500.00");
+    await openAccount(page, "Rainy day");
+    await expect(page.getByText(/^Savings$/)).toBeVisible();
   };
   await expectBudget();
 
@@ -169,14 +174,9 @@ test("Back keeps every answer and can change any of them, including the currency
   await button(page, "Open my Budget").click();
 
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
   await expect(page.getByText("Rent")).toHaveCount(0);
-  await goTo(page, "Accounts");
-  await expect(
-    page
-      .getByRole("table", { name: "Accounts" })
-      .getByRole("row", { name: /Checking/ }),
-  ).toContainText("1,000.00");
+  await expectBalance(page, "Checking", "1,000.00");
 });
 
 test("an amount the new currency can't hold has to be fixed before opening", async ({
@@ -199,7 +199,7 @@ test("an amount the new currency can't hold has to be fixed before opening", asy
   await button(page, "Remove Checking").click();
   await button(page, "Open my Budget").click();
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in JPY")).toBeVisible();
+  await expectCurrency(page, "JPY");
 });
 
 test("reloading mid-setup starts over and saves nothing", async ({ page }) => {
@@ -220,6 +220,7 @@ test.describe("with a Swedish browser", () => {
     await openApp(page);
     await button(page, "Get started").click();
     await button(page, "Choose a folder").click();
+    await button(page, "Start a new Budget").click();
     await expect(page.getByLabel("Currency")).toHaveValue("SEK");
   });
 });
@@ -342,10 +343,10 @@ test("a Budget that an older setup left without an Account still asks for one", 
   await expect(add).toBeVisible();
   await expect(page.getByRole("navigation")).toHaveCount(0);
   await add.getByLabel("Name").fill("Checking");
-  await add.getByLabel(/Opening Balance/).fill("100");
+  await add.getByLabel("What it holds today").fill("100");
   await add.getByRole("button", { name: "Add Account" }).click();
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
 });
 
 test("a returning user's Budget opens with the network offline", async ({
@@ -359,13 +360,13 @@ test("a returning user's Budget opens with the network offline", async ({
     firstAccount: { openingBalance: "200" },
   });
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in EUR")).toBeVisible();
+  await expectCurrency(page, "EUR");
 
   await context.setOffline(true);
   await reloadWhenSaved(page);
 
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in EUR")).toBeVisible();
+  await expectCurrency(page, "EUR");
   await expect(welcome(page)).toBeHidden();
 });
 
@@ -376,16 +377,7 @@ test("changes made after a reload come from the same device", async ({
   await goTo(page, "Budget");
   await reloadWhenSaved(page);
 
-  await goTo(page, "Accounts");
-  const add = page.getByRole("form", { name: "Add an Account" });
-  await add.getByLabel("Name").fill("Savings");
-  await add.getByLabel(/Opening Balance/).fill("100");
-  await add.getByRole("button", { name: "Add Account" }).click();
-  await expect(
-    page
-      .getByRole("table", { name: "Accounts" })
-      .getByRole("row", { name: /Savings/ }),
-  ).toBeVisible();
+  await addAnotherAccount(page, { name: "Savings", holds: "100" });
   await reloadWhenSaved(page);
 
   const deviceIds = (await storedRecords(page)).map(({ deviceId }) => deviceId);

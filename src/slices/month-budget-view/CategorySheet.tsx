@@ -1,4 +1,11 @@
-import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import {
   Button,
   Dialog,
@@ -33,11 +40,20 @@ import {
   useSheetBudget,
 } from "./category-sheet";
 import { type CoverCandidate, coveringSource } from "./covering-source";
+import { useReadyToAssignLine } from "./Summary";
 
-/** Which Categories the sheet steps through, in order, and where it starts. */
-export type SheetSteps = { title: string; ids: string[]; start: number };
+/**
+ * Which Categories the sheet steps through, in order, and where it starts. The
+ * Assign walk ends on a screen of its own instead of closing after the last.
+ */
+export type SheetSteps = {
+  title: string;
+  ids: string[];
+  start: number;
+  walk?: boolean;
+};
 
-type Actions = {
+export type Actions = {
   /** Either may throw when refused; the sheet shows why and stays put. */
   onAssign: (categoryId: string, amount: Money) => void;
   onMove: (fromCategoryId: string, toCategoryId: string, amount: Money) => void;
@@ -63,6 +79,30 @@ export function CategorySheet({
   onClose: () => void;
 }) {
   return (
+    <SheetFrame title={steps.title} onClose={onClose}>
+      <Steps
+        steps={steps}
+        month={month}
+        currency={currency}
+        wide={wide}
+        onDone={onClose}
+        {...actions}
+      />
+    </SheetFrame>
+  );
+}
+
+/** The sheet itself, whatever it holds. */
+export function SheetFrame({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
     <ModalOverlay
       isOpen
       isDismissable
@@ -78,17 +118,10 @@ export function CategorySheet({
               Close
             </Button>
             <Heading slot="title" className={styles.title}>
-              {steps.title}
+              {title}
             </Heading>
           </div>
-          <Steps
-            steps={steps}
-            month={month}
-            currency={currency}
-            wide={wide}
-            onDone={onClose}
-            {...actions}
-          />
+          {children}
         </Dialog>
       </Modal>
     </ModalOverlay>
@@ -98,8 +131,8 @@ export function CategorySheet({
 const SWIPE_ACROSS = 60;
 const SWIPE_ALONG = 40;
 
-function Steps({
-  steps: { ids, start },
+export function Steps({
+  steps: { ids, start, walk = false },
   month,
   currency,
   wide,
@@ -119,14 +152,18 @@ function Steps({
   const present = ids.filter((id) =>
     budget.categories.some((category) => category.id === id),
   );
+  if (walk && index >= present.length) {
+    return <WalkEnd readyToAssign={budget.readyToAssign} onDone={onDone} />;
+  }
   const at = Math.min(index, present.length - 1);
   const category = budget.categories.find(({ id }) => id === present[at]);
   if (!category) return null;
 
   const first = at === 0;
-  const last = at === present.length - 1;
+  // The walk has its end screen still to come.
+  const last = !walk && at === present.length - 1;
   const look = (to: number) => {
-    if (to >= 0 && to < present.length) setIndex(to);
+    if (to >= 0 && to < present.length + (walk ? 1 : 0)) setIndex(to);
   };
 
   return (
@@ -205,6 +242,40 @@ function Steps({
         showBack={!wide}
         {...actions}
       />
+    </div>
+  );
+}
+
+function WalkEnd({
+  readyToAssign,
+  onDone,
+}: {
+  readyToAssign: Money;
+  onDone: () => void;
+}) {
+  const line = useReadyToAssignLine(readyToAssign);
+  const done = useRef<HTMLButtonElement>(null);
+  useEffect(() => done.current?.focus(), []);
+
+  return (
+    <div className={styles.form}>
+      <div className={`${styles.body} ${styles.end}`}>
+        <p className={styles.name}>That's every Category.</p>
+        <p>
+          Ready to Assign is <strong>{formatMoney(readyToAssign)}</strong>.
+        </p>
+        <p className={styles.small}>{line}</p>
+      </div>
+      <div className={styles.foot}>
+        <button
+          ref={done}
+          type="button"
+          className={styles.main}
+          onClick={onDone}
+        >
+          Done
+        </button>
+      </div>
     </div>
   );
 }

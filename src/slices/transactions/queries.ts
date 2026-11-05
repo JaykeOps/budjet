@@ -1,13 +1,19 @@
 import type { ChangeRecord } from "../../kernel/change-log";
 import type { Money } from "../../kernel/money";
 import {
+  accounts,
   adjustments,
   balanceChecks,
   type OpeningBalance,
   openingBalances,
 } from "../accounts";
-import { currentTransfers } from "../transfers/records";
-import { type CurrentTransaction, currentTransactions } from "./records";
+import { categoryGroups } from "../categories";
+import { currentTransfers, isTransferMade } from "../transfers/records";
+import {
+  type CurrentTransaction,
+  currentTransactions,
+  isTransactionRecorded,
+} from "./records";
 
 export type Transaction = CurrentTransaction;
 
@@ -85,8 +91,16 @@ export function transactionList(
 ): TransactionListEntry[] {
   // Keyed by subject for Transactions and Transfers, by record for what the Accounts slice lists.
   const firstRecorded = new Map<string, number>();
-  records.forEach(({ id, subjectId }, index) => {
-    if (!firstRecorded.has(subjectId)) firstRecorded.set(subjectId, index);
+  records.forEach((record, index) => {
+    const { id, subjectId } = record;
+    if (!firstRecorded.has(subjectId)) {
+      // Brought back by Undo, it takes the place of what it restores.
+      const restores =
+        isTransactionRecorded(record) || isTransferMade(record)
+          ? record.payload.restores
+          : undefined;
+      firstRecorded.set(subjectId, firstRecorded.get(restores ?? "") ?? index);
+    }
     firstRecorded.set(id, index);
   });
   const inAccount = (entry: { accountId: string }) =>
@@ -134,4 +148,43 @@ export function payees(records: readonly ChangeRecord[]): string[] {
     if (payee) named.add(payee);
   }
   return [...named].sort(new Intl.Collator().compare);
+}
+
+/** A Payee used before, with what recording it again can fill in. */
+export type KnownPayee = {
+  name: string;
+  /** The last Category it had, unless that Category is hidden now. */
+  categoryId?: string;
+  /** The Account it was last recorded in, unless that Account is closed now. */
+  accountId?: string;
+};
+
+/** Every Payee the Budget's Transactions name, in alphabetical order, with what it can fill in. */
+export function knownPayees(records: readonly ChangeRecord[]): KnownPayee[] {
+  const last = new Map<string, { categoryId?: string; accountId: string }>();
+  for (const { payee, categoryId, accountId } of currentTransactions(records)) {
+    if (!payee) continue;
+    last.set(payee, {
+      categoryId: categoryId ?? last.get(payee)?.categoryId,
+      accountId,
+    });
+  }
+  const openAccounts = new Set(
+    accounts(records)
+      .filter(({ closed }) => !closed)
+      .map(({ id }) => id),
+  );
+  const visibleCategories = new Set(
+    categoryGroups(records)
+      .flatMap(({ categories }) => categories)
+      .filter(({ hidden }) => !hidden)
+      .map(({ id }) => id),
+  );
+  return [...last]
+    .sort(([a], [b]) => new Intl.Collator().compare(a, b))
+    .map(([name, { categoryId, accountId }]) => ({
+      name,
+      ...(categoryId && visibleCategories.has(categoryId) && { categoryId }),
+      ...(openAccounts.has(accountId) && { accountId }),
+    }));
 }

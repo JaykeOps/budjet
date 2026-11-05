@@ -40,6 +40,7 @@ export async function createBudget(
   await openApp(page);
   await page.getByRole("button", { name: "Get started" }).click();
   await page.getByRole("button", { name: "Choose a folder" }).click();
+  await page.getByRole("button", { name: "Start a new Budget" }).click();
   await page.getByLabel("Currency").selectOption(currency);
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: categories }).click();
@@ -75,15 +76,15 @@ export async function show(
 
 /**
  * Reaches a place through whichever navigation this device has: tabs on a
- * phone, the rail on desktop. Until the Accounts screen is rebuilt, the rail
- * reaches it through "+ Add Account".
+ * phone, the rail on desktop. Only a phone has an Accounts tab; `openAccount`
+ * and `addAccount` work on both.
  */
 export async function goTo(page: Page, place: Place): Promise<void> {
   const places = page.getByRole("navigation", { name: "Places" });
   const links = {
     Budget: places.getByRole("link", { name: "Budget", exact: true }),
     Activity: places.getByRole("link", { name: /^(Activity|All Accounts)/ }),
-    Accounts: places.getByRole("link", { name: /^(Accounts|\+ Add Account)$/ }),
+    Accounts: places.getByRole("link", { name: "Accounts", exact: true }),
   };
   const landmarks = {
     Budget: page.getByRole("heading", { name: "Budget", exact: true }),
@@ -92,6 +93,112 @@ export async function goTo(page: Page, place: Place): Promise<void> {
   };
   await links[place].click();
   await expect(landmarks[place]).toBeVisible();
+}
+
+/** Whether the rail shows rather than the tabs, at the width the CSS switches them. */
+export function hasRail(page: Page): boolean {
+  return (page.viewportSize()?.width ?? 0) >= 720;
+}
+
+/** Opens an Account's page: from the rail on desktop, drilling in from the Accounts tab on a phone. */
+export async function openAccount(page: Page, name: string): Promise<void> {
+  const named = new RegExp(`^${name}\\b`);
+  if (hasRail(page)) {
+    const places = page.getByRole("navigation", { name: "Places" });
+    const closed = places.getByRole("button", { name: /^Closed \(/ });
+    if (
+      (await closed.isVisible()) &&
+      (await closed.getAttribute("aria-expanded")) === "false"
+    ) {
+      await closed.click();
+    }
+    await places.getByRole("link", { name: named }).click();
+  } else {
+    await goTo(page, "Accounts");
+    const account = page.getByRole("button", { name: named });
+    if (!(await account.isVisible())) {
+      await page.getByText(/^Closed Accounts/).click();
+    }
+    await account.click();
+  }
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
+}
+
+/** The balance on the page of the Account open now, where its name is its heading. */
+export function balanceOf(page: Page, name: string): Locator {
+  return page.getByRole("status", { name: `Balance of ${name}` });
+}
+
+/** Opens an Account's page and checks what it holds. */
+export async function expectBalance(
+  page: Page,
+  name: string,
+  amount: string,
+): Promise<void> {
+  await openAccount(page, name);
+  await expect(balanceOf(page, name)).toContainText(amount);
+}
+
+/** Opens Add Account: from the rail on desktop, the Accounts tab on a phone. */
+export async function startAddingAccount(page: Page): Promise<Locator> {
+  if (hasRail(page)) {
+    await page.getByRole("button", { name: "+ Add Account" }).click();
+  } else {
+    await goTo(page, "Accounts");
+    await page.getByRole("button", { name: "Add Account" }).click();
+  }
+  return page.getByRole("dialog", { name: "Add Account" });
+}
+
+/** Adds an Account through its sheet, which then shows the new Account's page. */
+export async function addAccount(
+  page: Page,
+  { name, kind, holds }: { name: string; kind?: string; holds?: string },
+): Promise<void> {
+  const sheet = await startAddingAccount(page);
+  await sheet.getByLabel("Name").fill(name);
+  if (kind) await sheet.getByRole("radio", { name: kind }).check();
+  if (holds) await sheet.getByLabel("What it holds today").fill(holds);
+  await sheet.getByRole("button", { name: "Add Account" }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
+}
+
+/** Moves money from an Account's page, through the Transfer sheet. */
+export async function transfer(
+  page: Page,
+  { from, to, amount }: { from: string; to: string; amount: string },
+): Promise<void> {
+  await openAccount(page, from);
+  await page.getByRole("button", { name: "Transfer money" }).click();
+  const sheet = page.getByRole("dialog", { name: "Transfer money" });
+  await sheet.getByLabel("Amount").fill(amount);
+  await sheet.getByLabel("To").selectOption({ label: to });
+  await sheet.getByRole("button", { name: /^Transfer/ }).click();
+  await expect(sheet).toBeHidden();
+}
+
+/** The toast showing now. */
+export function toast(page: Page): Locator {
+  return page.getByRole("status", { name: "Notification" });
+}
+
+/**
+ * Deletes a row of a history: from its More menu on desktop, or by tapping it
+ * and choosing Delete in the sheet it opens on a phone.
+ */
+export async function deleteEntry(page: Page, row: Locator): Promise<void> {
+  if (hasRail(page)) {
+    await row.getByRole("button", { name: /^More/ }).click();
+    await page.getByRole("menuitem", { name: "Delete" }).click();
+    return;
+  }
+  await row.getByRole("button", { name: /^Open/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
 /** A Category's or Category Group's row on the Budget: a list item on a phone, a table row on desktop. */
@@ -116,24 +223,116 @@ export function budgetOutline(page: Page): Promise<(string | null)[]> {
     );
 }
 
-/** Records a Transaction in Activity and comes back to the Budget. */
+type TransactionEntry = {
+  date?: string;
+  amount: string;
+  /** Without one, money in goes to Ready to Assign. */
+  category?: string;
+  money?: "in" | "out";
+  payee?: string;
+  account?: string;
+};
+
+/** The steps of recording on a phone, from How much? on. */
+export async function startRecording(page: Page): Promise<Locator> {
+  await page.getByRole("button", { name: "Record", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Record a Transaction" }).click();
+  return page.getByRole("dialog", { name: "How much?" });
+}
+
+/** The Category step, named for the direction of the money. */
+export function categoryStep(page: Page): Locator {
+  return page.getByRole("dialog", {
+    name: /^(What was it for|Where does it go)\?$/,
+  });
+}
+
+/** A choice on the Category step, whose name starts with the Category's. */
+export function categoryChoice(page: Page, name: string): Locator {
+  return categoryStep(page).getByRole("button", {
+    name: new RegExp(`^${name}\\b`),
+  });
+}
+
+/** The last step of recording on a phone. */
+export function reviewStep(page: Page): Locator {
+  return page.getByRole("dialog", { name: "Anything else?" });
+}
+
+/** Chooses an Account in a select whose options also show its balance. */
+async function chooseAccount(field: Locator, name: string): Promise<void> {
+  await field.selectOption(
+    (await field
+      .locator("option", { hasText: name })
+      .getAttribute("value")) as string,
+  );
+}
+
+/** Records a Transaction from where the user is: through (+) on a phone, Activity's form on desktop. */
+export async function enterTransaction(
+  page: Page,
+  { date, amount, category, money = "out", payee, account }: TransactionEntry,
+): Promise<void> {
+  if (hasRail(page)) {
+    const form = page.getByRole("form", { name: "Record a Transaction" });
+    if (date) await form.getByLabel("Date").fill(date);
+    if (account) {
+      await form.getByLabel("Account").selectOption({ label: account });
+    }
+    await form.getByLabel("Money").selectOption(money);
+    await form.getByLabel("Amount").fill(amount);
+    if (category) {
+      await form.getByLabel("Category").selectOption({ label: category });
+    }
+    if (payee) await form.getByLabel("Payee").fill(payee);
+    await form.getByRole("button", { name: "Record Transaction" }).click();
+    return;
+  }
+  const first = await startRecording(page);
+  if (money === "in")
+    await first.getByRole("radio", { name: "Money in" }).check();
+  await first.getByLabel("Amount").fill(amount);
+  await first.getByRole("button", { name: "Next" }).click();
+  await categoryChoice(page, category ?? "Ready to Assign").click();
+  const review = reviewStep(page);
+  if (payee) await review.getByLabel("Payee").fill(payee);
+  if (date) await review.getByLabel("Another day").fill(date);
+  if (account) await chooseAccount(review.getByLabel("Account"), account);
+  await review.getByRole("button", { name: "Record", exact: true }).click();
+  await expect(review).toBeHidden();
+}
+
+/** Records a Transaction and comes back to the Budget. */
 export async function record(
   page: Page,
-  {
-    date,
-    amount,
-    category,
-    money = "out",
-  }: { date: string; amount: string; category: string; money?: "in" | "out" },
+  entry: TransactionEntry,
 ): Promise<void> {
   await goTo(page, "Activity");
-  const form = page.getByRole("form", { name: "Record a Transaction" });
-  await form.getByLabel("Date").fill(date);
-  await form.getByLabel("Money").selectOption(money);
-  await form.getByLabel("Amount").fill(amount);
-  await form.getByLabel("Category").selectOption({ label: category });
-  await form.getByRole("button", { name: "Record Transaction" }).click();
+  await enterTransaction(page, entry);
   await goTo(page, "Budget");
+}
+
+/** Checks whether recording money out offers a Category. */
+export async function expectCategoryOffered(
+  page: Page,
+  name: string,
+  offered: boolean,
+): Promise<void> {
+  const count = offered ? 1 : 0;
+  if (hasRail(page)) {
+    await expect(
+      page
+        .getByRole("form", { name: "Record a Transaction" })
+        .getByLabel("Category")
+        .getByRole("option", { name }),
+    ).toHaveCount(count);
+    return;
+  }
+  const first = await startRecording(page);
+  await first.getByLabel("Amount").fill("1");
+  await first.getByRole("button", { name: "Next" }).click();
+  await expect(categoryChoice(page, name)).toHaveCount(count);
+  await categoryStep(page).getByRole("button", { name: "Close" }).click();
 }
 
 /** Whether this device has the desktop table, which is typed into directly. */
@@ -183,6 +382,25 @@ export async function assign(
   const field = sheet.getByRole("textbox", { name: /^Assigned in / });
   await field.fill(amount);
   await field.press("Enter");
+  await closeSheet(sheet);
+}
+
+/**
+ * Opens Copy last Month's preview: the header's button on desktop, the Assign
+ * walk's opening offer on a phone. Returns the sheet holding it.
+ */
+export async function openCopyPreview(page: Page): Promise<Locator> {
+  const open = hasAssignedColumn(page)
+    ? page.getByRole("button", { name: "Copy last Month" })
+    : page.getByRole("button", { name: "Assign", exact: true });
+  await open.click();
+  return page.getByRole("dialog", { name: /^(Copy|Assign) / });
+}
+
+/** Copies everything Copy last Month offers and leaves the sheet. */
+export async function copyLastMonth(page: Page): Promise<void> {
+  const sheet = await openCopyPreview(page);
+  await sheet.getByRole("button", { name: /^Copy \d+ Assignments?$/ }).click();
   await closeSheet(sheet);
 }
 
@@ -236,4 +454,54 @@ export async function moveMoney(
   await field.fill(amount);
   await field.press("Enter");
   await closeSheet(sheet);
+}
+
+const CURRENCY_SIGNS: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  JPY: "¥",
+  SEK: "SEK",
+};
+
+/** Which currency the Budget is in, read off Ready to Assign. */
+export async function expectCurrency(
+  page: Page,
+  code: keyof typeof CURRENCY_SIGNS,
+): Promise<void> {
+  await expect(
+    page.getByRole("status", { name: "Ready to Assign" }),
+  ).toContainText(CURRENCY_SIGNS[code]);
+}
+
+/** Turns the Budget into its editable list. */
+export async function startEditing(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Edit Categories" }),
+  ).toBeVisible();
+}
+
+/** Leaves the editable list for the Budget. */
+export async function finishEditing(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Budget", exact: true }),
+  ).toBeVisible();
+}
+
+/** Opens the ⋯ of a Category or Category Group in the editable list, and returns its sheet. */
+export async function openMore(page: Page, name: string): Promise<Locator> {
+  await page.getByRole("button", { name: `More for ${name}` }).click();
+  const sheet = page.getByRole("dialog", { name });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
+/** Hides a Category from the Budget, which ends up back on the Budget. */
+export async function hideCategory(page: Page, name: string): Promise<void> {
+  await startEditing(page);
+  const sheet = await openMore(page, name);
+  await sheet.getByRole("button", { name: `Hide ${name}` }).click();
+  await expect(sheet).toBeHidden();
+  await finishEditing(page);
 }

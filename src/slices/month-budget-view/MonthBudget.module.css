@@ -38,6 +38,11 @@
   font-size: 18px;
   line-height: 1;
 }
+.headerActions {
+  display: flex;
+  gap: 8px;
+  margin-inline-start: auto;
+}
 .headerAction {
   padding: 8px 14px;
 }
@@ -67,9 +72,6 @@
   }
   .header {
     gap: 12px 16px;
-  }
-  .headerAction:first-of-type {
-    margin-inline-start: auto;
   }
 }
 
@@ -211,6 +213,24 @@
 .readyToAssignLine {
   margin: 8px 0 0;
   font-size: 13px;
+}
+/* The amount gets the card's full width; only the line makes room for the button. */
+.readyToAssignFoot {
+  position: relative;
+}
+.readyToAssignFoot .readyToAssignLine {
+  min-height: 40px;
+  padding-inline-end: 96px;
+}
+.readyToAssignButton {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  padding-inline: 18px;
+  background: var(--graphite-text);
+  box-shadow: none;
+  color: var(--graphite-button-text);
+  font-weight: 600;
 }
 
 /* ---------- Spent this Month ---------- */

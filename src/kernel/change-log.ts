@@ -12,6 +12,8 @@ export type ChangeRecord<Type extends string = string, Payload = unknown> = {
   subjectId: string;
   deviceId: string;
   timestamp: Timestamp;
+  /** When a record written at an earlier place in the log really was written. See `writeAt`. */
+  writtenAt?: number;
   type: Type;
   payload: Payload;
 };
@@ -104,15 +106,21 @@ function compareStrings(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-export function createInMemoryChangeLog(): ChangeLog {
+export function createInMemoryChangeLog(): ChangeLog & {
+  /** Swaps every record for these, as a change of Budget does. */
+  replaceAll(records: readonly ChangeRecord[]): void;
+} {
   let records: readonly ChangeRecord[] = [];
   const listeners = new Set<() => void>();
-  const append = (added: readonly ChangeRecord[]) => {
-    records = [...records, ...added].sort(compareRecords);
+  const replaceAll = (next: readonly ChangeRecord[]) => {
+    records = [...next].sort(compareRecords);
     for (const listener of listeners) listener();
   };
+  const append = (added: readonly ChangeRecord[]) =>
+    replaceAll([...records, ...added]);
   return {
     append,
+    replaceAll,
     merge(arriving) {
       const added = recordsToMerge(records, arriving);
       if (added.length > 0) append(added);
@@ -137,6 +145,18 @@ export type ChangeLogWriter = {
     type: Type,
     payload: Payload,
   ): ChangeRecord<Type, Payload>;
+  /**
+   * Writes a new record at the place an earlier one holds in the Change Log, by
+   * taking its timestamp. For Undo, when what a record means depends on what came
+   * before it and it has to come back to where it was: a fold replaying the log
+   * then meets it there, on every device.
+   */
+  writeAt<Type extends string, Payload>(
+    timestamp: Timestamp,
+    subjectId: string,
+    type: Type,
+    payload: Payload,
+  ): ChangeRecord<Type, Payload>;
 };
 
 /** Appends records made on this device to the Change Log. */
@@ -153,6 +173,19 @@ export function createChangeLogWriter(
         subjectId,
         deviceId,
         timestamp: nextTimestamp(changeLog.readAll().at(-1)?.timestamp, now()),
+        type,
+        payload,
+      };
+      changeLog.append([record]);
+      return record;
+    },
+    writeAt(timestamp, subjectId, type, payload) {
+      const record = {
+        id: crypto.randomUUID(),
+        subjectId,
+        deviceId,
+        timestamp,
+        writtenAt: now(),
         type,
         payload,
       };

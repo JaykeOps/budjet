@@ -174,6 +174,19 @@ describe("Assignments", () => {
       expect(assignment(records, "phone", november)).toBeUndefined();
     });
 
+    it("sets nothing for a Category whose Assignment last Month was zero", () => {
+      const { changeLog, writer } = budgetIn("USD");
+      setAssignment(writer, {
+        categoryId: "rent",
+        month: october,
+        amount: money(0, "USD"),
+      });
+
+      copyLastMonth(writer, { month: november });
+
+      expect(assignment(changeLog.readAll(), "rent", november)).toBeUndefined();
+    });
+
     it("copies only from the Month just before", () => {
       const { changeLog, writer } = budgetIn("USD");
       setAssignment(writer, {
@@ -448,14 +461,14 @@ describe("Assignments", () => {
         );
       });
 
-      it("copies into next Month as zero, leaving the Take-back behind", () => {
+      it("isn't copied into next Month, and leaves the Take-back behind", () => {
         const { changeLog, writer } = budgetIn("USD");
         storeNegativeAssignment(writer, 50);
 
         copyLastMonth(writer, { month: november });
 
         const records = changeLog.readAll();
-        expect(assignment(records, "rent", november)).toEqual(dollars(0));
+        expect(assignment(records, "rent", november)).toBeUndefined();
         expect(takeBack(records, "rent", november)).toBeUndefined();
       });
     });

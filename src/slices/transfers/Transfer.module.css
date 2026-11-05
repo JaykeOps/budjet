@@ -1,0 +1,30 @@
+.form {
+  flex-flow: column nowrap;
+  align-items: stretch;
+  gap: 12px;
+  margin: 0;
+}
+
+.field {
+  display: flex;
+}
+
+.note {
+  color: var(--muted);
+  font-size: 13px;
+}
+.note p {
+  margin: 0;
+}
+
+.save {
+  display: flex;
+  gap: 8px;
+}
+.save button[type="submit"] {
+  flex: 1;
+}
+
+.delete {
+  color: var(--overspent);
+}
