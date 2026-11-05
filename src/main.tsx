@@ -41,7 +41,15 @@ await upgradeDatabase({
 // Every record is read from browser storage before the first render, so a
 // returning user opens straight into their Budget.
 const [
-  { changeLog, keepInFolder, folderConnection, returning, unread, checkFolder },
+  {
+    changeLog,
+    keepInFolder,
+    folderConnection,
+    folderOffer,
+    returning,
+    unread,
+    checkFolder,
+  },
   deviceId,
 ] = await Promise.all([
   hasFolderPicker()
@@ -50,6 +58,7 @@ const [
         changeLog: await openIndexedDbChangeLog(),
         keepInFolder: undefined,
         folderConnection: undefined,
+        folderOffer: undefined,
         returning: undefined,
         unread: undefined,
         checkFolder: undefined,
@@ -67,6 +76,7 @@ function showApp({ folderChosen = false } = {}) {
         keepInFolder={keepInFolder}
         folderChosen={folderChosen}
         folderConnection={folderConnection}
+        folderOffer={folderOffer}
       />
     </StrictMode>,
   );
@@ -215,11 +225,27 @@ async function openFolderStorage() {
       });
     },
   };
+  // The move has its own refusal: a Budget already here is never replaced or merged.
+  const folderOffer = {
+    isInFolder: changeLog.inFolder,
+    moveIntoFolder: async (chosen: FileSystemDirectoryHandle) => {
+      const outcome = await changeLog.moveIntoFolder(
+        browserFolder(chosen),
+        chosen,
+      );
+      if (outcome === "moved") {
+        current = chosen;
+        budgetChanged.postMessage(null);
+      }
+      return outcome;
+    },
+  };
   const hasBudget = budget(changeLog.readAll()) !== undefined;
   return {
     changeLog,
     keepInFolder,
     folderConnection,
+    folderOffer,
     returning:
       handle && hasBudget
         ? {

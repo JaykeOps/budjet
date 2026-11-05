@@ -23,10 +23,7 @@ import {
   OpenAccountForm,
   useAccounts,
 } from "./slices/accounts";
-import {
-  deleteRedeclaredBalance,
-  openAccount,
-} from "./slices/accounts/commands";
+import { openAccount } from "./slices/accounts/commands";
 import {
   copyLastMonth,
   moveMoney,
@@ -34,24 +31,24 @@ import {
 } from "./slices/assignments/commands";
 import { type Budget, useBudget } from "./slices/budget-setup";
 import { CategoryList, categoryGroups } from "./slices/categories";
+import { MoveIntoFolderOffer } from "./slices/data-folder";
 import { MonthBudget } from "./slices/month-budget-view";
 import { TransactionsScreen } from "./slices/transactions";
-import {
-  deleteTransaction,
-  editTransaction,
-  recordTransaction,
-} from "./slices/transactions/commands";
-import { deleteTransfer, editTransfer } from "./slices/transfers/commands";
+import { recordTransaction } from "./slices/transactions/commands";
 import { Toasts, useToast } from "./ui/Toast";
+import { useHistoryChanges } from "./undo";
 import { pushAddress, useUrlParameter } from "./url-parameter";
 
 type KeepInFolder = ComponentProps<typeof FirstRun>["keepInFolder"];
+/** Absent where the browser has no folder picker. */
+type FolderOffer = ComponentProps<typeof MoveIntoFolderOffer> | undefined;
 
 export function App({
   writer,
   keepInFolder,
   folderChosen,
   folderConnection,
+  folderOffer,
 }: {
   writer: ChangeLogWriter;
   keepInFolder: KeepInFolder;
@@ -59,6 +56,7 @@ export function App({
   folderChosen?: boolean;
   /** Absent where a Budget can only live in Browser storage. */
   folderConnection?: FolderConnection;
+  folderOffer: FolderOffer;
 }) {
   return (
     <ChangeLogWriterProvider value={writer}>
@@ -66,6 +64,7 @@ export function App({
         keepInFolder={keepInFolder}
         folderChosen={folderChosen}
         folderConnection={folderConnection}
+        folderOffer={folderOffer}
       />
     </ChangeLogWriterProvider>
   );
@@ -96,10 +95,12 @@ function Root({
   keepInFolder,
   folderChosen,
   folderConnection,
+  folderOffer,
 }: {
   keepInFolder: KeepInFolder;
   folderChosen?: boolean;
   folderConnection?: FolderConnection;
+  folderOffer: FolderOffer;
 }) {
   const budget = useBudget();
   const hasBudget = budget !== undefined;
@@ -114,7 +115,11 @@ function Root({
   }
   return (
     <Toasts>
-      <Shell budget={budget} folderConnection={folderConnection} />
+      <Shell
+        budget={budget}
+        folderConnection={folderConnection}
+        folderOffer={folderOffer}
+      />
     </Toasts>
   );
 }
@@ -127,14 +132,17 @@ function Root({
 function Shell({
   budget,
   folderConnection,
+  folderOffer,
 }: {
   budget: Budget;
   folderConnection?: FolderConnection;
+  folderOffer: FolderOffer;
 }) {
   const writer = useChangeLogWriter();
   const accounts = useAccounts();
   const place = usePlace();
   const toast = useToast();
+  const historyChanges = useHistoryChanges();
   const [addingAccount, setAddingAccount] = useState(false);
 
   if (accounts.length === 0) {
@@ -154,6 +162,7 @@ function Shell({
       plus={<RecordMenu currency={budget.currency} />}
     >
       <Page titled={place === "activity"} folderConnection={folderConnection}>
+        {folderOffer && <MoveIntoFolderOffer {...folderOffer} />}
         {place === "budget" && (
           <>
             <BudgetMonth
@@ -178,13 +187,7 @@ function Shell({
           <AccountTransactions
             currency={budget.currency}
             onRecord={(input) => recordTransaction(writer, input)}
-            onEdit={(id, input) => editTransaction(writer, id, input)}
-            onDelete={(id) => deleteTransaction(writer, id)}
-            onDeleteRedeclaredBalance={(id) =>
-              deleteRedeclaredBalance(writer, id)
-            }
-            onEditTransfer={(id, input) => editTransfer(writer, id, input)}
-            onDeleteTransfer={(id) => deleteTransfer(writer, id)}
+            {...historyChanges}
           />
         )}
         {place === "accounts" && (

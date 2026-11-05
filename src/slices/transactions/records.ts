@@ -25,7 +25,14 @@ type TransactionFields = {
  */
 export type TransactionRecorded = ChangeRecord<
   "TransactionRecorded",
-  { version: 1 } & TransactionFields
+  {
+    version: 1;
+    /**
+     * The deleted Transaction that Undo brought back as this new one, whose
+     * place in a list it takes. Its money counts from now, as any record's does.
+     */
+    restores?: string;
+  } & TransactionFields
 >;
 
 /**
@@ -67,9 +74,10 @@ export type CurrentTransaction = { id: string } & TransactionFields;
 
 /**
  * Every Transaction as it stands now, in the order they were first recorded.
- * For each one the most recent record wins (docs/adr/0004): an edit replaces
- * it and a deletion removes it. Every slice that counts Transactions reads
- * them through this. Expects records oldest first, as `readAll` returns them.
+ * For each one the most recent record wins (docs/adr/0004), except that a
+ * deleted one stays deleted whatever else is written about it (docs/adr/0006).
+ * Every slice that counts Transactions reads them through this. Expects records
+ * oldest first, as `readAll` returns them.
  */
 export const currentTransactions = perSnapshot(foldTransactions);
 
@@ -78,24 +86,23 @@ function foldTransactions(
 ): readonly CurrentTransaction[] {
   // One pass over every record, ten years of them on a phone, so no copies:
   // a Map keeps each Transaction where it was first recorded while its most
-  // recent record replaces the value. An edit or deletion before the
-  // Transaction's first TransactionRecorded is replaced by that record anyway.
-  const latest = new Map<
-    string,
-    TransactionRecorded | TransactionEdited | TransactionDeleted
-  >();
+  // recent record replaces the value. An edit before the Transaction's
+  // first TransactionRecorded is replaced by that record anyway.
+  const latest = new Map<string, TransactionRecorded | TransactionEdited>();
+  const deleted = new Set<string>();
   for (const record of records) {
-    if (
+    if (isTransactionDeleted(record)) {
+      deleted.add(record.subjectId);
+    } else if (
       isTransactionRecorded(record) ||
-      ((isTransactionEdited(record) || isTransactionDeleted(record)) &&
-        latest.has(record.subjectId))
+      (isTransactionEdited(record) && latest.has(record.subjectId))
     ) {
       latest.set(record.subjectId, record);
     }
   }
   const current: CurrentTransaction[] = [];
   for (const [id, now] of latest) {
-    if (isTransactionDeleted(now)) continue;
+    if (deleted.has(id)) continue;
     // Listed field by field: spreading the payload is several times slower.
     const { accountId, date, amount, categoryId, payee, memo } = now.payload;
     current.push({ id, accountId, date, amount, categoryId, payee, memo });

@@ -8,8 +8,12 @@ import {
   openingBalances,
 } from "../accounts";
 import { categoryGroups } from "../categories";
-import { currentTransfers } from "../transfers/records";
-import { type CurrentTransaction, currentTransactions } from "./records";
+import { currentTransfers, isTransferMade } from "../transfers/records";
+import {
+  type CurrentTransaction,
+  currentTransactions,
+  isTransactionRecorded,
+} from "./records";
 
 export type Transaction = CurrentTransaction;
 
@@ -87,8 +91,16 @@ export function transactionList(
 ): TransactionListEntry[] {
   // Keyed by subject for Transactions and Transfers, by record for what the Accounts slice lists.
   const firstRecorded = new Map<string, number>();
-  records.forEach(({ id, subjectId }, index) => {
-    if (!firstRecorded.has(subjectId)) firstRecorded.set(subjectId, index);
+  records.forEach((record, index) => {
+    const { id, subjectId } = record;
+    if (!firstRecorded.has(subjectId)) {
+      // Brought back by Undo, it takes the place of what it restores.
+      const restores =
+        isTransactionRecorded(record) || isTransferMade(record)
+          ? record.payload.restores
+          : undefined;
+      firstRecorded.set(subjectId, firstRecorded.get(restores ?? "") ?? index);
+    }
     firstRecorded.set(id, index);
   });
   const inAccount = (entry: { accountId: string }) =>

@@ -6,3 +6,4 @@ ADR 0004 merges two devices' edits to the same thing by letting the most recent 
 
 - Every slice that deletes reads its records the same way: a subject with a delete record is gone, and edits before or after it don't count. The kernel provides this beside `latestBySubject`, so the folds share one rule.
 - Most recent edit wins (ADR 0004) still settles everything else: two edits, renames and reorders.
+- Undoing a delete writes a new thing with a fresh id, the same content and the same position, rather than its own record type. Two devices that both undo the same delete get two things, which the user can see and delete.

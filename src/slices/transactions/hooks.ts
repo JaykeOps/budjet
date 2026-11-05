@@ -45,12 +45,16 @@ export function useKnownPayees(): KnownPayee[] {
 }
 
 /** What money can be recorded against in a Month. */
-export function useCategoryChoices(of: Month, currency: Currency) {
+export function useCategoryChoices(
+  of: Month,
+  currency: Currency,
+  editing?: Transaction,
+) {
   return useChangeLogQuery(
     useCallback(
       (records: readonly ChangeRecord[]) =>
-        categoryChoices(records, of, currency),
-      [of, currency],
+        categoryChoices(records, of, currency, editing),
+      [of, currency, editing],
     ),
   );
 }
