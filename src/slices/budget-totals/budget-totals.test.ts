@@ -12,6 +12,7 @@ import {
   type TakeBackSet,
 } from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
+import type { CategoryDeleted } from "../categories/records";
 import type {
   TransactionDeleted,
   TransactionEdited,
@@ -106,6 +107,13 @@ function budget() {
       writer.write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
         id,
         "TransactionDeleted",
+        { version: 1 },
+      );
+    },
+    deleteCategory(id: string) {
+      writer.write<CategoryDeleted["type"], CategoryDeleted["payload"]>(
+        id,
+        "CategoryDeleted",
         { version: 1 },
       );
     },
@@ -587,5 +595,47 @@ describe("Budget Totals", () => {
       expect(totals.assignedAfter("holiday", "2026-10")).toBe(false);
       expect(totals.assignedAfter("gifts", "2026-10")).toBe(false);
     });
+  });
+
+  describe("a deleted Category (docs/adr/0006)", () => {
+    it("doesn't count an Assignment or Take-back written after the delete, by a device that hadn't seen it", () => {
+      const totals = budget();
+      totals.openAccount(100000);
+      totals.deleteCategory("holiday");
+
+      totals.assign("holiday", "2026-10", 30000);
+      totals.takeBack("holiday", "2026-11", 500);
+
+      expect(totals.readyToAssign()).toEqual(money(100000, "USD"));
+      expect(totals.available("holiday", "2026-11")).toEqual(money(0, "USD"));
+      expect(totals.used("holiday")).toBe(false);
+      expect(totals.assignedAfter("holiday", "2026-09")).toBe(false);
+    });
+
+    it("doesn't count one written before the delete either", () => {
+      const totals = budget();
+      totals.openAccount(100000);
+      totals.assign("holiday", "2026-10", 30000);
+      totals.assign("gifts", "2026-10", 2000);
+
+      totals.deleteCategory("holiday");
+
+      expect(totals.readyToAssign()).toEqual(money(98000, "USD"));
+    });
+  });
+
+  it("doesn't count a Transaction edited after it was deleted (docs/adr/0006)", () => {
+    const totals = budget();
+    totals.openAccount(100000);
+    const lunch = totals.record("2026-10-12", -900, "groceries");
+    const salary = totals.record("2026-10-13", 5000);
+
+    totals.delete(lunch);
+    totals.delete(salary);
+    totals.edit(lunch, "2026-10-12", -1200, "groceries");
+    totals.edit(salary, "2026-10-13", 7000);
+
+    expect(totals.readyToAssign()).toEqual(money(100000, "USD"));
+    expect(totals.available("groceries", "2026-10")).toEqual(money(0, "USD"));
   });
 });

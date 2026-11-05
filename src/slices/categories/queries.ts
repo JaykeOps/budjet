@@ -1,4 +1,4 @@
-import type { ChangeRecord } from "../../kernel/change-log";
+import { type ChangeRecord, deletedSubjects } from "../../kernel/change-log";
 import { isCategoriesRecord } from "./records";
 
 export type Category = { id: string; name: string; hidden: boolean };
@@ -27,7 +27,10 @@ export function categoryGroups(
     Placed & { groupId: string; hidden: boolean }
   >();
   // Once deleted, a thing stays deleted, whatever other devices did to it.
-  const deleted = new Set<string>();
+  const deleted = deletedSubjects(
+    records,
+    ({ type }) => type === "CategoryDeleted" || type === "CategoryGroupDeleted",
+  );
 
   // Records come oldest first, so each later record overwrites what it changes.
   for (const record of records) {
@@ -68,10 +71,6 @@ export function categoryGroups(
       case "CategoryHidden":
       case "CategoryUnhidden":
         if (category) category.hidden = record.type === "CategoryHidden";
-        break;
-      case "CategoryDeleted":
-      case "CategoryGroupDeleted":
-        deleted.add(id);
         break;
     }
   }
