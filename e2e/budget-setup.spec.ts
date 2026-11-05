@@ -49,6 +49,7 @@ async function walkToAccounts(page: Page, currency = "USD") {
   await openApp(page);
   await button(page, "Get started").click();
   await button(page, "Choose a folder").click();
+  await button(page, "Start a new Budget").click();
   await page.getByLabel("Currency").selectOption(currency);
   await button(page, "Next").click();
   await button(page, "Use the starter set").click();
@@ -79,6 +80,7 @@ test("a new user answers one question per screen and opens their Budget", async 
   ).toBeFocused();
   await expect(page.getByText("1 of 4")).toBeVisible();
   await button(page, "Choose a folder").click();
+  await button(page, "Start a new Budget").click();
 
   await expect(
     page.getByRole("heading", { name: "What currency is your Budget in?" }),
@@ -217,6 +219,7 @@ test.describe("with a Swedish browser", () => {
     await openApp(page);
     await button(page, "Get started").click();
     await button(page, "Choose a folder").click();
+    await button(page, "Start a new Budget").click();
     await expect(page.getByLabel("Currency")).toHaveValue("SEK");
   });
 });

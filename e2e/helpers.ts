@@ -40,6 +40,7 @@ export async function createBudget(
   await openApp(page);
   await page.getByRole("button", { name: "Get started" }).click();
   await page.getByRole("button", { name: "Choose a folder" }).click();
+  await page.getByRole("button", { name: "Start a new Budget" }).click();
   await page.getByLabel("Currency").selectOption(currency);
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: categories }).click();

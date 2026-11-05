@@ -43,16 +43,23 @@ type KeepInFolder = ComponentProps<typeof FirstRun>["keepInFolder"];
 export function App({
   writer,
   keepInFolder,
+  folderChosen,
   folderConnection,
 }: {
   writer: ChangeLogWriter;
   keepInFolder: KeepInFolder;
+  /** A folder is already chosen for the Budget setup is about to write. */
+  folderChosen?: boolean;
   /** Absent where a Budget can only live in Browser storage. */
   folderConnection?: FolderConnection;
 }) {
   return (
     <ChangeLogWriterProvider value={writer}>
-      <Root keepInFolder={keepInFolder} folderConnection={folderConnection} />
+      <Root
+        keepInFolder={keepInFolder}
+        folderChosen={folderChosen}
+        folderConnection={folderConnection}
+      />
     </ChangeLogWriterProvider>
   );
 }
@@ -80,9 +87,11 @@ function Page({
 /** First run, which has no navigation, until there's a Budget, then the Budget. */
 function Root({
   keepInFolder,
+  folderChosen,
   folderConnection,
 }: {
   keepInFolder: KeepInFolder;
+  folderChosen?: boolean;
   folderConnection?: FolderConnection;
 }) {
   const budget = useBudget();
@@ -93,7 +102,9 @@ function Root({
     if (hasBudget) requestPersistentStorage();
   }, [hasBudget]);
 
-  if (!budget) return <FirstRun keepInFolder={keepInFolder} />;
+  if (!budget) {
+    return <FirstRun keepInFolder={keepInFolder} folderChosen={folderChosen} />;
+  }
   return (
     <Toasts>
       <Shell budget={budget} folderConnection={folderConnection} />

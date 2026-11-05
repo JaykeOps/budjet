@@ -16,6 +16,18 @@ export async function fakeFolderPicker(page: Page): Promise<void> {
   }, PICKED_FOLDER);
 }
 
+/** Makes the next use of the picker return another folder, created if needed. */
+export async function pickFolderNext(page: Page, name: string): Promise<void> {
+  await page.evaluate((name) => {
+    const picker = window.showDirectoryPicker;
+    window.showDirectoryPicker = async () => {
+      window.showDirectoryPicker = picker;
+      const root = await navigator.storage.getDirectory();
+      return root.getDirectoryHandle(name, { create: true });
+    };
+  }, name);
+}
+
 /** Makes the next use of the picker end as if the user cancelled it. */
 export async function cancelNextFolderPicker(page: Page): Promise<void> {
   await page.evaluate(() => {
@@ -62,9 +74,10 @@ export async function removeFolder(page: Page): Promise<void> {
   }, PICKED_FOLDER);
 }
 
-/** The name and text of every file in the picked folder's `Crownkeep` subfolder. */
+/** The name and text of every file in a folder's `Crownkeep` subfolder. */
 export function filesInFolder(
   page: Page,
+  folder: string = PICKED_FOLDER,
 ): Promise<{ name: string; text: string }[]> {
   return page.evaluate(async (name) => {
     const root = await navigator.storage.getDirectory();
@@ -84,7 +97,7 @@ export function filesInFolder(
       });
     }
     return files;
-  }, PICKED_FOLDER);
+  }, folder);
 }
 
 /**
@@ -112,6 +125,7 @@ export async function deliverFile(
   page: Page,
   fileName: string,
   text: string,
+  folder: string = PICKED_FOLDER,
 ): Promise<void> {
   await page.evaluate(
     async ({ folder, fileName, text }) => {
@@ -125,7 +139,7 @@ export async function deliverFile(
       await writable.write(text);
       await writable.close();
     },
-    { folder: PICKED_FOLDER, fileName, text },
+    { folder, fileName, text },
   );
 }
 

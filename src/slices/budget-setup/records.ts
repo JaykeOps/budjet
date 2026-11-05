@@ -20,3 +20,8 @@ export type BudgetCreated = ChangeRecord<
 export function isBudgetCreated(record: ChangeRecord): record is BudgetCreated {
   return record.type === "BudgetCreated";
 }
+
+/** The id on each `BudgetCreated`: a Budget's identity. */
+export function budgetIds(records: readonly ChangeRecord[]): string[] {
+  return records.filter(isBudgetCreated).map(({ subjectId }) => subjectId);
+}

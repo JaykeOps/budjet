@@ -84,6 +84,7 @@ test("a lost folder is found by trying it, and choosing it again opens the Budge
   await expect(places(page)).toHaveCount(0);
 
   await button(page, "Choose a folder").click();
+  await button(page, "Put my Budget here").click();
   await goTo(page, "Budget");
   await expect(page.getByText("Kept in USD")).toBeVisible();
 });
