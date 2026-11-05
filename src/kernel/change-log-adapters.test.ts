@@ -15,7 +15,7 @@ import {
 
 /**
  * Each adapter gives every test fresh storage, which `open` opens. Opening it
- * again shows what a later visit to budjet would read back.
+ * again shows what a later visit to Crownkeep would read back.
  */
 type Adapter = { name: string; storage(): { open(): Promise<ChangeLog> } };
 

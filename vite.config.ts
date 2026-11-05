@@ -7,7 +7,9 @@ import { configDefaults } from "vitest/config";
 
 export default defineConfig({
   define: {
-    __APP_VERSION__: JSON.stringify(process.env.BUDJET_VERSION ?? "v0.0.0-dev"),
+    __APP_VERSION__: JSON.stringify(
+      process.env.CROWNKEEP_VERSION ?? "v0.0.0-dev",
+    ),
   },
   plugins: [
     // The app is English only, so React Aria's other locales stay out of the bundle.
@@ -22,8 +24,8 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,woff2}"],
       },
       manifest: {
-        name: "budjet",
-        short_name: "budjet",
+        name: "Crownkeep",
+        short_name: "Crownkeep",
         description:
           "Local-first budgeting that keeps your data in your own Data Folder.",
         theme_color: "#18181d",

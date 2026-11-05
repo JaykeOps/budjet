@@ -16,6 +16,7 @@ import {
 } from "./change-log";
 import type { FileStamp, FileStamps } from "./folder-checks";
 
+/** The name from before Crownkeep. Renaming it would strand everyone's Local Copy. */
 const DATABASE = "budjet";
 const RECORDS = "records";
 /** A copy of each record not yet written to the Data Folder, so a reload keeps trying. */
@@ -123,7 +124,7 @@ export async function openLocalCopy(
     // An abort means the writes are gone, so this stays until the next open.
     transaction.onabort = () => {
       writesUnderway--;
-      console.error("budjet could not save a change", transaction.error);
+      console.error("Crownkeep could not save a change", transaction.error);
       saveState.set({ status: "unsaved", reason: "write-failed" });
     };
   }

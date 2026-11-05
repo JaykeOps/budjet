@@ -1,5 +1,5 @@
 {
-  description = "budjet: the single toolchain for humans, agents and Dagger (see docs/adr/0001)";
+  description = "Crownkeep: the single toolchain for humans, agents and Dagger (see docs/adr/0001)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

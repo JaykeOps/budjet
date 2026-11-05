@@ -89,7 +89,7 @@ function Page({
   return (
     <main>
       {folderConnection && <FolderBanner connection={folderConnection} />}
-      {titled && <h1>budjet</h1>}
+      {titled && <h1>Crownkeep</h1>}
       {children}
       <p>Version {__APP_VERSION__}</p>
     </main>

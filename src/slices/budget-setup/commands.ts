@@ -13,7 +13,7 @@ export function createBudget(
     throw new RangeError(`${currency} is not a currency`);
   }
   if (budget(writer.changeLog.readAll())) {
-    throw new Error("budjet already has a Budget");
+    throw new Error("Crownkeep already has a Budget");
   }
   writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
     crypto.randomUUID(),

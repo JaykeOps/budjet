@@ -1,11 +1,11 @@
-# budjet
+# Crownkeep
 
 A local-first budgeting app that runs in the browser and keeps the user's data on their own device.
 
 ## Language
 
 **Data Folder**:
-The directory on the user's device, chosen by the user, where budjet keeps their data. Getting it onto other devices is the job of whatever sync service the user points at that folder; budjet never talks to a sync service itself.
+The directory on the user's device, chosen by the user, where Crownkeep keeps their data. Getting it onto other devices is the job of whatever sync service the user points at that folder; Crownkeep never talks to a sync service itself.
 _Avoid_: Vault, workspace, sync folder, cloud storage
 
 **Browser storage**:
@@ -22,7 +22,7 @@ The user's whole plan for their money, in a single currency chosen when it is cr
 _Avoid_: Plan, book, ledger
 
 **Account**:
-A place where the user holds money they could spend or move soon: a checking account, a savings account or cash. Every dollar in an Account is budgeted. Investments, property and debts are not Accounts, and budjet does not track them.
+A place where the user holds money they could spend or move soon: a checking account, a savings account or cash. Every dollar in an Account is budgeted. Investments, property and debts are not Accounts, and Crownkeep does not track them.
 _Avoid_: Wallet, asset, bank
 
 **Category**:
@@ -85,7 +85,7 @@ One Month of an Account's history, or of every Account's together: the money in,
 _Avoid_: Report, ledger
 
 **Adjustment**:
-The difference budjet records when the user re-declares an Account's real balance. It goes into, or comes out of, Ready to Assign.
+The difference Crownkeep records when the user re-declares an Account's real balance. It goes into, or comes out of, Ready to Assign.
 _Avoid_: Correction, reconciliation, fix
 
 **Balance check**:
@@ -95,5 +95,5 @@ _Avoid_: Reconciliation, verify, $0 Adjustment
 ## Delivery
 
 **Release**:
-A version of budjet identified by a git tag, with its release notes and its deployed build.
+A version of Crownkeep identified by a git tag, with its release notes and its deployed build.
 _Avoid_: Deploy (a deploy is one step of a release), version bump
