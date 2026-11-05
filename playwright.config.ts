@@ -12,6 +12,9 @@ if (nixVersion && version !== nixVersion) {
   );
 }
 
+/** Where the same build answers under a subpath, as GitHub Pages serves it. */
+export const SUBPATH_ADDRESS = "http://localhost:4174/budjet/";
+
 export default defineConfig({
   testDir: "e2e",
   forbidOnly: !!process.env.CI,
@@ -30,9 +33,17 @@ export default defineConfig({
       testIgnore: /\.desktop\.spec\.ts$/,
     },
   ],
-  webServer: {
-    command: "pnpm preview",
-    url: "http://localhost:4173",
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      command: "pnpm preview",
+      url: "http://localhost:4173",
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command:
+        "pnpm exec vite preview --base /budjet/ --port 4174 --strictPort",
+      url: SUBPATH_ADDRESS,
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
 });
