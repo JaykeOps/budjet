@@ -44,15 +44,11 @@ test("a user edits and deletes a Transfer from the history", async ({
     .getByRole("row", { name: /^To Savings/ });
   const more = row.getByRole("button", { name: /^More/ });
 
-  await more.click();
-  await page.getByRole("menuitem", { name: "Edit" }).click();
-  const edit = page.getByRole("dialog", { name: "Edit Transfer" });
+  await row.getByRole("button", { name: /^Open/ }).click();
+  const edit = page.getByRole("form", { name: "Edit Transfer" });
   await expect(edit.getByLabel("Amount")).toHaveValue("200.00");
   await edit.getByLabel("Amount").fill("50");
-  await expect(
-    edit.getByText("Checking goes to $950.00. Savings goes to $550.00."),
-  ).toBeVisible();
-  await edit.getByRole("button", { name: "Save changes" }).click();
+  await edit.getByRole("button", { name: /^Save changes/ }).click();
 
   await expect(edit).toBeHidden();
   await expect(balanceOf(page, "Checking")).toContainText("$950.00");
@@ -104,8 +100,6 @@ test("a Transfer's More menu works from the keyboard", async ({ page }) => {
     .getByRole("button", { name: /^More/ });
   await more.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("menuitem", { name: "Edit" })).toBeFocused();
-  await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("menuitem", { name: "Delete" })).toBeFocused();
 
   await page.keyboard.press("Escape");

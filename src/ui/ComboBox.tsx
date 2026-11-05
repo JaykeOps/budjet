@@ -110,7 +110,8 @@ export function ComboBox({
  * With no option highlighted, Enter would keep the field's old choice, whatever's
  * typed: submitting the form if the list is closed, and putting the old choice
  * back if it's open. When what's typed isn't that choice, Enter chooses the first
- * match, or stays here if nothing matches.
+ * match, or stays here if nothing matches. When it is that choice, an open list
+ * closes and Enter still reaches the form.
  */
 function ComboBoxInput({
   inputRef,
@@ -134,11 +135,22 @@ function ComboBoxInput({
       onKeyDownCapture={(event) => {
         tabbing.current = event.key === "Tab";
         if (event.key !== "Enter" || !options || !state) return;
-        if (state.isOpen && state.selectionManager.focusedKey !== null) return;
+        const { focusedKey } = state.selectionManager;
+        const elsewhere =
+          focusedKey !== null && focusedKey !== state.selectedKey;
+        if (state.isOpen && elsewhere) return;
         const typed = state.inputValue.trim().toLowerCase();
         const chosen = state.selectedItem?.textValue ?? "";
-        if (!typed || typed === chosen.toLowerCase()) return;
+        if (!typed) return;
         event.preventDefault();
+        if (typed === chosen.toLowerCase()) {
+          // The list has nothing new to say, so this Enter is for the form.
+          if (!state.isOpen) return;
+          event.stopPropagation();
+          state.close();
+          event.currentTarget.form?.requestSubmit();
+          return;
+        }
         event.stopPropagation();
         const match = firstMatch(typed);
         if (match) state.setSelectedKey(match.id);

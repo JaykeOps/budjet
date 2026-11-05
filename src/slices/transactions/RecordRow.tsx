@@ -26,6 +26,7 @@ import {
 } from "../transfers";
 import type { TransactionInput } from "./commands";
 import { useCategoryChoices, useKnownPayees } from "./hooks";
+import type { Transaction } from "./queries";
 import styles from "./RecordRow.module.css";
 import {
   afterThis,
@@ -233,8 +234,10 @@ export function RecordRow({
   );
 }
 
-function TransactionFields({
+/** A Transaction's fields, for the row that records it and the row that edits it. `editing` is that one, whose own money is left out of what's shown. */
+export function TransactionFields({
   draft,
+  editing,
   currency,
   payeeField,
   categoryField,
@@ -242,6 +245,7 @@ function TransactionFields({
   onChange,
 }: {
   draft: Draft;
+  editing?: Transaction;
   currency: Currency;
   payeeField: RefObject<HTMLInputElement | null>;
   categoryField: RefObject<HTMLInputElement | null>;
@@ -251,7 +255,7 @@ function TransactionFields({
   const open = useAccounts().filter(({ closed }) => !closed);
   const amountId = useId();
   const known = useKnownPayees();
-  const choices = useCategoryChoices(monthOf(draft.date), currency);
+  const choices = useCategoryChoices(monthOf(draft.date), currency, editing);
   const switchTo = (direction: Direction) =>
     onChange(withDirection(draft, direction));
   return (
@@ -350,7 +354,12 @@ function TransactionFields({
         >
           {open.map(({ id, name, balance }) => (
             <option key={id} value={id}>
-              {name} · {formatMoney(balance)}
+              {name} ·{" "}
+              {formatMoney(
+                editing?.accountId === id
+                  ? added(balance, -editing.amount.minorUnits)
+                  : balance,
+              )}
             </option>
           ))}
         </select>
@@ -428,8 +437,16 @@ function CategoryOption({
   );
 }
 
-function AfterLine({ draft, currency }: { draft: Draft; currency: Currency }) {
-  const choices = useCategoryChoices(monthOf(draft.date), currency);
+export function AfterLine({
+  draft,
+  editing,
+  currency,
+}: {
+  draft: Draft;
+  editing?: Transaction;
+  currency: Currency;
+}) {
+  const choices = useCategoryChoices(monthOf(draft.date), currency, editing);
   const line = afterThis(draft, currency, choices);
   if (!line) return <>Choose a Category to see what it has left.</>;
   const { name, after } = line;

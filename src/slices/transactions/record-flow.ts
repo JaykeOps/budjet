@@ -148,6 +148,22 @@ export function categoryChoices(
   };
 }
 
+/** Whether the Draft now says something other than what it started as. */
+export function draftChanged(
+  draft: Draft,
+  started: Draft,
+  currency: Currency,
+): boolean {
+  return (
+    draftAmount(draft, currency)?.minorUnits !==
+      draftAmount(started, currency)?.minorUnits ||
+    draft.categoryId !== started.categoryId ||
+    draft.payee.trim() !== started.payee.trim() ||
+    draft.date !== started.date ||
+    draft.accountId !== started.accountId
+  );
+}
+
 /** The Draft to start on once this one is recorded. Date and Account stay: several in a row usually share them. */
 export function nextDraft({ date, accountId }: Draft): Draft {
   return { direction: "out", typed: "", payee: "", date, accountId };
