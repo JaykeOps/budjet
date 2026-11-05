@@ -8,27 +8,32 @@ import {
 } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
 import { formatMoney } from "../../kernel/money";
-import type { Month } from "../../kernel/month";
+import { currentMonth, type Month } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
 import { OpenableSheet } from "../../ui/Sheet";
 import { categoryUsed, useAvailable } from "../budget-totals";
 import styles from "./CategoryEditor.module.css";
+import { MoveOutFlow } from "./MoveOutFlow";
+import { moveOutChoices } from "./move-out";
 import { type Category, type CategoryGroup, categoryGroups } from "./queries";
+import { CategoryMoves, GroupMoves, type Moves, useReorder } from "./Reorder";
 
 type Named = { id: string; name: string };
 
 /** What the app shell does for each change. Any of them may refuse by throwing. */
-export type CategoryChanges = {
+export type CategoryChanges = Moves & {
   addCategory: (groupId: string, name: string) => void;
   addGroup: (name: string) => void;
   renameCategory: (categoryId: string, name: string) => void;
   renameGroup: (groupId: string, name: string) => void;
-  hide: (category: Named) => void;
+  /** `other` takes its money or covers it; without one, Ready to Assign does. */
+  hide: (category: Named, other?: string) => void;
   unhide: (category: Named) => void;
   deleteCategory: (category: Named) => void;
   deleteGroup: (group: Named) => void;
   moveThemAndDelete: (group: Named, toGroupId: string) => void;
   setLeftOut: (group: Named, leftOut: boolean) => void;
+  moveOut: (category: Named, month: Month, other?: string) => void;
 };
 
 type Open = { kind: "category" | "group"; id: string };
@@ -50,6 +55,24 @@ export function CategoryEditor({
   const [open, setOpen] = useState<Open>();
   const [deletions, setDeletions] = useState(0);
   const list = useRef<HTMLDivElement>(null);
+  const { shown, dragging, handle } = useReorder(groups, changes, list);
+
+  // Moving across Category Groups remounts the row, taking with it the ⋯ that
+  // focus goes back to. This runs after the sheet has tried.
+  const lastOpen = useRef<string>(undefined);
+  useEffect(() => {
+    if (open) {
+      lastOpen.current = open.id;
+      return;
+    }
+    const id = lastOpen.current;
+    if (!id) return;
+    const frame = requestAnimationFrame(() => {
+      if (document.activeElement !== document.body) return;
+      list.current?.querySelector<HTMLElement>(`[data-more="${id}"]`)?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
 
   // What opened the sheet is gone, so focus would otherwise fall out of the
   // page. This runs after the sheet has handed focus back.
@@ -74,14 +97,22 @@ export function CategoryEditor({
       .find(({ id }) => id === open.id);
 
   return (
-    <div ref={list} tabIndex={-1} className={styles.list}>
-      {groups.map((group) => (
+    <div
+      ref={list}
+      tabIndex={-1}
+      className={styles.list}
+      data-reordering={dragging !== undefined}
+    >
+      {shown.map((group) => (
         <section
           key={group.id}
           className={styles.group}
           aria-label={group.name}
+          data-group-id={group.id}
+          data-dragging={dragging === group.id}
         >
-          <div className={`${styles.row} ${styles.head}`}>
+          <div className={`${styles.row} ${styles.head}`} data-group-head>
+            {handle("group", group)}
             <NameField
               label={`Name of ${group.name}`}
               name={group.name}
@@ -89,6 +120,7 @@ export function CategoryEditor({
               onRename={(name) => changes.renameGroup(group.id, name)}
             />
             <MoreButton
+              id={group.id}
               name={group.name}
               onPress={() => setOpen({ kind: "group", id: group.id })}
             />
@@ -99,7 +131,10 @@ export function CategoryEditor({
                 key={category.id}
                 className={styles.row}
                 data-hidden={category.hidden}
+                data-row-id={category.id}
+                data-dragging={dragging === category.id}
               >
+                {handle("category", category)}
                 <NameField
                   label={`Name of ${category.name}`}
                   name={category.name}
@@ -108,6 +143,7 @@ export function CategoryEditor({
                 {category.hidden && <span className={styles.tag}>Hidden</span>}
                 <AvailablePill categoryId={category.id} month={month} />
                 <MoreButton
+                  id={category.id}
                   name={category.name}
                   onPress={() => setOpen({ kind: "category", id: category.id })}
                 />
@@ -131,25 +167,35 @@ export function CategoryEditor({
       {openCategory && (
         <OpenableSheet title={openCategory.name} isOpen onClose={close}>
           {() => (
-            <CategoryFate
-              category={openCategory}
-              changes={changes}
-              onClose={close}
-              onDeleted={closeDeleted}
-            />
+            <>
+              <CategoryMoves
+                category={openCategory}
+                groups={groups}
+                moves={changes}
+              />
+              <CategoryFate
+                category={openCategory}
+                changes={changes}
+                onClose={close}
+                onDeleted={closeDeleted}
+              />
+            </>
           )}
         </OpenableSheet>
       )}
       {openGroup && (
         <OpenableSheet title={openGroup.name} isOpen onClose={close}>
           {() => (
-            <GroupFate
-              group={openGroup}
-              others={groups.filter(({ id }) => id !== openGroup.id)}
-              changes={changes}
-              onClose={close}
-              onDeleted={closeDeleted}
-            />
+            <>
+              <GroupMoves group={openGroup} groups={groups} moves={changes} />
+              <GroupFate
+                group={openGroup}
+                others={groups.filter(({ id }) => id !== openGroup.id)}
+                changes={changes}
+                onClose={close}
+                onDeleted={closeDeleted}
+              />
+            </>
           )}
         </OpenableSheet>
       )}
@@ -157,11 +203,20 @@ export function CategoryEditor({
   );
 }
 
-function MoreButton({ name, onPress }: { name: string; onPress: () => void }) {
+function MoreButton({
+  id,
+  name,
+  onPress,
+}: {
+  id: string;
+  name: string;
+  onPress: () => void;
+}) {
   return (
     <button
       type="button"
       className={styles.more}
+      data-more={id}
       aria-label={`More for ${name}`}
       onClick={onPress}
     >
@@ -332,8 +387,37 @@ function CategoryFate({
       [id],
     ),
   );
+  const month = currentMonth();
+  const holdsMoney = useChangeLogQuery(
+    useCallback(
+      (records: readonly ChangeRecord[]) => {
+        const choices = moveOutChoices(records, id, month);
+        return Boolean(choices?.left.minorUnits || choices?.later.length);
+      },
+      [id, month],
+    ),
+  );
+  const [movingOut, setMovingOut] = useState(false);
   const [refusal, attempt] = useAttempt();
 
+  if (movingOut) {
+    return (
+      <Fate refusal={refusal}>
+        <MoveOutFlow
+          category={category}
+          month={month}
+          hide
+          onApply={(other) =>
+            attempt(() => {
+              changes.hide(category, other);
+              onClose();
+            })
+          }
+          onCancel={() => setMovingOut(false)}
+        />
+      </Fate>
+    );
+  }
   return (
     <Fate refusal={refusal}>
       {hidden && (
@@ -344,13 +428,17 @@ function CategoryFate({
       )}
       <button
         type="button"
-        onClick={() =>
+        onClick={() => {
+          if (!hidden && holdsMoney) {
+            setMovingOut(true);
+            return;
+          }
           attempt(() => {
             if (hidden) changes.unhide(category);
             else changes.hide(category);
             onClose();
-          })
-        }
+          });
+        }}
       >
         {hidden ? "Unhide" : "Hide"} {name}
       </button>

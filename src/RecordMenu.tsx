@@ -6,20 +6,14 @@ import {
   MenuTrigger,
   Popover,
 } from "react-aria-components";
-import { type Currency, formatMoney } from "./kernel/money";
-import { useChangeLogWriter } from "./kernel/use-change-log-query";
+import type { Currency } from "./kernel/money";
 import { PlusIcon } from "./NavigationShell";
 import styles from "./RecordMenu.module.css";
 import { useAccounts } from "./slices/accounts";
 import { RecordTransactionSheet } from "./slices/transactions";
-import {
-  deleteTransaction,
-  recordTransaction,
-} from "./slices/transactions/commands";
 import { TransferSheet } from "./slices/transfers";
-import { deleteTransfer, makeTransfer } from "./slices/transfers/commands";
-import { useToast } from "./ui/Toast";
 import { useUrlParameter } from "./url-parameter";
+import { useRecordCommands } from "./use-record-commands";
 
 /**
  * The tab bar's (+): a menu above it that starts recording a Transaction or
@@ -27,8 +21,7 @@ import { useUrlParameter } from "./url-parameter";
  * it was opened from, and says what it did in a toast.
  */
 export function RecordMenu({ currency }: { currency: Currency }) {
-  const writer = useChangeLogWriter();
-  const toast = useToast();
+  const commands = useRecordCommands();
   const accounts = useAccounts();
   const [accountId] = useUrlParameter("account");
   const [opening, setOpening] = useState<"transaction" | "transfer">();
@@ -77,10 +70,11 @@ export function RecordMenu({ currency }: { currency: Currency }) {
         </Popover>
       </MenuTrigger>
       {opening === "transaction" && (
-        <RecordingSheet
+        <RecordTransactionSheet
           currency={currency}
           defaultAccountId={here?.id}
           onClose={() => setOpening(undefined)}
+          onRecord={commands.record}
         />
       )}
       <TransferSheet
@@ -89,44 +83,8 @@ export function RecordMenu({ currency }: { currency: Currency }) {
         onClose={() => setOpening(undefined)}
         currency={currency}
         draft={here ? { fromAccountId: here.id } : {}}
-        onSubmit={(input) => {
-          const id = makeTransfer(writer, input);
-          toast({
-            text: "Transfer made",
-            onUndo: () => deleteTransfer(writer, id),
-          });
-        }}
+        onSubmit={commands.transfer}
       />
     </>
-  );
-}
-
-/** Records a Transaction and says what it did in a toast. */
-export function RecordingSheet({
-  currency,
-  defaultAccountId,
-  onClose,
-}: {
-  currency: Currency;
-  defaultAccountId?: string;
-  onClose: () => void;
-}) {
-  const writer = useChangeLogWriter();
-  const toast = useToast();
-  return (
-    <RecordTransactionSheet
-      currency={currency}
-      defaultAccountId={defaultAccountId}
-      onClose={onClose}
-      onRecord={(input) => {
-        const id = recordTransaction(writer, input);
-        const sign = input.amount.minorUnits > 0 ? "+" : "";
-        const payee = input.payee?.trim();
-        toast({
-          text: `Recorded ${sign}${formatMoney(input.amount)}${payee ? ` at ${payee}` : ""}`,
-          onUndo: () => deleteTransaction(writer, id),
-        });
-      }}
-    />
   );
 }

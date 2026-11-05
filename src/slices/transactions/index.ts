@@ -12,6 +12,7 @@ export {
   type TransferEntry,
   transactionList,
 } from "./queries";
+export { RecordRow } from "./RecordRow";
 export { RecordTransactionSheet } from "./RecordTransactionSheet";
 export type { Showing } from "./ShowingPicker";
 export { type Statement, statements } from "./statements";

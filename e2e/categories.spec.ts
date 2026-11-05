@@ -4,6 +4,7 @@ import {
   assign,
   budgetOutline,
   createBudget,
+  editorOutline,
   expectCategoryOffered,
   finishEditing,
   goTo,
@@ -19,19 +20,6 @@ const button = (scope: Page | Locator, name: string) =>
 
 const nameField = (page: Page, name: string) =>
   page.getByRole("textbox", { name: `Name of ${name}`, exact: true });
-
-/** Each Category Group's name and its Categories' names, in order, in the editable list. */
-function editorOutline(page: Page) {
-  return page
-    .locator("section[aria-label]")
-    .evaluateAll((groups) =>
-      groups.flatMap((group) =>
-        [...group.querySelectorAll("input")]
-          .map((field) => field.value)
-          .filter((name) => name.length > 0),
-      ),
-    );
-}
 
 const starter = [
   "Bills",
@@ -233,26 +221,6 @@ test("a used Category explains why it can't be deleted and offers hiding", async
   await expect.poll(() => budgetOutline(page)).not.toContain("Rent");
   await goTo(page, "Activity");
   await expectCategoryOffered(page, "Rent", false);
-});
-
-test("hiding a Category holding money is refused, and says why", async ({
-  page,
-}) => {
-  await page.clock.setFixedTime(new Date("2026-10-15T12:00:00"));
-  await createBudget(page);
-  await goTo(page, "Budget");
-  await assign(page, "Rent", "50");
-  await startEditing(page);
-
-  await expect(
-    page.getByRole("listitem").filter({ has: nameField(page, "Rent") }),
-  ).toContainText("$50.00");
-
-  const sheet = await openMore(page, "Rent");
-  await button(sheet, "Hide Rent").click();
-  await expect(sheet.getByRole("alert")).toContainText(
-    "Rent still has $50.00 Available",
-  );
 });
 
 test("hidden Categories stay in place, and a Group with nothing visible shows only here", async ({

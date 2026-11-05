@@ -1,11 +1,5 @@
-import { type FormEvent, type ReactNode, useId, useState } from "react";
-import {
-  type Currency,
-  formatMoney,
-  type Money,
-  parseMoney,
-  typedMoney,
-} from "../../kernel/money";
+import { type ReactNode, useId } from "react";
+import { type Currency, formatMoney, type Money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import type { Category, CategoryGroup } from "../categories";
 import {
@@ -16,13 +10,12 @@ import {
 import { useGroupSubtotals } from "./group-subtotals";
 import { availableHint, Hint } from "./Hint";
 import styles from "./MonthBudget.module.css";
+import type { AssignedColumn } from "./use-assigned-column";
 
 export type RowsProps = {
   groups: CategoryGroup[];
   month: Month;
   currency: Currency;
-  onAssign: (categoryId: string, amount: Money) => void;
-  onError: (message: string | undefined) => void;
   onOpenCategory: (categoryId: string) => void;
   onAssignGroup: (group: CategoryGroup) => void;
   /** The Category a newcomer starts at, highlighted until anything is assigned. */
@@ -76,6 +69,7 @@ function GroupList({
 }
 
 type RowProps = RowsProps & { category: Category };
+type TableProps = RowsProps & { column: AssignedColumn };
 
 function ListRow({
   category,
@@ -130,7 +124,7 @@ function ListRow({
 }
 
 /** Desktop's rows: one table card per Category Group, sharing the first one's column headings. */
-export function CategoryTables(props: RowsProps) {
+export function CategoryTables(props: TableProps) {
   const { groups, month, currency } = props;
   const subtotals = useGroupSubtotals(month, currency);
   return groups.map((group, index) => (
@@ -153,7 +147,7 @@ function GroupTable({
   spent,
   available,
   ...props
-}: RowsProps & {
+}: TableProps & {
   group: CategoryGroup;
   headed: boolean;
   assigned: Money | undefined;
@@ -213,17 +207,18 @@ function TableRow({
   category,
   month,
   currency,
-  onAssign,
-  onError,
+  column,
   onOpenCategory,
   coachedCategoryId,
-}: RowProps) {
+}: TableProps & { category: Category }) {
   const row = useCategoryRow(category.id, month, currency);
+  const focused = column.focusedId === category.id;
   return (
     <tr
       className={styles.tableRow}
       data-state={row.state}
       data-coached={category.id === coachedCategoryId || undefined}
+      data-focused={focused}
     >
       <th scope="row">
         <span className={styles.tableName}>
@@ -246,13 +241,23 @@ function TableRow({
         </span>
       </th>
       <td>
-        <AssignmentField
-          category={category}
-          assigned={row.assigned}
-          currency={currency}
-          onAssign={onAssign}
-          onError={onError}
+        <input
+          className={styles.assignment}
+          aria-label={`Assignment for ${category.name}`}
+          inputMode="decimal"
+          autoComplete="off"
+          {...column.field(category.id, row.assigned)}
         />
+        {/* Only the Tab after the focused field, so the panel is never far away. */}
+        {focused && column.panelShown && (
+          <button
+            type="button"
+            className={styles.goToPanel}
+            onClick={column.goToPanel}
+          >
+            Go to the panel
+          </button>
+        )}
       </td>
       <td>
         <span className={styles.tableSpending}>
@@ -261,7 +266,19 @@ function TableRow({
         </span>
       </td>
       <td>
-        <Pill row={row} />
+        <span className={styles.tableAvailable}>
+          <Pill row={row} />
+          {row.state === "overspent" && (
+            <button
+              type="button"
+              className={styles.coverIt}
+              aria-label={`Cover ${category.name}`}
+              onClick={() => column.cover(category.id)}
+            >
+              Cover
+            </button>
+          )}
+        </span>
       </td>
     </tr>
   );
@@ -331,50 +348,5 @@ function OverspentNote({
       {row.note} <Hint term="Overspent">{overspentHint(name, row)}</Hint>
       {children}
     </span>
-  );
-}
-
-/** Set by typing an amount and pressing Enter or leaving the field. */
-function AssignmentField({
-  category,
-  assigned,
-  currency,
-  onAssign,
-  onError,
-}: Pick<RowProps, "category" | "currency" | "onAssign" | "onError"> & {
-  assigned: Money;
-}) {
-  const [draft, setDraft] = useState<string>();
-
-  function save() {
-    if (draft === undefined) return;
-    const amount = parseMoney(draft, currency);
-    if (!amount) {
-      onError(`"${draft}" isn't an amount in ${currency}`);
-      return;
-    }
-    setDraft(undefined);
-    onError(undefined);
-    if (amount.minorUnits !== assigned.minorUnits) {
-      onAssign(category.id, amount);
-    }
-  }
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    save();
-  }
-
-  return (
-    <form className={styles.assignmentForm} onSubmit={submit}>
-      <input
-        className={styles.assignment}
-        aria-label={`Assignment for ${category.name}`}
-        inputMode="decimal"
-        value={draft ?? typedMoney(assigned)}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={save}
-      />
-    </form>
   );
 }

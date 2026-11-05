@@ -10,6 +10,7 @@ import {
   show,
   startAddingAccount,
   toast,
+  transferFields,
 } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
@@ -276,15 +277,15 @@ test("Close Account with money offers a pre-filled Transfer, then closes at zero
   ).toBeVisible();
   await closing.getByRole("button", { name: "Transfer $116.25" }).click();
 
-  const moving = page.getByRole("dialog", { name: "Transfer money" });
+  const moving = transferFields(page);
   await expect(moving.getByLabel("Amount")).toHaveValue("116.25");
   await expect(moving.getByLabel("From").locator("option:checked")).toHaveText(
-    "Wallet",
+    /^Wallet/,
   );
   await expect(moving.getByLabel("To").locator("option:checked")).toHaveText(
-    "Everyday",
+    /^Everyday/,
   );
-  await moving.getByRole("button", { name: "Transfer $116.25" }).click();
+  await moving.getByRole("button", { name: /^(Transfer \$|Record)/ }).click();
   await expect(balanceOf(page, "Wallet")).toContainText("$0.00");
 
   await moreAction(page, "Wallet", "Close Account");
@@ -363,10 +364,7 @@ for (const colorScheme of ["light", "dark"] as const) {
     await scan();
 
     await page.getByRole("button", { name: "Transfer money" }).click();
-    await page
-      .getByRole("dialog", { name: "Transfer money" })
-      .getByLabel("Amount")
-      .fill("5");
+    await transferFields(page).getByLabel("Amount").fill("5");
     await scan();
     await page.keyboard.press("Escape");
 

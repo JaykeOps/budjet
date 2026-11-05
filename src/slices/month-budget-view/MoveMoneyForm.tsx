@@ -1,6 +1,15 @@
 import { type FormEvent, useId, useState } from "react";
-import { type Currency, type Money, parseMoney } from "../../kernel/money";
-import { useVisibleCategoryGroups } from "./visible-categories";
+import {
+  type Currency,
+  formatMoney,
+  type Money,
+  parseMoney,
+  typedMoney,
+} from "../../kernel/money";
+import type { Month } from "../../kernel/month";
+import styles from "./CategorySheet.module.css";
+import { groupsOf, useSheetBudget } from "./category-sheet";
+import { moveChange, movePlan, moveStart, READY_TO_ASSIGN } from "./move-money";
 
 export type MoveInput = {
   fromCategoryId: string;
@@ -9,79 +18,132 @@ export type MoveInput = {
 };
 
 /**
- * Moves an amount from one Category's Assignment to another's. `onMove`
- * returns false when the move was refused; the form then keeps what was typed.
+ * From / To / Amount, between Categories or Ready to Assign. `onMove` and
+ * `onAssign` may throw when refused; the form shows why and stays put.
  */
 export function MoveMoneyForm({
+  month,
   currency,
   onMove,
-  onError,
+  onAssign,
+  onDone,
 }: {
+  month: Month;
   currency: Currency;
-  onMove: (input: MoveInput) => boolean;
-  onError: (message: string | undefined) => void;
+  onMove: (input: MoveInput) => void;
+  onAssign: (categoryId: string, amount: Money) => void;
+  onDone: () => void;
 }) {
-  const headingId = useId();
-  const groups = useVisibleCategoryGroups();
-  const firstCategoryId = groups.flatMap((group) => group.categories)[0]?.id;
-  const [from, setFrom] = useState<string>();
-  const [to, setTo] = useState<string>();
-  const [amount, setAmount] = useState("");
-  const fromCategoryId = from ?? firstCategoryId ?? "";
-  const toCategoryId = to ?? firstCategoryId ?? "";
+  const fromId = useId();
+  const toId = useId();
+  const budget = useSheetBudget(month, currency);
+  const [start] = useState(() => moveStart(budget));
+  const [from, setFrom] = useState(start.from);
+  const [to, setTo] = useState(start.to);
+  const [typed, setTyped] = useState(
+    start.amount ? typedMoney(start.amount) : "",
+  );
+  const [error, setError] = useState<string>();
+  const amount = parseMoney(typed, currency) ?? undefined;
+  const plan = movePlan(budget, from, to, amount, month);
+  const unreadable =
+    typed.trim() !== "" && !amount
+      ? `"${typed}" isn't an amount in ${currency}`
+      : undefined;
+  const shown = error ?? plan.refusal ?? unreadable;
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const parsed = parseMoney(amount, currency);
-    if (!parsed) {
-      onError(`"${amount}" isn't an amount in ${currency}`);
-      return;
-    }
-    if (onMove({ fromCategoryId, toCategoryId, amount: parsed })) {
-      setAmount("");
+    if (!amount || !plan.ready) return;
+    try {
+      const change = moveChange(budget, from, to, amount);
+      if (change.kind === "assign") onAssign(change.categoryId, change.amount);
+      else onMove(change);
+      onDone();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
     }
   }
 
-  const options = groups.map((group) => (
-    <optgroup key={group.id} label={group.name}>
-      {group.categories.map((category) => (
-        <option key={category.id} value={category.id}>
-          {category.name}
-        </option>
+  const options = (
+    <>
+      <option value={READY_TO_ASSIGN}>
+        Ready to Assign ({formatMoney(budget.readyToAssign)})
+      </option>
+      {groupsOf(budget.categories).map(([groupName, members]) => (
+        <optgroup key={groupName} label={groupName}>
+          {members.map(({ id, name, row }) => (
+            <option key={id} value={id}>
+              {name} ({formatMoney(row.available)})
+            </option>
+          ))}
+        </optgroup>
       ))}
-    </optgroup>
-  ));
+    </>
+  );
 
   return (
-    <form aria-labelledby={headingId} onSubmit={submit}>
-      <h3 id={headingId}>Move money</h3>
-      <label>
-        From{" "}
+    <form className={styles.moveForm} onSubmit={submit}>
+      <div className={styles.field}>
+        <label htmlFor={fromId}>From</label>
         <select
-          value={fromCategoryId}
-          onChange={(event) => setFrom(event.target.value)}
+          id={fromId}
+          value={from}
+          onChange={(event) => {
+            setFrom(event.target.value);
+            setError(undefined);
+          }}
         >
           {options}
         </select>
-      </label>{" "}
-      <label>
-        To{" "}
+      </div>
+      <div className={styles.field}>
+        <label htmlFor={toId}>To</label>
         <select
-          value={toCategoryId}
-          onChange={(event) => setTo(event.target.value)}
+          id={toId}
+          value={to}
+          onChange={(event) => {
+            setTo(event.target.value);
+            setError(undefined);
+          }}
         >
           {options}
         </select>
-      </label>{" "}
-      <label>
-        Amount{" "}
-        <input
-          inputMode="decimal"
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-        />
-      </label>{" "}
-      <button type="submit">Move</button>
+      </div>
+      <div className={styles.field}>
+        <label className={styles.field}>
+          Amount
+          <input
+            className={styles.amount}
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="0"
+            value={typed}
+            onChange={(event) => {
+              setTyped(event.target.value);
+              setError(undefined);
+            }}
+            onFocus={(event) => event.target.select()}
+          />
+        </label>
+        {shown && <p role="alert">{shown}</p>}
+      </div>
+      {from !== to && (
+        <div className={styles.after} aria-live="polite">
+          {plan.ends.map(({ name, after }) => (
+            <p key={name}>
+              <span>{name} after</span>
+              <strong>{formatMoney(after)}</strong>
+            </p>
+          ))}
+          {plan.note && <p className={styles.note}>{plan.note}</p>}
+        </div>
+      )}
+      <button type="submit" className={styles.main} disabled={!plan.ready}>
+        {amount && amount.minorUnits > 0
+          ? `Move ${formatMoney(amount)}`
+          : "Move"}
+      </button>
     </form>
   );
 }

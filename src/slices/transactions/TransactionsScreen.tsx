@@ -1,4 +1,11 @@
-import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import {
   type Currency,
   money,
@@ -37,28 +44,28 @@ type HistoryActions = {
 
 /**
  * History as Month Statements, of every Account or the one the app shell says
- * it is showing, with a form to record a Transaction and a way to change each
- * row, unless a closed Account is involved. The app shell keeps what's showing
- * and decides what recording, editing and deleting do; an error it throws is
- * shown on the form. Below the rows, an empty state says what to do next when
- * there's no open Account or nothing but Opening Balances.
+ * it is showing, with a way to change each row, unless a closed Account is
+ * involved. The app shell keeps what's showing, gives the row that records, and
+ * decides what editing and deleting do; an error it throws is shown on the form.
+ * Below the rows, an empty state says what to do next when there's no open
+ * Account or nothing but Opening Balances.
  */
 export function TransactionsScreen({
   showing,
   onShow,
-  onRecord,
+  recordRow,
   onRecordFirst,
   onAddAccount,
   ...actions
 }: HistoryActions & {
   showing: Showing;
   onShow: (showing: Showing) => void;
-  onRecord: (input: TransactionInput) => void;
+  /** The row that records on desktop, if it's open. */
+  recordRow: ReactNode;
   /** The empty state's way to start recording, into the Account showing if any. */
   onRecordFirst: (accountId?: string) => void;
   onAddAccount: () => void;
 }) {
-  const { currency } = actions;
   const headingId = useId();
   const accounts = useAccounts();
   const openAccounts = accounts.filter(({ closed }) => !closed);
@@ -69,12 +76,11 @@ export function TransactionsScreen({
     : all;
   const rows = useRowChanges(actions);
 
-  const recordInto = account ?? openAccounts.at(0);
   const onlyOpeningBalances = all.every(({ entries }) =>
     entries.every(({ kind }) => kind === "opening-balance"),
   );
   return (
-    <section aria-labelledby={headingId}>
+    <section aria-labelledby={headingId} className={styles.screen}>
       <h2 id={headingId}>
         {account ? (
           account.name
@@ -90,23 +96,8 @@ export function TransactionsScreen({
           Closed. Its history stays here, and it takes no new Transactions or
           Transfers.
         </p>
-      ) : rows.editing ? (
-        rows.editing
       ) : (
-        recordInto && (
-          // A phone records from (+).
-          <div className={styles.recordForm}>
-            <TransactionForm
-              key={recordInto.id}
-              heading="Record a Transaction"
-              submitLabel="Record Transaction"
-              defaultAccountId={recordInto.id}
-              accounts={openAccounts}
-              currency={currency}
-              onSubmit={onRecord}
-            />
-          </div>
-        )
+        rows.editing
       )}
       <ShowingPicker
         showing={{ accountId: account?.id, month: showing.month }}
@@ -115,6 +106,7 @@ export function TransactionsScreen({
           onShow(to);
         }}
       />
+      {!account?.closed && recordRow}
       {statements.length === 0 ? (
         <p>Nothing here. Try another Month.</p>
       ) : (
@@ -324,15 +316,11 @@ function useRowChanges({
 
 type Direction = "out" | "in";
 
-/**
- * Records a new Transaction, or edits one when given its `initial` values.
- * After recording, the form clears for the next one.
- */
+/** Edits a Transaction, in the Account it's in. */
 function TransactionForm({
   heading,
   submitLabel,
   defaultAccountId,
-  accounts,
   currency,
   initial,
   onSubmit,
@@ -341,8 +329,6 @@ function TransactionForm({
   heading: string;
   submitLabel: string;
   defaultAccountId: string;
-  /** The Accounts to choose from. Without them it stays in `defaultAccountId`. */
-  accounts?: Account[];
   currency: Currency;
   initial?: Transaction;
   onSubmit: (input: TransactionInput) => void;
@@ -354,7 +340,6 @@ function TransactionForm({
   const groups = useCategoryGroups();
   const payees = usePayees();
   const form = useRef<HTMLFormElement>(null);
-  const [accountId, setAccountId] = useState(defaultAccountId);
   const [date, setDate] = useState(initial?.date ?? today);
   const [direction, setDirection] = useState<Direction>(
     initial && initial.amount.minorUnits > 0 ? "in" : "out",
@@ -385,7 +370,7 @@ function TransactionForm({
     const sign = direction === "out" ? -1 : 1;
     try {
       onSubmit({
-        accountId,
+        accountId: defaultAccountId,
         date,
         amount: money(sign * typed.minorUnits, currency),
         categoryId: categoryId || undefined,
@@ -407,23 +392,6 @@ function TransactionForm({
   return (
     <form ref={form} aria-labelledby={headingId} onSubmit={submit}>
       <h3 id={headingId}>{heading}</h3>
-      {accounts && (
-        <>
-          <label>
-            Account{" "}
-            <select
-              value={accountId}
-              onChange={(event) => setAccountId(event.target.value)}
-            >
-              {accounts.map(({ id, name }) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>{" "}
-        </>
-      )}
       <label>
         Date{" "}
         <input

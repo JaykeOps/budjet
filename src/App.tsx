@@ -19,7 +19,8 @@ import { useMonthInUrl } from "./month-in-url";
 import { NavigationShell } from "./NavigationShell";
 import { requestPersistentStorage } from "./persistent-storage";
 import { placeAddress, usePlace } from "./place-in-url";
-import { RecordingSheet, RecordMenu } from "./RecordMenu";
+import { isDesktop, useRecordingRow } from "./RecordingRow";
+import { RecordMenu } from "./RecordMenu";
 import {
   AddAccountSheet,
   OpenAccountForm,
@@ -35,11 +36,14 @@ import { type Budget, useBudget } from "./slices/budget-setup";
 import { categoryGroups } from "./slices/categories";
 import { MoveIntoFolderOffer } from "./slices/data-folder";
 import { MonthBudget } from "./slices/month-budget-view";
-import { TransactionsScreen } from "./slices/transactions";
-import { recordTransaction } from "./slices/transactions/commands";
+import {
+  RecordTransactionSheet,
+  TransactionsScreen,
+} from "./slices/transactions";
 import { Toasts, useToast } from "./ui/Toast";
 import { useHistoryChanges } from "./undo";
 import { pushAddress, useUrlParameter } from "./url-parameter";
+import { useRecordCommands } from "./use-record-commands";
 
 type KeepInFolder = ComponentProps<typeof FirstRun>["keepInFolder"];
 /** Absent where the browser has no folder picker. */
@@ -146,6 +150,7 @@ function Shell({
   const toast = useToast();
   const historyChanges = useHistoryChanges();
   const [addingAccount, setAddingAccount] = useState(false);
+  const recording = useRecordingRow(budget.currency);
 
   if (accounts.length === 0) {
     return (
@@ -161,6 +166,8 @@ function Shell({
   return (
     <NavigationShell
       onAddAccount={() => setAddingAccount(true)}
+      onRecord={() => recording.start()}
+      recordButton={recording.recordButton}
       plus={<RecordMenu currency={budget.currency} />}
     >
       <Page titled={place === "activity"} folderConnection={folderConnection}>
@@ -182,8 +189,9 @@ function Shell({
         {place === "activity" && (
           <AccountTransactions
             currency={budget.currency}
-            onRecord={(input) => recordTransaction(writer, input)}
             onAddAccount={() => setAddingAccount(true)}
+            onRecordInRow={() => recording.start()}
+            recordRow={recording.row}
             {...historyChanges}
           />
         )}
@@ -191,6 +199,8 @@ function Shell({
           <AccountsPlace
             currency={budget.currency}
             onAddAccount={() => setAddingAccount(true)}
+            recordRow={recording.row}
+            onTransferInRow={recording.start}
           />
         )}
       </Page>
@@ -211,15 +221,18 @@ function Shell({
 }
 
 /** The Transactions screen for what the address bar says it's showing (`?account=<id>&statement=YYYY-MM`). */
-function AccountTransactions(
-  props: Omit<
-    ComponentProps<typeof TransactionsScreen>,
-    "showing" | "onShow" | "onRecordFirst"
-  >,
-) {
+function AccountTransactions({
+  onRecordInRow,
+  ...props
+}: Omit<
+  ComponentProps<typeof TransactionsScreen>,
+  "showing" | "onShow" | "onRecordFirst"
+> & { onRecordInRow: () => void }) {
   const [accountId] = useUrlParameter("account");
   const [statementMonth] = useUrlParameter("statement");
-  const [recording, setRecording] = useState<{ into?: string }>();
+  const commands = useRecordCommands();
+  // The row only shows on desktop, so a phone records through the sheet.
+  const [recordingOnPhone, setRecordingOnPhone] = useState<{ into?: string }>();
   return (
     <>
       <TransactionsScreen
@@ -230,14 +243,17 @@ function AccountTransactions(
         onShow={({ accountId, month }) =>
           pushAddress(placeAddress("activity", accountId, month))
         }
-        onRecordFirst={(into) => setRecording({ into })}
+        onRecordFirst={(into) =>
+          isDesktop() ? onRecordInRow() : setRecordingOnPhone({ into })
+        }
         {...props}
       />
-      {recording && (
-        <RecordingSheet
+      {recordingOnPhone && (
+        <RecordTransactionSheet
           currency={props.currency}
-          defaultAccountId={recording.into}
-          onClose={() => setRecording(undefined)}
+          defaultAccountId={recordingOnPhone.into}
+          onClose={() => setRecordingOnPhone(undefined)}
+          onRecord={commands.record}
         />
       )}
     </>

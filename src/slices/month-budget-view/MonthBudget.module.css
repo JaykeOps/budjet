@@ -58,6 +58,33 @@
   min-width: 0;
 }
 
+.hiddenMoney {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 16px;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+.hiddenMoneyAction {
+  flex: none;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--link);
+  font-weight: 500;
+}
+.hiddenMoneySheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* Same width as use-wide.ts, where rows become a table. */
 @media (min-width: 1180px) {
   .columns {
@@ -390,9 +417,6 @@
   justify-content: space-between;
   gap: 12px;
 }
-.assignmentForm {
-  margin: 0;
-}
 
 /* ---------- Category Groups on desktop ---------- */
 
@@ -489,14 +513,92 @@
   text-align: right;
 }
 
-.standIn {
-  padding: clamp(16px, 4vw, 24px);
+.tableRow[data-focused="true"] {
+  background: var(--raised);
+}
+.tableAvailable {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+/* Only the keyboard ever lands on it. */
+.goToPanel:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.goToPanel:focus {
+  margin-top: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+/* ---------- The panel under Ready to Assign ---------- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
   border-radius: var(--radius-card);
   background: var(--card);
   box-shadow: var(--depth-card);
 }
-.standIn form {
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.panelToggle {
+  align-self: flex-start;
+  min-height: 24px;
+  padding: 2px 0;
+  box-shadow: none;
+  color: var(--link);
+  font-size: 13px;
+  font-weight: 500;
+}
+.panelBreakdown {
   margin: 0;
+}
+.panelBreakdown > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.panelBreakdown > div:last-child {
+  border-top: 1px solid var(--edge);
+  color: var(--text);
+  font-weight: 600;
+}
+.panelBreakdown dd {
+  margin: 0;
+  white-space: nowrap;
+}
+.panelAfter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.panelSuggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.panelSuggestion {
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+  white-space: normal;
 }
 
 /* ---------- Empty and first screens ---------- */

@@ -7,18 +7,23 @@ import {
   previousMonth,
 } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
+import { Sheet } from "../../ui/Sheet";
 import {
   type CategoryChanges,
   CategoryEditor,
+  type CategoryGroup,
   useCategoryGroups,
 } from "../categories";
+import { AssignPanel } from "./AssignPanel";
 import { AssignWalk, CopyLastMonth } from "./AssignWalk";
 import { CategoryLists, CategoryTables } from "./CategoryRows";
 import { CategorySheet, type SheetSteps } from "./CategorySheet";
+import { HiddenMoney } from "./HiddenMoney";
 import styles from "./MonthBudget.module.css";
 import { type MoveInput, MoveMoneyForm } from "./MoveMoneyForm";
 import { type FirstCategoryChanges, NoCategories } from "./NoCategories";
 import { anythingAssigned, ReadyToAssign, SpentThisMonthCard } from "./Summary";
+import { useAssignedColumn } from "./use-assigned-column";
 import { useWide } from "./use-wide";
 import { useVisibleCategoryGroups } from "./visible-categories";
 
@@ -72,7 +77,17 @@ export function MonthBudget({
   const [error, setError] = useState<string>();
   const [steps, setSteps] = useState<SheetSteps>();
   const [flow, setFlow] = useState<"walk" | "copy">();
-  const Rows = wide ? CategoryTables : CategoryLists;
+  const ids = groups.flatMap(({ categories }) =>
+    categories.map(({ id }) => id),
+  );
+  const column = useAssignedColumn({
+    ids,
+    month,
+    currency,
+    onAssign: (categoryId, amount) =>
+      attempt(() => onAssign({ categoryId, month, amount })),
+    onError: setError,
+  });
 
   /** Runs a change, showing the error if it is refused; true when it went through. */
   function attempt(action: () => void): boolean {
@@ -85,6 +100,21 @@ export function MonthBudget({
       return false;
     }
   }
+
+  const rows = {
+    groups,
+    month,
+    currency,
+    coachedCategoryId: coached?.id,
+    onOpenCategory: (categoryId: string) =>
+      setSteps({ title: "Categories", ids, start: ids.indexOf(categoryId) }),
+    onAssignGroup: ({ name, categories }: CategoryGroup) =>
+      setSteps({
+        title: `Assign ${name}`,
+        ids: categories.map(({ id }) => id),
+        start: 0,
+      }),
+  };
 
   return (
     <div className={styles.screen}>
@@ -138,6 +168,25 @@ export function MonthBudget({
                   Copy last Month
                 </button>
               )}
+              {wide && (
+                <Sheet
+                  title="Move money"
+                  trigger="Move money"
+                  triggerClassName={styles.headerAction}
+                >
+                  {(close) => (
+                    <MoveMoneyForm
+                      month={month}
+                      currency={currency}
+                      onMove={(input) => onMoveMoney({ ...input, month })}
+                      onAssign={(categoryId, amount) =>
+                        onAssign({ categoryId, month, amount })
+                      }
+                      onDone={close}
+                    />
+                  )}
+                </Sheet>
+              )}
               <button
                 type="button"
                 className={styles.headerAction}
@@ -163,6 +212,9 @@ export function MonthBudget({
         <section className={styles.columns} aria-labelledby={monthId}>
           <div className={styles.summary}>
             <ReadyToAssign onAssign={() => setFlow("walk")} />
+            {wide && (
+              <AssignPanel column={column} month={month} currency={currency} />
+            )}
             <SpentThisMonthCard month={month} />
           </div>
           <div className={styles.groups}>
@@ -174,6 +226,12 @@ export function MonthBudget({
                 onError={setError}
               />
             )}
+            <HiddenMoney
+              month={month}
+              onMoveOut={(category, other) =>
+                attempt(() => categoryChanges.moveOut(category, month, other))
+              }
+            />
             {coached && (
               <p className={styles.coach}>
                 Start at the top with what's due soonest.{" "}
@@ -182,33 +240,11 @@ export function MonthBudget({
                   : `Tap ${coached.name} and give it what it needs.`}
               </p>
             )}
-            <Rows
-              coachedCategoryId={coached?.id}
-              groups={groups}
-              month={month}
-              currency={currency}
-              onAssign={(categoryId, amount) =>
-                attempt(() => onAssign({ categoryId, month, amount }))
-              }
-              onError={setError}
-              onOpenCategory={(categoryId) => {
-                const ids = groups.flatMap(({ categories }) =>
-                  categories.map(({ id }) => id),
-                );
-                setSteps({
-                  title: "Categories",
-                  ids,
-                  start: ids.indexOf(categoryId),
-                });
-              }}
-              onAssignGroup={({ name, categories }) =>
-                setSteps({
-                  title: `Assign ${name}`,
-                  ids: categories.map(({ id }) => id),
-                  start: 0,
-                })
-              }
-            />
+            {wide ? (
+              <CategoryTables {...rows} column={column} />
+            ) : (
+              <CategoryLists {...rows} />
+            )}
           </div>
         </section>
       )}
@@ -253,16 +289,6 @@ export function MonthBudget({
           onClose={() => setFlow(undefined)}
           onCopy={(unticked) => onCopyLastMonth(month, unticked)}
         />
-      )}
-      {/* Stands in until Move money has its own dialog (#107). */}
-      {!editing && (
-        <div className={styles.standIn}>
-          <MoveMoneyForm
-            currency={currency}
-            onMove={(input) => attempt(() => onMoveMoney({ ...input, month }))}
-            onError={setError}
-          />
-        </div>
       )}
     </div>
   );

@@ -4,6 +4,12 @@ import { type Transfer, transfers } from "./queries";
 
 export type { TransferInput } from "./commands";
 export type { TransferDetails } from "./records";
+export {
+  TransferRowFields,
+  TransferRowLine,
+  transferRowDraft,
+  transferRowInput,
+} from "./TransferRowFields";
 export { type TransferDraft, TransferSheet } from "./TransferSheet";
 export { type Transfer, transfers };
 
