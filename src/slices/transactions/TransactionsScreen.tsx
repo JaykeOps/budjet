@@ -17,10 +17,10 @@ import { type Showing, ShowingPicker } from "./ShowingPicker";
 
 /**
  * History as Month Statements, of every Account or the one the app shell says
- * it is showing, with a form to record a Transaction and a way to edit or
- * delete each one, unless its Account is closed. The app shell keeps what's
- * showing and decides what recording, editing and deleting do; an error it
- * throws is shown on the form.
+ * it is showing, with a form to record a Transaction, a way to edit or delete
+ * each one, and to delete an Adjustment or Balance check, unless its Account is
+ * closed. The app shell keeps what's showing and decides what recording,
+ * editing and deleting do; an error it throws is shown on the form.
  */
 export function TransactionsScreen({
   currency,
@@ -29,6 +29,7 @@ export function TransactionsScreen({
   onRecord,
   onEdit,
   onDelete,
+  onDeleteRedeclaredBalance,
 }: {
   currency: Currency;
   showing: Showing;
@@ -36,6 +37,7 @@ export function TransactionsScreen({
   onRecord: (input: TransactionInput) => void;
   onEdit: (id: string, input: TransactionInput) => void;
   onDelete: (id: string) => void;
+  onDeleteRedeclaredBalance: (recordId: string) => void;
 }) {
   const headingId = useId();
   const accounts = useAccounts();
@@ -51,8 +53,20 @@ export function TransactionsScreen({
     : all;
 
   function actionsFor(entry: TransactionListEntry): MenuAction[] {
-    if (entry.kind !== "transaction" || closedIds.has(entry.accountId)) {
+    if (
+      entry.kind === "transfer" ||
+      entry.kind === "opening-balance" ||
+      closedIds.has(entry.accountId)
+    ) {
       return [];
+    }
+    if (entry.kind !== "transaction") {
+      return [
+        {
+          label: "Delete",
+          onAction: () => onDeleteRedeclaredBalance(entry.id),
+        },
+      ];
     }
     const { kind: _, ...transaction } = entry;
     return [

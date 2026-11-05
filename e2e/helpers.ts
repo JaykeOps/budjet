@@ -18,36 +18,34 @@ export async function openApp(page: Page): Promise<void> {
   }
 }
 
-export async function addFirstAccount(
-  page: Page,
-  { name = "Checking", type, openingBalance = "1000" }: FirstAccount = {},
-): Promise<void> {
-  const setup = page.getByRole("form", { name: "Add your first Account" });
-  await setup.getByLabel("Name").fill(name);
-  if (type) {
-    await setup.getByLabel("Type").selectOption(type);
-  }
-  await setup.getByLabel("Opening Balance").fill(openingBalance);
-  await setup.getByRole("button", { name: "Add Account" }).click();
-}
-
 /**
- * Creates a Budget through the UI, with its first Account unless
- * `firstAccount` is null, which stops at the first Account step of setup.
+ * Creates a Budget by walking first run: every spec's way through setup. Any
+ * change to the setup steps belongs here, not in the specs.
  */
 export async function createBudget(
   page: Page,
   {
     currency = "USD",
-    firstAccount = {},
-  }: { currency?: string; firstAccount?: FirstAccount | null } = {},
+    categories = "Use the starter set",
+    firstAccount: { name = "Checking", type, openingBalance = "1000" } = {},
+  }: {
+    currency?: string;
+    categories?: "Use the starter set" | "Start blank";
+    firstAccount?: FirstAccount;
+  } = {},
 ): Promise<void> {
   await openApp(page);
+  await page.getByRole("button", { name: "Get started" }).click();
   await page.getByLabel("Currency").selectOption(currency);
-  await page.getByRole("button", { name: "Create Budget" }).click();
-  if (firstAccount) {
-    await addFirstAccount(page, firstAccount);
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: categories }).click();
+  await page.getByLabel("Name").fill(name);
+  if (type) {
+    await page.getByRole("radio", { name: type }).check();
   }
+  await page.getByLabel("What it holds today").fill(openingBalance);
+  await page.getByRole("button", { name: "Add Account" }).click();
+  await page.getByRole("button", { name: "Open my Budget" }).click();
 }
 
 /** Activity on a phone and All Accounts on desktop, which are one screen. */

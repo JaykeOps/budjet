@@ -1,31 +1,17 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import {
-  activity,
-  addFirstAccount,
-  createBudget,
-  goTo,
-  openApp,
-} from "./helpers";
+import { activity, createBudget, goTo, openApp } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
-test("setup shows no navigation, and finishing it opens on the Budget", async ({
+test("first run shows no navigation, and finishing it opens on the Budget", async ({
   page,
 }) => {
   const places = page.getByRole("navigation", { name: "Places" });
   await openApp(page);
-  await expect(
-    page.getByRole("heading", { name: "Create your Budget" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Get started" })).toBeVisible();
   await expect(places).toBeHidden();
 
-  await createBudget(page, { firstAccount: null });
-  await expect(
-    page.getByRole("heading", { name: "Add your first Account" }),
-  ).toBeVisible();
-  await expect(places).toBeHidden();
-
-  await addFirstAccount(page);
+  await createBudget(page);
   await expect(places).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Budget", exact: true }),

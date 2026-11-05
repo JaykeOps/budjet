@@ -17,6 +17,7 @@ import {
   isAccountOpened,
   isAccountRenamed,
   isBalanceRedeclared,
+  isRedeclaredBalanceDeleted,
 } from "./records";
 
 export type Account = {
@@ -73,6 +74,7 @@ export type BalanceCheck = {
  */
 export function accounts(records: readonly ChangeRecord[]): Account[] {
   const { balances } = ledger(records);
+  const deleted = deletedRedeclarations(records);
   const byId = new Map<string, Account>();
   for (const record of records) {
     if (isAccountOpened(record)) {
@@ -93,7 +95,7 @@ export function accounts(records: readonly ChangeRecord[]): Account[] {
     } else if (isAccountClosed(record)) {
       const account = byId.get(record.subjectId);
       if (account) account.closed = true;
-    } else if (isBalanceRedeclared(record)) {
+    } else if (isBalanceRedeclared(record) && !deleted.has(record.id)) {
       const account = byId.get(record.subjectId);
       if (account) account.lastChecked = localDate(record.timestamp.wallTime);
     }
@@ -170,6 +172,15 @@ type Ledger = {
 };
 
 /**
+ * The ids of the `BalanceRedeclared` records that were deleted. Read up front,
+ * because a deletion wins wherever it falls in the Change Log (docs/adr/0006).
+ */
+const deletedRedeclarations = perSnapshot(
+  (records: readonly ChangeRecord[]): ReadonlySet<string> =>
+    new Set(records.filter(isRedeclaredBalanceDeleted).map((r) => r.subjectId)),
+);
+
+/**
  * The one place an Account balance is calculated (docs/adr/0005). Replays
  * every record that moves an Account's balance, in Change Log order, so each
  * re-declared balance can be measured against the balance just before it. A
@@ -179,6 +190,7 @@ type Ledger = {
  * records directly because both of those slices depend on Accounts.
  */
 const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
+  const deleted = deletedRedeclarations(records);
   const balances = new Map<string, number>();
   const move = (accountId: string, minorUnits: number) =>
     balances.set(accountId, (balances.get(accountId) ?? 0) + minorUnits);
@@ -200,6 +212,7 @@ const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
     if (isAccountOpened(record)) {
       move(record.subjectId, record.payload.openingBalance.minorUnits);
     } else if (isBalanceRedeclared(record)) {
+      if (deleted.has(record.id)) continue;
       const { balance } = record.payload;
       const difference =
         balance.minorUnits - (balances.get(record.subjectId) ?? 0);

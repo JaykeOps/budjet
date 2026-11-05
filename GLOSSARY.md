@@ -8,6 +8,9 @@ A local-first budgeting app that runs in the browser and keeps the user's data o
 The directory on the user's device, chosen by the user, where budjet keeps their data. Getting it onto other devices is the job of whatever sync service the user points at that folder; budjet never talks to a sync service itself.
 _Avoid_: Vault, workspace, sync folder, cloud storage
 
+**Browser storage**:
+Where a Budget lives when the browser can't use a Data Folder, tied to that one browser on that one device.
+
 ## Budgeting
 
 **Budget**:
@@ -72,6 +75,10 @@ _Avoid_: Starting balance, initial amount
 **Transfer**:
 A movement of money from one Account to another. It has no Category, does not count as spending, and leaves Ready to Assign unchanged.
 _Avoid_: Move, transaction pair
+
+**Statement**:
+One Month of an Account's history, or of every Account's together: the money in, the money out and the balance it ended at, like a bank's. Across every Account a Transfer shows once and counts as neither in nor out.
+_Avoid_: Report, ledger
 
 **Adjustment**:
 The difference budjet records when the user re-declares an Account's real balance. It goes into, or comes out of, Ready to Assign.
