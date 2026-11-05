@@ -204,24 +204,116 @@ export function budgetOutline(page: Page): Promise<(string | null)[]> {
     );
 }
 
-/** Records a Transaction in Activity and comes back to the Budget. */
+type TransactionEntry = {
+  date?: string;
+  amount: string;
+  /** Without one, money in goes to Ready to Assign. */
+  category?: string;
+  money?: "in" | "out";
+  payee?: string;
+  account?: string;
+};
+
+/** The steps of recording on a phone, from How much? on. */
+export async function startRecording(page: Page): Promise<Locator> {
+  await page.getByRole("button", { name: "Record", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Record a Transaction" }).click();
+  return page.getByRole("dialog", { name: "How much?" });
+}
+
+/** The Category step, named for the direction of the money. */
+export function categoryStep(page: Page): Locator {
+  return page.getByRole("dialog", {
+    name: /^(What was it for|Where does it go)\?$/,
+  });
+}
+
+/** A choice on the Category step, whose name starts with the Category's. */
+export function categoryChoice(page: Page, name: string): Locator {
+  return categoryStep(page).getByRole("button", {
+    name: new RegExp(`^${name}\\b`),
+  });
+}
+
+/** The last step of recording on a phone. */
+export function reviewStep(page: Page): Locator {
+  return page.getByRole("dialog", { name: "Anything else?" });
+}
+
+/** Chooses an Account in a select whose options also show its balance. */
+async function chooseAccount(field: Locator, name: string): Promise<void> {
+  await field.selectOption(
+    (await field
+      .locator("option", { hasText: name })
+      .getAttribute("value")) as string,
+  );
+}
+
+/** Records a Transaction from where the user is: through (+) on a phone, Activity's form on desktop. */
+export async function enterTransaction(
+  page: Page,
+  { date, amount, category, money = "out", payee, account }: TransactionEntry,
+): Promise<void> {
+  if (hasRail(page)) {
+    const form = page.getByRole("form", { name: "Record a Transaction" });
+    if (date) await form.getByLabel("Date").fill(date);
+    if (account) {
+      await form.getByLabel("Account").selectOption({ label: account });
+    }
+    await form.getByLabel("Money").selectOption(money);
+    await form.getByLabel("Amount").fill(amount);
+    if (category) {
+      await form.getByLabel("Category").selectOption({ label: category });
+    }
+    if (payee) await form.getByLabel("Payee").fill(payee);
+    await form.getByRole("button", { name: "Record Transaction" }).click();
+    return;
+  }
+  const first = await startRecording(page);
+  if (money === "in")
+    await first.getByRole("radio", { name: "Money in" }).check();
+  await first.getByLabel("Amount").fill(amount);
+  await first.getByRole("button", { name: "Next" }).click();
+  await categoryChoice(page, category ?? "Ready to Assign").click();
+  const review = reviewStep(page);
+  if (payee) await review.getByLabel("Payee").fill(payee);
+  if (date) await review.getByLabel("Another day").fill(date);
+  if (account) await chooseAccount(review.getByLabel("Account"), account);
+  await review.getByRole("button", { name: "Record", exact: true }).click();
+  await expect(review).toBeHidden();
+}
+
+/** Records a Transaction and comes back to the Budget. */
 export async function record(
   page: Page,
-  {
-    date,
-    amount,
-    category,
-    money = "out",
-  }: { date: string; amount: string; category: string; money?: "in" | "out" },
+  entry: TransactionEntry,
 ): Promise<void> {
   await goTo(page, "Activity");
-  const form = page.getByRole("form", { name: "Record a Transaction" });
-  await form.getByLabel("Date").fill(date);
-  await form.getByLabel("Money").selectOption(money);
-  await form.getByLabel("Amount").fill(amount);
-  await form.getByLabel("Category").selectOption({ label: category });
-  await form.getByRole("button", { name: "Record Transaction" }).click();
+  await enterTransaction(page, entry);
   await goTo(page, "Budget");
+}
+
+/** Checks whether recording money out offers a Category. */
+export async function expectCategoryOffered(
+  page: Page,
+  name: string,
+  offered: boolean,
+): Promise<void> {
+  const count = offered ? 1 : 0;
+  if (hasRail(page)) {
+    await expect(
+      page
+        .getByRole("form", { name: "Record a Transaction" })
+        .getByLabel("Category")
+        .getByRole("option", { name }),
+    ).toHaveCount(count);
+    return;
+  }
+  const first = await startRecording(page);
+  await first.getByLabel("Amount").fill("1");
+  await first.getByRole("button", { name: "Next" }).click();
+  await expect(categoryChoice(page, name)).toHaveCount(count);
+  await categoryStep(page).getByRole("button", { name: "Close" }).click();
 }
 
 /** Whether this device has the desktop table, which is typed into directly. */

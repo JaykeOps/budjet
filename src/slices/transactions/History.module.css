@@ -162,7 +162,8 @@
   padding-block: 12px;
 }
 
-.notOnPhone {
+.notOnPhone,
+.recordForm {
   display: none;
 }
 
@@ -172,5 +173,8 @@
   }
   .notOnPhone {
     display: inline;
+  }
+  .recordForm {
+    display: block;
   }
 }

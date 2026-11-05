@@ -1,11 +1,13 @@
 import type { ChangeRecord } from "../../kernel/change-log";
 import type { Money } from "../../kernel/money";
 import {
+  accounts,
   adjustments,
   balanceChecks,
   type OpeningBalance,
   openingBalances,
 } from "../accounts";
+import { categoryGroups } from "../categories";
 import { currentTransfers } from "../transfers/records";
 import { type CurrentTransaction, currentTransactions } from "./records";
 
@@ -134,4 +136,43 @@ export function payees(records: readonly ChangeRecord[]): string[] {
     if (payee) named.add(payee);
   }
   return [...named].sort(new Intl.Collator().compare);
+}
+
+/** A Payee used before, with what recording it again can fill in. */
+export type KnownPayee = {
+  name: string;
+  /** The last Category it had, unless that Category is hidden now. */
+  categoryId?: string;
+  /** The Account it was last recorded in, unless that Account is closed now. */
+  accountId?: string;
+};
+
+/** Every Payee the Budget's Transactions name, in alphabetical order, with what it can fill in. */
+export function knownPayees(records: readonly ChangeRecord[]): KnownPayee[] {
+  const last = new Map<string, { categoryId?: string; accountId: string }>();
+  for (const { payee, categoryId, accountId } of currentTransactions(records)) {
+    if (!payee) continue;
+    last.set(payee, {
+      categoryId: categoryId ?? last.get(payee)?.categoryId,
+      accountId,
+    });
+  }
+  const openAccounts = new Set(
+    accounts(records)
+      .filter(({ closed }) => !closed)
+      .map(({ id }) => id),
+  );
+  const visibleCategories = new Set(
+    categoryGroups(records)
+      .flatMap(({ categories }) => categories)
+      .filter(({ hidden }) => !hidden)
+      .map(({ id }) => id),
+  );
+  return [...last]
+    .sort(([a], [b]) => new Intl.Collator().compare(a, b))
+    .map(([name, { categoryId, accountId }]) => ({
+      name,
+      ...(categoryId && visibleCategories.has(categoryId) && { categoryId }),
+      ...(openAccounts.has(accountId) && { accountId }),
+    }));
 }

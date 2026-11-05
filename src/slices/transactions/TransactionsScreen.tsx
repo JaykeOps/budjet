@@ -18,6 +18,7 @@ import type {
   TransactionListEntry,
   TransferEntry,
 } from "./queries";
+import { today } from "./record-flow";
 import { type Showing, ShowingPicker } from "./ShowingPicker";
 
 /** What the app shell does with the rows of a history. */
@@ -80,15 +81,18 @@ export function TransactionsScreen({
         rows.editing
       ) : (
         recordInto && (
-          <TransactionForm
-            key={recordInto.id}
-            heading="Record a Transaction"
-            submitLabel="Record Transaction"
-            defaultAccountId={recordInto.id}
-            accounts={openAccounts}
-            currency={currency}
-            onSubmit={onRecord}
-          />
+          // A phone records from (+).
+          <div className={styles.recordForm}>
+            <TransactionForm
+              key={recordInto.id}
+              heading="Record a Transaction"
+              submitLabel="Record Transaction"
+              defaultAccountId={recordInto.id}
+              accounts={openAccounts}
+              currency={currency}
+              onSubmit={onRecord}
+            />
+          </div>
         )
       )}
       <ShowingPicker
@@ -427,11 +431,4 @@ function CategoryPicker({
       ))}
     </select>
   );
-}
-
-/** This device's local date, "YYYY-MM-DD". */
-function today(): string {
-  const now = new Date();
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }

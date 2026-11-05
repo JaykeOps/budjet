@@ -16,6 +16,7 @@ import { useMonthInUrl } from "./month-in-url";
 import { NavigationShell } from "./NavigationShell";
 import { requestPersistentStorage } from "./persistent-storage";
 import { placeAddress, usePlace } from "./place-in-url";
+import { RecordMenu } from "./RecordMenu";
 import {
   AddAccountSheet,
   OpenAccountForm,
@@ -118,7 +119,10 @@ function Shell({ budget }: { budget: Budget }) {
     );
   }
   return (
-    <NavigationShell onAddAccount={() => setAddingAccount(true)}>
+    <NavigationShell
+      onAddAccount={() => setAddingAccount(true)}
+      plus={<RecordMenu currency={budget.currency} />}
+    >
       <Page titled={place === "activity"}>
         {place === "budget" && (
           <>
