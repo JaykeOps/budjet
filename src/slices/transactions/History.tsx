@@ -8,6 +8,7 @@ import {
 import { formatMoney, type Money } from "../../kernel/money";
 import { currentMonth, type Month, monthName } from "../../kernel/month";
 import { Menu, type MenuAction } from "../../ui/Menu";
+import { railShows } from "../../ui/rail";
 import { useAccounts } from "../accounts";
 import { useCategoryGroups } from "../categories";
 import styles from "./History.module.css";
@@ -22,8 +23,8 @@ const ROW_HEIGHT = 76;
  */
 const OVERSCAN = 10;
 
-/** Below this width, the CSS has a phone's layout and a row opens as a sheet. */
-const opensInPlace = () => window.matchMedia("(min-width: 720px)").matches;
+/** Without the rail, the CSS has a phone's layout and a row opens as a sheet. */
+const opensInPlace = railShows;
 
 type Row =
   | { kind: "statement"; statement: Statement; open: boolean }

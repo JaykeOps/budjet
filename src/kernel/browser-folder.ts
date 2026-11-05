@@ -3,6 +3,27 @@ import type { ReturningFolder } from "./folder-on-return";
 
 const SUBFOLDER = "Crownkeep";
 
+/**
+ * Opens the folder picker. Cancelling, or declining the browser's prompt, gives
+ * nothing; any other failure rejects.
+ */
+export async function pickFolder(): Promise<
+  FileSystemDirectoryHandle | undefined
+> {
+  try {
+    return await window.showDirectoryPicker?.({
+      id: "crownkeep",
+      mode: "readwrite",
+    });
+  } catch (error) {
+    // Both arrive as AbortError.
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
 /** A chosen Data Folder as the browser reaches it. Everything goes in its `Crownkeep` subfolder (docs/adr/0009). */
 export function browserFolder(handle: FileSystemDirectoryHandle): Folder {
   return {

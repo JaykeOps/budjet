@@ -1,3 +1,5 @@
+import { pickFolder } from "../kernel/browser-folder";
+
 /**
  * Whether this browser can keep a Budget in a Data Folder. Ask this, not which
  * browser it is: the one exception is `shouldSuggestHomeScreen`.
@@ -11,16 +13,10 @@ export async function chooseFolder(
   onChoose: (folder: FileSystemDirectoryHandle) => Promise<void>,
 ): Promise<void> {
   try {
-    const folder = await window.showDirectoryPicker?.({
-      id: "crownkeep",
-      mode: "readwrite",
-    });
+    const folder = await pickFolder();
     if (folder) await onChoose(folder);
   } catch (error) {
-    // Cancelling, and declining the browser's prompt, both arrive as AbortError.
-    if (!(error instanceof DOMException && error.name === "AbortError")) {
-      console.error("Crownkeep could not use that folder", error);
-    }
+    console.error("Crownkeep could not use that folder", error);
   }
 }
 
