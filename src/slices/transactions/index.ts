@@ -12,6 +12,7 @@ export {
   type TransferEntry,
   transactionList,
 } from "./queries";
+export { RecordTransactionSheet } from "./RecordTransactionSheet";
 export type { Showing } from "./ShowingPicker";
 export { type Statement, statements } from "./statements";
-export { TransactionsScreen } from "./TransactionsScreen";
+export { AccountHistory, TransactionsScreen } from "./TransactionsScreen";

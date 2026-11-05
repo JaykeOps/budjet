@@ -37,19 +37,6 @@
   font-weight: 600;
 }
 
-/* (+) sits inside the bar, not raised above it. */
-.plus {
-  justify-self: center;
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-control);
-  background: var(--primary);
-  box-shadow: var(--depth-primary);
-  color: var(--on-primary);
-}
-
 @media (min-width: 720px) {
   .tabBar {
     display: none;
@@ -145,10 +132,7 @@
 }
 
 .addAccount {
+  box-shadow: none;
   color: var(--link);
   font-weight: 600;
-  text-decoration: none;
-}
-.addAccount[aria-current="page"] {
-  text-decoration: underline;
 }

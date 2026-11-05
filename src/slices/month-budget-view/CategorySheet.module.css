@@ -1,0 +1,295 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: color-mix(in srgb, var(--page) 70%, transparent);
+}
+.sheet {
+  width: 100%;
+  /* Above the phone's keyboard, so the main button stays in reach. */
+  max-height: calc(var(--visual-viewport-height, 100dvh) - 12px);
+  display: flex;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--page);
+  box-shadow: var(--depth-card);
+}
+.dialog {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.head {
+  display: grid;
+  grid-template-columns: 72px 1fr 72px;
+  align-items: center;
+  padding: 12px 16px 8px;
+}
+.close {
+  justify-self: start;
+  padding: 6px 0;
+  box-shadow: none;
+  color: var(--link);
+}
+.title {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-align: center;
+}
+.steps {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  touch-action: pan-y;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px 8px;
+}
+.where {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  min-width: 0;
+  text-align: center;
+}
+.name {
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.small,
+.tip {
+  color: var(--muted);
+  font-size: 13px;
+}
+.tip {
+  margin: 0;
+  text-align: center;
+}
+.arrow {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: var(--card);
+  font-size: 22px;
+  line-height: 1;
+}
+.readyToAssign {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 16px 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-control);
+  background: var(--graphite-card);
+  color: var(--graphite-text);
+}
+.form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  margin: 0;
+}
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 16px 12px;
+  overflow-y: auto;
+}
+.breakdown {
+  margin: 0;
+  padding: 6px 16px;
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+.breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  color: var(--muted);
+}
+.breakdown > div:last-child {
+  border-top: 1px solid var(--edge);
+  color: var(--text);
+  font-weight: 600;
+}
+.breakdown dd {
+  margin: 0;
+  white-space: nowrap;
+}
+.from {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--raised);
+}
+.from button {
+  box-shadow: none;
+}
+.from button[aria-pressed="true"] {
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+.forReaders {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.field select {
+  width: 100%;
+}
+.field [role="alert"] {
+  margin: 0;
+  color: var(--on-overspent-tint);
+}
+.amount {
+  width: 100%;
+  padding-block: 8px;
+  font-size: 28px;
+  font-weight: var(--amount-weight);
+  letter-spacing: var(--amount-tracking);
+}
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.suggestion {
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+  white-space: normal;
+}
+.after {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.after p {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+}
+.after p.note {
+  display: block;
+  margin-top: 4px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--raised);
+  font-size: 13px;
+}
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px max(12px, env(safe-area-inset-bottom));
+}
+.main {
+  flex: 1;
+  min-height: 48px;
+  white-space: normal;
+}
+.end {
+  justify-content: center;
+  padding-block: 32px;
+  text-align: center;
+}
+.end p {
+  margin: 0;
+}
+.copyIntro {
+  margin: 0;
+  color: var(--muted);
+}
+.copyList {
+  margin: 0;
+  padding: 6px 0;
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--depth-card);
+  list-style: none;
+}
+.copyRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+.copyRow input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.copyName {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+}
+.after p.warning {
+  display: block;
+  margin-top: 4px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--overspent-tint);
+  color: var(--on-overspent-tint);
+  font-size: 13px;
+}
+.quiet {
+  background: var(--card);
+}
+
+/* Same width as use-wide.ts, where the sheet becomes a side panel. */
+@media (min-width: 1180px) {
+  .overlay {
+    align-items: stretch;
+    justify-content: flex-end;
+  }
+  .sheet {
+    width: 420px;
+    max-height: none;
+    border-radius: var(--radius-card) 0 0 var(--radius-card);
+  }
+}

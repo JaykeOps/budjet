@@ -11,10 +11,19 @@ import { pushAddress, useUrlParameter, useUrlSearch } from "./url-parameter";
  * bar on a phone and a left rail on desktop. Which one shows is decided by
  * width alone, so both lead to the same places.
  *
- * Recording isn't rebuilt yet, so (+) and Record stand in by opening Activity,
- * where the Record a Transaction form is.
+ * Recording on desktop isn't rebuilt yet, so Record stands in by opening
+ * Activity, where the Record a Transaction form is.
  */
-export function NavigationShell({ children }: { children: ReactNode }) {
+export function NavigationShell({
+  onAddAccount,
+  plus,
+  children,
+}: {
+  onAddAccount: () => void;
+  /** The tab bar's (+). */
+  plus: ReactNode;
+  children: ReactNode;
+}) {
   // Links are built from the address, so they have to follow it.
   useUrlSearch();
   const place = usePlace();
@@ -22,23 +31,29 @@ export function NavigationShell({ children }: { children: ReactNode }) {
   const here = { place, accountId: accountId ?? undefined };
   return (
     <div className={styles.shell}>
-      <Rail here={here} />
+      <Rail here={here} onAddAccount={onAddAccount} />
       {children}
-      <TabBar here={here} />
+      <TabBar here={here} plus={plus} />
     </div>
   );
 }
 
 type Here = { place: Place; accountId?: string };
 
-function Rail({ here }: { here: Here }) {
+function Rail({
+  here,
+  onAddAccount,
+}: {
+  here: Here;
+  onAddAccount: () => void;
+}) {
   const accounts = useAccounts();
   const total = useChangeLogQuery(accountsTotal);
   const [showClosed, setShowClosed] = useState(false);
   const open = accounts.filter(({ closed }) => !closed);
   const closed = accounts.filter(({ closed }) => closed);
   const atAccount = (id: string) =>
-    here.place === "activity" && here.accountId === id;
+    here.place === "accounts" && here.accountId === id;
 
   return (
     <nav className={styles.rail} aria-label="Places">
@@ -60,7 +75,7 @@ function Rail({ here }: { here: Here }) {
       <PlaceLink
         className={styles.railItem}
         to={placeAddress("activity")}
-        current={here.place === "activity" && !here.accountId}
+        current={here.place === "activity"}
       >
         <span className={styles.name}>All Accounts</span>{" "}
         {total && <span className={styles.amount}>{formatMoney(total)}</span>}
@@ -69,7 +84,7 @@ function Rail({ here }: { here: Here }) {
         <PlaceLink
           key={id}
           className={styles.railItem}
-          to={placeAddress("activity", id)}
+          to={placeAddress("accounts", id)}
           current={atAccount(id)}
         >
           <span className={styles.name}>{name}</span>{" "}
@@ -91,24 +106,24 @@ function Rail({ here }: { here: Here }) {
           <PlaceLink
             key={id}
             className={styles.railItem}
-            to={placeAddress("activity", id)}
+            to={placeAddress("accounts", id)}
             current={atAccount(id)}
           >
             <span className={styles.name}>{name}</span>
           </PlaceLink>
         ))}
-      <PlaceLink
+      <button
+        type="button"
         className={styles.addAccount}
-        to={placeAddress("accounts")}
-        current={here.place === "accounts"}
+        onClick={onAddAccount}
       >
         + Add Account
-      </PlaceLink>
+      </button>
     </nav>
   );
 }
 
-function TabBar({ here }: { here: Here }) {
+function TabBar({ here, plus }: { here: Here; plus: ReactNode }) {
   return (
     <nav className={styles.tabBar} aria-label="Places">
       <PlaceLink
@@ -127,13 +142,7 @@ function TabBar({ here }: { here: Here }) {
         <TabIcon d="M4 7h16M4 12h16M4 17h10" />
         Activity
       </PlaceLink>
-      <PlaceLink
-        className={styles.plus}
-        to={placeAddress("activity", here.accountId)}
-        label="Record"
-      >
-        <PlusIcon />
-      </PlaceLink>
+      {plus}
       <PlaceLink
         className={styles.tab}
         to={placeAddress("accounts")}
@@ -150,13 +159,11 @@ function TabBar({ here }: { here: Here }) {
 function PlaceLink({
   to,
   current = false,
-  label,
   className,
   children,
 }: {
   to: string;
   current?: boolean;
-  label?: string;
   className: string | undefined;
   children: ReactNode;
 }) {
@@ -172,7 +179,6 @@ function PlaceLink({
     <a
       className={className}
       href={to}
-      aria-label={label}
       aria-current={current ? "page" : undefined}
       onClick={follow}
     >
@@ -199,7 +205,7 @@ function TabIcon({ d }: { d: string }) {
   );
 }
 
-function PlusIcon() {
+export function PlusIcon() {
   return (
     <svg
       width="20"

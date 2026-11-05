@@ -6,7 +6,9 @@ import {
   nextMonth,
   previousMonth,
 } from "../../kernel/month";
+import { AssignWalk, CopyLastMonth } from "./AssignWalk";
 import { CategoryLists, CategoryTables } from "./CategoryRows";
+import { CategorySheet, type SheetSteps } from "./CategorySheet";
 import styles from "./MonthBudget.module.css";
 import { type MoveInput, MoveMoneyForm } from "./MoveMoneyForm";
 import { ReadyToAssign, SpentThisMonthCard } from "./Summary";
@@ -37,7 +39,8 @@ export function MonthBudget({
   currency: Currency;
   onMonthChange: (month: Month) => void;
   onAssign: (input: AssignInput) => void;
-  onCopyLastMonth: (month: Month) => void;
+  /** Copies into `month`, except the Categories the user unticked. */
+  onCopyLastMonth: (month: Month, unticked: ReadonlySet<string>) => void;
   onMoveMoney: (input: MoveMoneyInput) => void;
 }) {
   const monthId = useId();
@@ -46,6 +49,8 @@ export function MonthBudget({
   );
   const wide = useWide();
   const [error, setError] = useState<string>();
+  const [steps, setSteps] = useState<SheetSteps>();
+  const [flow, setFlow] = useState<"walk" | "copy">();
   const Rows = wide ? CategoryTables : CategoryLists;
 
   /** Runs a change, showing the error if it is refused; true when it went through. */
@@ -86,11 +91,11 @@ export function MonthBudget({
             ›
           </button>
         </nav>
-        {month > firstMonth && (
+        {wide && month > firstMonth && (
           <button
             type="button"
             className={styles.headerAction}
-            onClick={() => attempt(() => onCopyLastMonth(month))}
+            onClick={() => setFlow("copy")}
           >
             Copy last Month
           </button>
@@ -99,7 +104,7 @@ export function MonthBudget({
       {error && <p role="alert">{error}</p>}
       <section className={styles.columns} aria-labelledby={monthId}>
         <div className={styles.summary}>
-          <ReadyToAssign />
+          <ReadyToAssign onAssign={() => setFlow("walk")} />
           <SpentThisMonthCard month={month} />
         </div>
         <div className={styles.groups}>
@@ -111,9 +116,68 @@ export function MonthBudget({
               attempt(() => onAssign({ categoryId, month, amount }))
             }
             onError={setError}
+            onOpenCategory={(categoryId) => {
+              const ids = groups.flatMap(({ categories }) =>
+                categories.map(({ id }) => id),
+              );
+              setSteps({
+                title: "Categories",
+                ids,
+                start: ids.indexOf(categoryId),
+              });
+            }}
+            onAssignGroup={({ name, categories }) =>
+              setSteps({
+                title: `Assign ${name}`,
+                ids: categories.map(({ id }) => id),
+                start: 0,
+              })
+            }
           />
         </div>
       </section>
+      {steps && (
+        <CategorySheet
+          // A new Month, say from the browser's Back, starts it afresh.
+          key={month}
+          steps={steps}
+          month={month}
+          currency={currency}
+          wide={wide}
+          onClose={() => setSteps(undefined)}
+          onAssign={(categoryId, amount) =>
+            onAssign({ categoryId, month, amount })
+          }
+          onMove={(fromCategoryId, toCategoryId, amount) =>
+            onMoveMoney({ fromCategoryId, toCategoryId, amount, month })
+          }
+        />
+      )}
+      {flow === "walk" && (
+        <AssignWalk
+          key={month}
+          month={month}
+          currency={currency}
+          wide={wide}
+          onClose={() => setFlow(undefined)}
+          onCopy={(unticked) => onCopyLastMonth(month, unticked)}
+          onAssign={(categoryId, amount) =>
+            onAssign({ categoryId, month, amount })
+          }
+          onMove={(fromCategoryId, toCategoryId, amount) =>
+            onMoveMoney({ fromCategoryId, toCategoryId, amount, month })
+          }
+        />
+      )}
+      {flow === "copy" && (
+        <CopyLastMonth
+          key={month}
+          month={month}
+          currency={currency}
+          onClose={() => setFlow(undefined)}
+          onCopy={(unticked) => onCopyLastMonth(month, unticked)}
+        />
+      )}
       {/* Stands in until Move money has its own dialog (#107). */}
       <div className={styles.standIn}>
         <MoveMoneyForm

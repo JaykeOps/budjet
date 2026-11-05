@@ -13,12 +13,24 @@ export type InMemoryFolder = Folder & {
   /** Makes each later append fail with this error's name, until cleared. */
   failWith(errorName: string | undefined): void;
   appends(): number;
+  /** Puts a file in place the way a sync service does. */
+  deliver(fileName: string, text: string, lastModified?: number): void;
+  /** Makes reading this one file fail with this error's name, until cleared. */
+  failReading(fileName: string, errorName: string | undefined): void;
+  /** The files read, and the files whose date and size were checked, since the last clear. */
+  reads(): string[];
+  stamps(): string[];
+  clearReads(): void;
 };
 
 export function createInMemoryFolder(): InMemoryFolder {
   const files = new Map<string, string>();
   let failure: string | undefined;
   let appends = 0;
+  const unreadable = new Map<string, string>();
+  const modified = new Map<string, number>();
+  let reads: string[] = [];
+  let stamps: string[] = [];
   let lockHeld: Promise<unknown> = Promise.resolve();
 
   return {
@@ -37,12 +49,45 @@ export function createInMemoryFolder(): InMemoryFolder {
       await new Promise((resolve) => setTimeout(resolve));
       if (failure) throw new DOMException("In-memory failure", failure);
       files.set(fileName, before + text);
+      modified.set(fileName, Date.now());
       appends++;
     },
-    list: async () => [...files.keys()],
-    read: async (fileName) => files.get(fileName) ?? "",
+    async list() {
+      if (failure) throw new DOMException("In-memory failure", failure);
+      return [...files.keys()];
+    },
+    async read(fileName) {
+      reads.push(fileName);
+      const error = failure ?? unreadable.get(fileName);
+      if (error) throw new DOMException("In-memory failure", error);
+      return files.get(fileName) ?? "";
+    },
+    async stamp(fileName) {
+      stamps.push(fileName);
+      const error = failure ?? unreadable.get(fileName);
+      if (error) throw new DOMException("In-memory failure", error);
+      return {
+        size: files.get(fileName)?.length ?? 0,
+        lastModified: modified.get(fileName) ?? 0,
+      };
+    },
+    reads: () => reads,
+    stamps: () => stamps,
+    clearReads() {
+      reads = [];
+      stamps = [];
+    },
+    failReading(fileName, errorName) {
+      if (errorName) unreadable.set(fileName, errorName);
+      else unreadable.delete(fileName);
+    },
+    deliver(fileName, text, lastModified = Date.now()) {
+      files.set(fileName, text);
+      modified.set(fileName, lastModified);
+    },
     async remove(fileName) {
       files.delete(fileName);
+      modified.delete(fileName);
     },
   };
 }

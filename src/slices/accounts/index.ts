@@ -13,8 +13,13 @@ import {
   openingBalances,
 } from "./queries";
 
-export { AccountsScreen } from "./AccountsScreen";
-export { OpenAccountForm, type OpenAccountInput } from "./OpenAccountForm";
+export { AccountPage } from "./AccountPage";
+export { AccountsTab } from "./AccountsTab";
+export {
+  AddAccountSheet,
+  OpenAccountForm,
+  type OpenAccountInput,
+} from "./OpenAccountForm";
 export type { AccountKind } from "./records";
 export {
   type Account,

@@ -1,5 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
-import { budgetOutline, budgetRow, createBudget, goTo } from "./helpers";
+import {
+  assign,
+  budgetOutline,
+  budgetRow,
+  createBudget,
+  expectCategoryOffered,
+  goTo,
+  record,
+} from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 /** Each Category Group's name followed by its Categories' names, in order. */
@@ -74,13 +82,7 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
 
   const categories = page.getByRole("region", { name: "Categories" });
   const alert = categories.getByRole("alert");
-  const picker = page
-    .getByRole("form", { name: "Record a Transaction" })
-    .getByLabel("Category");
-  const assignRent = async (amount: string) => {
-    await page.getByLabel("Assignment for Rent").fill(amount);
-    await page.getByLabel("Assignment for Rent").press("Enter");
-  };
+  const assignRent = (amount: string) => assign(page, "Rent", amount);
 
   // Hiding is refused while Rent still has money Available.
   await assignRent("50");
@@ -89,12 +91,7 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
 
   // Paying the rent spends it, and a used Category can't be deleted: the
   // refusal offers to hide it.
-  await goTo(page, "Activity");
-  const record = page.getByRole("form", { name: "Record a Transaction" });
-  await record.getByLabel("Amount").fill("50");
-  await record.getByLabel("Category").selectOption({ label: "Rent" });
-  await record.getByRole("button", { name: "Record Transaction" }).click();
-  await goTo(page, "Budget");
+  await record(page, { amount: "50", category: "Rent" });
   await expect(budgetRow(page, "Rent")).toContainText("$50.00");
   await expect(budgetRow(page, "Rent")).toContainText("$0.00");
   await categories.getByRole("button", { name: "Delete Rent" }).click();
@@ -127,7 +124,7 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
         "Dining Out",
       ]);
     await goTo(page, "Activity");
-    await expect(picker.getByRole("option", { name: "Rent" })).toHaveCount(0);
+    await expectCategoryOffered(page, "Rent", false);
     await goTo(page, "Budget");
     await expect(
       categories.getByRole("button", { name: "Unhide Rent" }),
@@ -159,7 +156,7 @@ test("a user hides, unhides and deletes Categories, and deletes an empty Categor
         "Dining Out",
       ]);
     await goTo(page, "Activity");
-    await expect(picker.getByRole("option", { name: "Rent" })).toHaveCount(1);
+    await expectCategoryOffered(page, "Rent", true);
   };
   await expectRentBack();
 
