@@ -48,6 +48,27 @@ export async function createBudget(
   await page.getByRole("button", { name: "Open my Budget" }).click();
 }
 
+/** Activity on a phone and All Accounts on desktop, which are one screen. */
+export function activity(page: Page) {
+  return page.getByRole("region", { name: /^(Activity|All Accounts)$/ });
+}
+
+/** Narrows Activity through its one "Showing" button, whose button then says how many entries. */
+export async function show(
+  page: Page,
+  { account, month }: { account?: string; month?: string },
+  entries?: string,
+): Promise<void> {
+  await page.getByRole("button", { name: /^Showing:/ }).click();
+  const picker = page.getByRole("dialog", { name: "Show" });
+  if (account) await picker.getByRole("radio", { name: account }).check();
+  if (month) await picker.getByRole("radio", { name: month }).check();
+  await picker
+    .getByRole("button", { name: entries ?? /^Show \d+ entr/ })
+    .click();
+  await expect(picker).toBeHidden();
+}
+
 /**
  * Reaches a place through whichever navigation this device has: tabs on a
  * phone, the rail on desktop. Until the Accounts screen is rebuilt, the rail
@@ -62,7 +83,7 @@ export async function goTo(page: Page, place: Place): Promise<void> {
   };
   const landmarks = {
     Budget: page.getByRole("heading", { name: "Budget", exact: true }),
-    Activity: page.getByRole("region", { name: "Transactions", exact: true }),
+    Activity: activity(page),
     Accounts: page.getByRole("region", { name: "Accounts", exact: true }),
   };
   await links[place].click();

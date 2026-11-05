@@ -42,6 +42,18 @@ export type Adjustment = {
   /** The day the balance was re-declared, on this device's calendar, "YYYY-MM-DD". */
   date: string;
   amount: Money;
+  /** The balance the user re-declared. */
+  balance: Money;
+};
+
+/** What an Account held when it was added to the Budget. */
+export type OpeningBalance = {
+  /** The id of the record that opened the Account. */
+  id: string;
+  accountId: string;
+  /** The day the Account was opened, on this device's calendar, "YYYY-MM-DD". */
+  date: string;
+  amount: Money;
 };
 
 /** A re-declared balance equal to the balance just before it. Nothing moved. */
@@ -113,6 +125,18 @@ export function balanceChecks(
   records: readonly ChangeRecord[],
 ): readonly BalanceCheck[] {
   return ledger(records).balanceChecks;
+}
+
+/** Every Opening Balance, oldest first. It is never deleted, even at $0.00. */
+export function openingBalances(
+  records: readonly ChangeRecord[],
+): OpeningBalance[] {
+  return records.filter(isAccountOpened).map((record) => ({
+    id: record.id,
+    accountId: record.subjectId,
+    date: localDate(record.timestamp.wallTime),
+    amount: record.payload.openingBalance,
+  }));
 }
 
 /** An Account's balance. */
@@ -204,6 +228,7 @@ const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
         foundAdjustments.push({
           ...redeclared,
           amount: money(difference, balance.currency),
+          balance,
         });
       }
     } else if (isTransactionRecorded(record) || isTransactionEdited(record)) {
