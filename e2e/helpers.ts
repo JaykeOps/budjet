@@ -422,3 +422,53 @@ export async function expectAssigned(
   );
   await closeSheet(sheet);
 }
+
+const CURRENCY_SIGNS: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  JPY: "¥",
+  SEK: "SEK",
+};
+
+/** Which currency the Budget is in, read off Ready to Assign. */
+export async function expectCurrency(
+  page: Page,
+  code: keyof typeof CURRENCY_SIGNS,
+): Promise<void> {
+  await expect(
+    page.getByRole("status", { name: "Ready to Assign" }),
+  ).toContainText(CURRENCY_SIGNS[code]);
+}
+
+/** Turns the Budget into its editable list. */
+export async function startEditing(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Edit Categories" }),
+  ).toBeVisible();
+}
+
+/** Leaves the editable list for the Budget. */
+export async function finishEditing(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Budget", exact: true }),
+  ).toBeVisible();
+}
+
+/** Opens the ⋯ of a Category or Category Group in the editable list, and returns its sheet. */
+export async function openMore(page: Page, name: string): Promise<Locator> {
+  await page.getByRole("button", { name: `More for ${name}` }).click();
+  const sheet = page.getByRole("dialog", { name });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
+/** Hides a Category from the Budget, which ends up back on the Budget. */
+export async function hideCategory(page: Page, name: string): Promise<void> {
+  await startEditing(page);
+  const sheet = await openMore(page, name);
+  await sheet.getByRole("button", { name: `Hide ${name}` }).click();
+  await expect(sheet).toBeHidden();
+  await finishEditing(page);
+}

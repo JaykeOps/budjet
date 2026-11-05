@@ -7,7 +7,7 @@ import {
   PICKED_FOLDER,
   removeFolder,
 } from "./folder";
-import { createBudget, goTo } from "./helpers";
+import { createBudget, expectCurrency, goTo } from "./helpers";
 import { folderWritesFinished, reloadWhenSaved } from "./reload";
 
 const heading = (page: Page, name: string) =>
@@ -40,7 +40,7 @@ test("a lapsed folder shows Open your Budget before the app, and one tap opens t
   await button(page, "Open").click();
   await goTo(page, "Budget");
   await expect(places(page)).toBeVisible();
-  await expect(page.getByText("Kept in USD")).toBeVisible();
+  await expectCurrency(page, "USD");
 });
 
 test("Open your Budget mentions installing where the browser offers it", async ({
@@ -86,7 +86,7 @@ test("a lost folder is found by trying it, and choosing it again opens the Budge
   await button(page, "Choose a folder").click();
   await button(page, "Put my Budget here").click();
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in USD")).toBeVisible();
+  await expectCurrency(page, "USD");
 });
 
 for (const colorScheme of ["light", "dark"] as const) {

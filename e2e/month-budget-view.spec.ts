@@ -7,6 +7,7 @@ import {
   createBudget,
   expectAssigned,
   goTo,
+  hideCategory,
   record,
 } from "./helpers";
 import { reloadWhenSaved } from "./reload";
@@ -290,7 +291,7 @@ test("a hidden Category's Group doesn't show once nothing in it does", async ({
 }) => {
   await createBudget(page, { firstAccount: { openingBalance: "1000" } });
   await goTo(page, "Budget");
-  await page.getByRole("button", { name: "Hide Emergency Fund" }).click();
+  await hideCategory(page, "Emergency Fund");
 
   await expect.poll(() => budgetOutline(page)).not.toContain("Savings");
 });

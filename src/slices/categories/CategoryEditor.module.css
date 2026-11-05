@@ -1,0 +1,182 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.list:focus {
+  outline: none;
+}
+
+.group {
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--depth-card);
+}
+.categories {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 4px 4px 4px 6px;
+  border-top: 1px solid var(--edge);
+}
+.head {
+  border-top: 0;
+  background: var(--raised);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+}
+.name:hover,
+.name:focus {
+  border-color: var(--control-border);
+  background: var(--page);
+}
+.name[data-bold="true"] {
+  font-weight: 650;
+}
+.row[data-hidden="true"] .name {
+  color: var(--muted);
+}
+
+.tag {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-control);
+  background: var(--raised);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pill {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: var(--radius-control);
+  background: var(--available-tint);
+  color: var(--on-available-tint);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pill[data-state="overspent"] {
+  background: var(--overspent-tint);
+  color: var(--on-overspent-tint);
+}
+
+.more {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 20px;
+}
+
+.foot {
+  padding: 2px 6px;
+  border-top: 1px solid var(--edge);
+}
+.add {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--link);
+  font-weight: 500;
+}
+.addField {
+  box-sizing: border-box;
+  width: 100%;
+  margin-block: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  background: var(--page);
+  color: inherit;
+  font: inherit;
+}
+
+.fate {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.field {
+  margin-block-end: -8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.toggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  color: var(--text);
+  font-size: inherit;
+  text-align: start;
+}
+/* A native checkbox, so it needs no script, drawn as the switch it's announced as. */
+.toggle input {
+  flex: none;
+  order: 1;
+  position: relative;
+  appearance: none;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--control-border);
+  border-radius: 13px;
+  background: var(--raised);
+  box-shadow: none;
+}
+.toggle input::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 3px;
+  inset-inline-start: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.toggle input:checked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+.toggle input:checked::before {
+  inset-inline-start: 21px;
+  background: var(--on-primary);
+}
+.danger {
+  color: var(--overspent);
+}
