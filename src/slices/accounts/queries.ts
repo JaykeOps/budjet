@@ -1,4 +1,8 @@
-import { type ChangeRecord, perSnapshot } from "../../kernel/change-log";
+import {
+  type ChangeRecord,
+  deletedSubjects,
+  perSnapshot,
+} from "../../kernel/change-log";
 import { addMoney, type Money, money } from "../../kernel/money";
 import { isBudgetCreated } from "../budget-setup/records";
 import {
@@ -177,7 +181,7 @@ type Ledger = {
  */
 const deletedRedeclarations = perSnapshot(
   (records: readonly ChangeRecord[]): ReadonlySet<string> =>
-    new Set(records.filter(isRedeclaredBalanceDeleted).map((r) => r.subjectId)),
+    deletedSubjects(records, isRedeclaredBalanceDeleted),
 );
 
 /**
@@ -187,7 +191,9 @@ const deletedRedeclarations = perSnapshot(
  * Transaction or Transfer counts as each of its records leaves it: an edit
  * moves the difference, so the latest record of each wins (docs/adr/0004), and
  * a deletion takes it back out, after which later records about it count for
- * nothing (docs/adr/0006). It reads the Transactions and Transfers records
+ * nothing (docs/adr/0006). That stays positional rather than leaving the subject
+ * out up front: a re-declaration before the deletion was measured with it counted.
+ * It reads the Transactions and Transfers records
  * directly because both of those slices depend on Accounts.
  */
 const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {

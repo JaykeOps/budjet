@@ -4,6 +4,7 @@
  */
 import {
   type ChangeRecord,
+  deletedSubjects,
   latestBySubject,
   perSnapshot,
 } from "../../kernel/change-log";
@@ -55,10 +56,16 @@ export type CurrentAssignment = {
 /**
  * Every Category's Assignment and Take-back in every Month as they now stand,
  * by `assignmentSubject`: the latest of each wins, and a stored negative
- * Assignment reads as $0 plus a Take-back of the difference.
+ * Assignment reads as $0 plus a Take-back of the difference. A deleted Category
+ * has none, whatever another device wrote for it (docs/adr/0006). Records may
+ * import only the kernel, so its delete record is matched by the type it publishes.
  */
 export const currentAssignments = perSnapshot(
   (records: readonly ChangeRecord[]): Map<string, CurrentAssignment> => {
+    const deleted = deletedSubjects(
+      records,
+      ({ type }) => type === "CategoryDeleted",
+    );
     const current = new Map<string, CurrentAssignment>();
     const entry = (
       subject: string,
@@ -95,6 +102,9 @@ export const currentAssignments = perSnapshot(
       } else {
         found.assigned = amount;
       }
+    }
+    for (const [subject, { categoryId }] of current) {
+      if (deleted.has(categoryId)) current.delete(subject);
     }
     return current;
   },

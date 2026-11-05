@@ -4,6 +4,7 @@
  */
 import {
   type ChangeRecord,
+  deletedSubjects,
   latestBySubject,
   perSnapshot,
 } from "../../kernel/change-log";
@@ -70,9 +71,7 @@ export function isTransferDeleted(
  */
 export const currentTransfers = perSnapshot(
   (records: readonly ChangeRecord[]): ReadonlyMap<string, TransferDetails> => {
-    const deleted = new Set(
-      records.filter(isTransferDeleted).map(({ subjectId }) => subjectId),
-    );
+    const deleted = deletedSubjects(records, isTransferDeleted);
     const latest = latestBySubject(
       records.filter(
         (record): record is TransferMade | TransferEdited =>

@@ -102,6 +102,22 @@ export function latestBySubject<Record extends ChangeRecord>(
   return latest;
 }
 
+/**
+ * Every subject with a delete record. A deleted thing stays deleted whatever else
+ * is written about it, before or after (docs/adr/0006), so folds leave out these
+ * subjects' other records.
+ */
+export function deletedSubjects(
+  records: readonly ChangeRecord[],
+  isDelete: (record: ChangeRecord) => boolean,
+): Set<string> {
+  const deleted = new Set<string>();
+  for (const record of records) {
+    if (isDelete(record)) deleted.add(record.subjectId);
+  }
+  return deleted;
+}
+
 function compareStrings(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
