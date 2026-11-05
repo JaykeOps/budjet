@@ -273,6 +273,10 @@ function TransactionFields({
         }}
       />
       <ComboBox
+        // Its choice and its options both change with direction, and without
+        // starting afresh its text only catches up after the next paint. Arriving
+        // before then, what's typed lands after that text instead of replacing it.
+        key={draft.direction}
         label={draft.direction === "in" ? "Goes to" : "Category"}
         placeholder="Type to find one"
         inputRef={categoryField}

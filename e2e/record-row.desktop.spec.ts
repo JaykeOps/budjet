@@ -302,6 +302,76 @@ test("money in with a Category that matches nothing stays there and records noth
   await expect(toast(page)).toBeEmpty();
 });
 
+test("typing a Category straight after + replaces Ready to Assign", async ({
+  page,
+}) => {
+  await createBudget(page);
+  await page.keyboard.press("Alt+n");
+  await amount(page).fill("40");
+  await amount(page).focus();
+
+  // Moving on before the field catches up with +, which is otherwise only a few
+  // milliseconds: what's selected on arriving has to be Ready to Assign already.
+  await amount(page).evaluate(async (input: HTMLInputElement) => {
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "+",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await Promise.resolve();
+    const field = input.form?.querySelector<HTMLInputElement>(
+      '[role="combobox"][placeholder="Type to find one"]',
+    );
+    field?.focus();
+    field?.select();
+    await Promise.resolve();
+    document.execCommand("insertText", false, "Groceries");
+  });
+
+  await expect(category(page)).toHaveValue("Groceries");
+  await page.keyboard.press("Enter");
+  await expect(row(page).getByText("Groceries after this:")).toBeVisible();
+});
+
+for (const [direction, sign, field] of [
+  ["in", "+", "Goes to"],
+  ["out", "-", "Category"],
+] as const) {
+  test(`money ${direction}: Enter straight after typing a Category chooses that Category`, async ({
+    page,
+  }) => {
+    await createBudget(page);
+    await page.keyboard.press("Alt+n");
+    await amount(page).fill("40");
+    await amount(page).press(sign);
+    await category(page).focus();
+    await expect(page.getByRole("listbox")).toBeVisible();
+
+    // Enter arriving before the list has narrowed, which is otherwise only a few
+    // milliseconds, so slow machines were the only ones to see this.
+    await category(page).evaluate(async (input: HTMLInputElement) => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(input, "Groceries");
+      input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+      await Promise.resolve();
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+
+    await expect(row(page).getByLabel(field)).toHaveValue("Groceries");
+    await expect(row(page).getByText("Groceries after this:")).toBeVisible();
+  });
+}
+
 test("a known Payee is suggested and fills in its last Category", async ({
   page,
 }) => {
