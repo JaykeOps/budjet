@@ -163,6 +163,18 @@ export function unhideCategory(
 }
 
 /**
+ * Hides a Category again whatever it holds, for an Undo of unhiding it: it was
+ * hidden like that a moment ago, and the Budget flags one holding money.
+ */
+export function restoreHidden(
+  writer: ChangeLogWriter,
+  categoryId: string,
+): void {
+  findCategory(writer, categoryId);
+  write(writer, categoryId, "CategoryHidden", { version: 1 });
+}
+
+/**
  * Refuses to delete a used Category. The UI offers to hide it instead, so it
  * can tell this refusal from the others.
  */

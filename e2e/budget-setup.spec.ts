@@ -3,6 +3,7 @@ import {
   addAccount as addAnotherAccount,
   createBudget,
   expectBalance,
+  expectCurrency,
   goTo,
   openAccount,
   openApp,
@@ -138,7 +139,7 @@ test("a new user answers one question per screen and opens their Budget", async 
 
   const expectBudget = async () => {
     await goTo(page, "Budget");
-    await expect(page.getByText("Kept in SEK")).toBeVisible();
+    await expectCurrency(page, "SEK");
     await expect(page.getByText("Rent")).not.toHaveCount(0);
     await expectBalance(page, "Checking", "1,500.00");
     await openAccount(page, "Rainy day");
@@ -173,7 +174,7 @@ test("Back keeps every answer and can change any of them, including the currency
   await button(page, "Open my Budget").click();
 
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
   await expect(page.getByText("Rent")).toHaveCount(0);
   await expectBalance(page, "Checking", "1,000.00");
 });
@@ -198,7 +199,7 @@ test("an amount the new currency can't hold has to be fixed before opening", asy
   await button(page, "Remove Checking").click();
   await button(page, "Open my Budget").click();
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in JPY")).toBeVisible();
+  await expectCurrency(page, "JPY");
 });
 
 test("reloading mid-setup starts over and saves nothing", async ({ page }) => {
@@ -345,7 +346,7 @@ test("a Budget that an older setup left without an Account still asks for one", 
   await add.getByLabel("What it holds today").fill("100");
   await add.getByRole("button", { name: "Add Account" }).click();
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
 });
 
 test("a returning user's Budget opens with the network offline", async ({
@@ -359,13 +360,13 @@ test("a returning user's Budget opens with the network offline", async ({
     firstAccount: { openingBalance: "200" },
   });
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in EUR")).toBeVisible();
+  await expectCurrency(page, "EUR");
 
   await context.setOffline(true);
   await reloadWhenSaved(page);
 
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in EUR")).toBeVisible();
+  await expectCurrency(page, "EUR");
   await expect(welcome(page)).toBeHidden();
 });
 

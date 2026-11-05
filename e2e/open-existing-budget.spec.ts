@@ -7,7 +7,7 @@ import {
   holdReadingAfterOneFile,
   lapseFolderAccess,
 } from "./folder";
-import { createBudget, goTo, openApp } from "./helpers";
+import { createBudget, expectCurrency, goTo, openApp } from "./helpers";
 import { folderWritesFinished } from "./reload";
 
 const BUDGET_ID = "budget-from-another-device";
@@ -74,7 +74,7 @@ test("first run opens a folder that already holds a Budget, skipping setup", asy
   await startFirstRun(page);
 
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
   await expect(
     page.getByRole("heading", { name: "What currency is your Budget in?" }),
   ).toHaveCount(0);
@@ -99,7 +99,7 @@ test("a full read blocks with a count and no partial Budget, and leaving resumes
   await page.reload();
 
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
   await expect(reading(page)).toHaveCount(0);
 });
 
@@ -116,7 +116,7 @@ test("a read left with access lapsed asks for the folder, then finishes", async 
   await page.getByRole("button", { name: "Open", exact: true }).click();
 
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
 });
 
 test("a cleared Local Copy reads the Budget back from its folder", async ({
@@ -131,5 +131,5 @@ test("a cleared Local Copy reads the Budget back from its folder", async ({
   await page.reload();
 
   await goTo(page, "Budget");
-  await expect(page.getByText("Kept in SEK")).toBeVisible();
+  await expectCurrency(page, "SEK");
 });

@@ -467,3 +467,120 @@ export async function expectAssigned(
   );
   await closeSheet(sheet);
 }
+
+/** The option in a select whose text starts with this name, ignoring the amount after it. */
+async function selectByName(select: Locator, name: string): Promise<void> {
+  const value = await select
+    .locator("option", { hasText: new RegExp(`^${name} \\(`) })
+    .first()
+    .getAttribute("value");
+  await select.selectOption(value ?? "");
+}
+
+/** Moves money between two Categories in the Month showing, however this screen does it. */
+export async function moveMoney(
+  page: Page,
+  { from, to, amount }: { from: string; to: string; amount: string },
+): Promise<void> {
+  if (hasAssignedColumn(page)) {
+    await page.getByRole("button", { name: "Move money" }).click();
+    const dialog = page.getByRole("dialog", { name: "Move money" });
+    await selectByName(dialog.getByLabel("From", { exact: true }), from);
+    await selectByName(dialog.getByLabel("To", { exact: true }), to);
+    await dialog.getByLabel("Amount").fill(amount);
+    await dialog.getByRole("button", { name: /^Move / }).click();
+    await expect(dialog).toHaveCount(0);
+    return;
+  }
+  const sheet = await openCategory(page, to);
+  await sheet.getByRole("button", { name: "Another Category" }).click();
+  await selectByName(sheet.getByLabel("Take it from"), from);
+  const field = sheet.getByRole("textbox", { name: `Move to ${to}` });
+  await field.fill(amount);
+  await field.press("Enter");
+  await closeSheet(sheet);
+}
+
+const CURRENCY_SIGNS: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  JPY: "¥",
+  SEK: "SEK",
+};
+
+/** Which currency the Budget is in, read off Ready to Assign. */
+export async function expectCurrency(
+  page: Page,
+  code: keyof typeof CURRENCY_SIGNS,
+): Promise<void> {
+  await expect(
+    page.getByRole("status", { name: "Ready to Assign" }),
+  ).toContainText(CURRENCY_SIGNS[code]);
+}
+
+/** Turns the Budget into its editable list. */
+export async function startEditing(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Edit Categories" }),
+  ).toBeVisible();
+}
+
+/** Leaves the editable list for the Budget. */
+export async function finishEditing(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Budget", exact: true }),
+  ).toBeVisible();
+}
+
+/** Opens the ⋯ of a Category or Category Group in the editable list, and returns its sheet. */
+export async function openMore(page: Page, name: string): Promise<Locator> {
+  await page.getByRole("button", { name: `More for ${name}` }).click();
+  const sheet = page.getByRole("dialog", { name });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
+/** The drag handle of a Category or Category Group in the editable list. */
+export function handleOf(page: Page, name: string): Locator {
+  return page.getByRole("button", { name: `Move ${name}.` });
+}
+
+/** Each Category Group's name and its Categories' names, in order, in the editable list. */
+export function editorOutline(page: Page): Promise<string[]> {
+  return page
+    .locator("section[aria-label]")
+    .evaluateAll((groups) =>
+      groups.flatMap((group) =>
+        [...group.querySelectorAll("input")]
+          .map((field) => field.value)
+          .filter((name) => name.length > 0),
+      ),
+    );
+}
+
+/** Drags with a mouse from a handle to over something else, in steps as a hand would. */
+export async function dragTo(
+  page: Page,
+  handle: Locator,
+  target: Locator,
+): Promise<void> {
+  await handle.hover();
+  await page.mouse.down();
+  const box = await target.boundingBox();
+  if (!box) throw new Error("Nowhere to drag to");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, {
+    steps: 8,
+  });
+  await page.mouse.up();
+}
+
+/** Hides a Category from the Budget, which ends up back on the Budget. */
+export async function hideCategory(page: Page, name: string): Promise<void> {
+  await startEditing(page);
+  const sheet = await openMore(page, name);
+  await sheet.getByRole("button", { name: `Hide ${name}` }).click();
+  await expect(sheet).toBeHidden();
+  await finishEditing(page);
+}

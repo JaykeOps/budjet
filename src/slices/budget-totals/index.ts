@@ -6,6 +6,7 @@ import type { Month } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
 import {
   assignedAfter,
+  assignmentsAfter,
   available,
   categoryUsed,
   type OverspentCategory,
@@ -16,6 +17,7 @@ import {
 
 export {
   assignedAfter,
+  assignmentsAfter,
   available,
   categoryUsed,
   type OverspentCategory,
