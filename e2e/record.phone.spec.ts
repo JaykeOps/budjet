@@ -296,15 +296,15 @@ test("Make a Transfer moves money from (+), with a toast", async ({ page }) => {
   await expectBalance(page, "Savings", "$700.00");
 });
 
-test("Activity on a phone has no form, as recording starts from (+)", async ({
+test("Alt+N starts nothing on a phone, as recording starts from (+)", async ({
   page,
 }) => {
   await createBudget(page);
   await goTo(page, "Activity");
 
-  await expect(
-    page.getByRole("form", { name: "Record a Transaction" }),
-  ).toBeHidden();
+  await page.keyboard.press("Alt+n");
+
+  await expect(page.getByRole("form", { name: "Record" })).toBeHidden();
 });
 
 for (const colorScheme of ["light", "dark"] as const) {

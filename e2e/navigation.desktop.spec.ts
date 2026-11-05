@@ -11,13 +11,15 @@ test("the rail has Record, Budget, All Accounts with the total, each open Accoun
   await createBudget(page);
   await addAccount(page, { name: "Savings", holds: "500" });
 
+  await expect(rail(page).getByRole("button").first()).toHaveAccessibleName(
+    "Record",
+  );
   const links = rail(page).getByRole("link");
-  await expect(links).toHaveCount(5);
-  await expect(links.nth(0)).toHaveAccessibleName("Record");
-  await expect(links.nth(1)).toHaveAccessibleName("Budget");
-  await expect(links.nth(2)).toHaveAccessibleName("All Accounts $1,500.00");
-  await expect(links.nth(3)).toHaveAccessibleName("Checking $1,000.00");
-  await expect(links.nth(4)).toHaveAccessibleName("Savings $500.00");
+  await expect(links).toHaveCount(4);
+  await expect(links.nth(0)).toHaveAccessibleName("Budget");
+  await expect(links.nth(1)).toHaveAccessibleName("All Accounts $1,500.00");
+  await expect(links.nth(2)).toHaveAccessibleName("Checking $1,000.00");
+  await expect(links.nth(3)).toHaveAccessibleName("Savings $500.00");
   await expect(
     rail(page).getByRole("button", { name: "+ Add Account" }),
   ).toBeVisible();
@@ -66,18 +68,6 @@ test("closed Accounts fold away behind a Closed toggle that shows how many", asy
 
   await toggle.click();
   await expect(old).toBeHidden();
-});
-
-test("Record stands in for recording by opening the Record a Transaction form", async ({
-  page,
-}) => {
-  await createBudget(page);
-
-  await rail(page).getByRole("link", { name: "Record" }).click();
-
-  await expect(
-    page.getByRole("form", { name: "Record a Transaction" }),
-  ).toBeVisible();
 });
 
 test("Activity on a phone and All Accounts on desktop are the same place", async ({

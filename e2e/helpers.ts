@@ -164,13 +164,28 @@ export async function addAccount(
   await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
 }
 
-/** Moves money from an Account's page, through the Transfer sheet. */
+/** What Transfer money opens: the row on desktop, a sheet on a phone. */
+export function transferFields(page: Page): Locator {
+  return page
+    .getByRole("form", { name: "Record" })
+    .or(page.getByRole("dialog", { name: "Transfer money" }));
+}
+
+/** Moves money from an Account's page, through the row on desktop and the Transfer sheet on a phone. */
 export async function transfer(
   page: Page,
   { from, to, amount }: { from: string; to: string; amount: string },
 ): Promise<void> {
   await openAccount(page, from);
   await page.getByRole("button", { name: "Transfer money" }).click();
+  if (hasRail(page)) {
+    const row = recordRow(page);
+    await row.getByLabel("Amount").fill(amount);
+    await chooseAccount(row.getByLabel("To"), to);
+    await row.getByLabel("Amount").press("Enter");
+    await expect(row.getByLabel("Amount")).toHaveValue("");
+    return;
+  }
   const sheet = page.getByRole("dialog", { name: "Transfer money" });
   await sheet.getByLabel("Amount").fill(amount);
   await sheet.getByLabel("To").selectOption({ label: to });
@@ -268,24 +283,51 @@ async function chooseAccount(field: Locator, name: string): Promise<void> {
   );
 }
 
-/** Records a Transaction from where the user is: through (+) on a phone, Activity's form on desktop. */
+/** The row that records on desktop, found even with one of its lists open, which hides the page from assistive technology. */
+export function recordRow(page: Page): Locator {
+  return page.getByRole("form", { name: "Record", includeHidden: true });
+}
+
+/** Opens the row that records on desktop, unless it's open already. */
+async function openRecordRow(page: Page): Promise<Locator> {
+  const row = recordRow(page);
+  if (!(await row.isVisible())) {
+    await page
+      .getByRole("navigation", { name: "Places" })
+      .getByRole("button", { name: "Record" })
+      .click();
+  }
+  return row;
+}
+
+/** Records a Transaction from where the user is: through (+) on a phone, the row on desktop. */
 export async function enterTransaction(
   page: Page,
   { date, amount, category, money = "out", payee, account }: TransactionEntry,
 ): Promise<void> {
   if (hasRail(page)) {
-    const form = page.getByRole("form", { name: "Record a Transaction" });
-    if (date) await form.getByLabel("Date").fill(date);
-    if (account) {
-      await form.getByLabel("Account").selectOption({ label: account });
+    const row = await openRecordRow(page);
+    const amountField = row.getByLabel("Amount");
+    if (date) await row.getByLabel("Date").fill(date);
+    await amountField.fill(amount);
+    await amountField.press(money === "in" ? "+" : "-");
+    if (payee) {
+      await row
+        .getByRole("combobox", { name: "Payee", includeHidden: true })
+        .fill(payee);
     }
-    await form.getByLabel("Money").selectOption(money);
-    await form.getByLabel("Amount").fill(amount);
     if (category) {
-      await form.getByLabel("Category").selectOption({ label: category });
+      await row
+        .getByRole("combobox", {
+          name: /^(Category|Goes to)$/,
+          includeHidden: true,
+        })
+        .fill(category);
+      await page.keyboard.press("Enter");
     }
-    if (payee) await form.getByLabel("Payee").fill(payee);
-    await form.getByRole("button", { name: "Record Transaction" }).click();
+    if (account) await chooseAccount(row.getByLabel("Account"), account);
+    await amountField.press("Enter");
+    await expect(amountField).toHaveValue("");
     return;
   }
   const first = await startRecording(page);
@@ -320,12 +362,15 @@ export async function expectCategoryOffered(
 ): Promise<void> {
   const count = offered ? 1 : 0;
   if (hasRail(page)) {
+    const row = await openRecordRow(page);
+    await row.getByRole("combobox", { name: "Category" }).focus();
+    await expect(page.getByRole("listbox")).toBeVisible();
     await expect(
       page
-        .getByRole("form", { name: "Record a Transaction" })
-        .getByLabel("Category")
-        .getByRole("option", { name }),
+        .getByRole("listbox")
+        .getByRole("option", { name: new RegExp(`^${name}\\b`) }),
     ).toHaveCount(count);
+    await page.keyboard.press("Escape");
     return;
   }
   const first = await startRecording(page);

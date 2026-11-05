@@ -1,3 +1,8 @@
+/* Not a scroller, so the row that records can stick to the top of the page. */
+.screen {
+  overflow: visible;
+}
+
 .history {
   table-layout: fixed;
 }
@@ -181,8 +186,7 @@
   padding-block: 12px;
 }
 
-.notOnPhone,
-.recordForm {
+.notOnPhone {
   display: none;
 }
 
@@ -192,9 +196,6 @@
   }
   .notOnPhone {
     display: inline;
-  }
-  .recordForm {
-    display: block;
   }
   .actionsColumn {
     width: 64px;

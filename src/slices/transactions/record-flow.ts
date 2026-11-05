@@ -148,6 +148,38 @@ export function categoryChoices(
   };
 }
 
+/** The Draft to start on once this one is recorded. Date and Account stay: several in a row usually share them. */
+export function nextDraft({ date, accountId }: Draft): Draft {
+  return { direction: "out", typed: "", payee: "", date, accountId };
+}
+
+/** The first field the Draft can't be recorded without, in the order the row has them. */
+export function missingField(
+  draft: Draft,
+  currency: Currency,
+): "category" | "amount" | undefined {
+  if (draft.direction === "out" && !draft.categoryId) return "category";
+  return draftAmount(draft, currency) ? undefined : "amount";
+}
+
+/** What the Draft's Category, or Ready to Assign for money in with none, would hold after it. Undefined until money out has a Category. */
+export function afterThis(
+  draft: Draft,
+  currency: Currency,
+  { readyToAssign, groups }: CategoryChoices,
+): { name: string; after: Money } | undefined {
+  const category = groups
+    .flatMap(({ categories }) => categories)
+    .find(({ id }) => id === draft.categoryId);
+  if (!category && draft.direction === "out") return undefined;
+  const now = category?.available ?? readyToAssign;
+  const change = draftAmount(draft, currency)?.minorUnits ?? 0;
+  return {
+    name: category?.name ?? "Ready to Assign",
+    after: money(now.minorUnits + change, currency),
+  };
+}
+
 const pad = (part: number) => String(part).padStart(2, "0");
 
 function calendarDate(day: Date): string {

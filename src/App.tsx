@@ -18,6 +18,7 @@ import { useMonthInUrl } from "./month-in-url";
 import { NavigationShell } from "./NavigationShell";
 import { requestPersistentStorage } from "./persistent-storage";
 import { placeAddress, usePlace } from "./place-in-url";
+import { useRecordingRow } from "./RecordingRow";
 import { RecordMenu } from "./RecordMenu";
 import {
   AddAccountSheet,
@@ -35,7 +36,6 @@ import { categoryGroups } from "./slices/categories";
 import { MoveIntoFolderOffer } from "./slices/data-folder";
 import { MonthBudget } from "./slices/month-budget-view";
 import { TransactionsScreen } from "./slices/transactions";
-import { recordTransaction } from "./slices/transactions/commands";
 import { Toasts, useToast } from "./ui/Toast";
 import { useHistoryChanges } from "./undo";
 import { pushAddress, useUrlParameter } from "./url-parameter";
@@ -145,6 +145,7 @@ function Shell({
   const toast = useToast();
   const historyChanges = useHistoryChanges();
   const [addingAccount, setAddingAccount] = useState(false);
+  const recording = useRecordingRow(budget.currency);
 
   if (accounts.length === 0) {
     return (
@@ -160,6 +161,8 @@ function Shell({
   return (
     <NavigationShell
       onAddAccount={() => setAddingAccount(true)}
+      onRecord={() => recording.start()}
+      recordButton={recording.recordButton}
       plus={<RecordMenu currency={budget.currency} />}
     >
       <Page titled={place === "activity"} folderConnection={folderConnection}>
@@ -181,7 +184,7 @@ function Shell({
         {place === "activity" && (
           <AccountTransactions
             currency={budget.currency}
-            onRecord={(input) => recordTransaction(writer, input)}
+            recordRow={recording.row}
             {...historyChanges}
           />
         )}
@@ -189,6 +192,8 @@ function Shell({
           <AccountsPlace
             currency={budget.currency}
             onAddAccount={() => setAddingAccount(true)}
+            recordRow={recording.row}
+            onTransferInRow={recording.start}
           />
         )}
       </Page>
