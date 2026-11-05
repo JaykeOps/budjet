@@ -6,11 +6,26 @@
  */
 import { useMemo } from "react";
 import type { ChangeLogWriter } from "./kernel/change-log";
+import { formatMoney, money } from "./kernel/money";
+import { type Month, monthNameAlone, previousMonth } from "./kernel/month";
 import { useChangeLogWriter } from "./kernel/use-change-log-query";
 import {
   deleteRedeclaredBalance,
   restoreRedeclaredBalance,
 } from "./slices/accounts/commands";
+import {
+  type AssignmentInput,
+  copyLastMonth,
+  type MoveMoneyInput,
+  moveMoney,
+  restoreAssignment,
+  setAssignment,
+} from "./slices/assignments/commands";
+import {
+  assignmentSubject,
+  currentAssignments,
+} from "./slices/assignments/records";
+import { categoryGroups } from "./slices/categories";
 import type { TransactionInput } from "./slices/transactions";
 import {
   deleteTransaction,
@@ -104,6 +119,105 @@ export function deleteRedeclaredBalanceWithUndo(
   return () => {
     restoreRedeclaredBalance(writer, recordId);
   };
+}
+
+export type Place = { categoryId: string; month: Month };
+
+/** Notes the Assignment and Take-back at each place, and returns what writes them back. */
+export function rememberMoney(writer: ChangeLogWriter, places: Place[]): Undo {
+  const current = currentAssignments(writer.changeLog.readAll());
+  const remembered = places.map((place) => {
+    const now = current.get(assignmentSubject(place.categoryId, place.month));
+    return { ...place, assigned: now?.assigned, takenBack: now?.takenBack };
+  });
+  return () => {
+    for (const place of remembered) restoreAssignment(writer, place);
+  };
+}
+
+/** Undoing writes the previous Assignment and Take-back as new records. */
+export function setAssignmentWithUndo(
+  writer: ChangeLogWriter,
+  input: AssignmentInput,
+): Undo {
+  const undo = rememberMoney(writer, [input]);
+  setAssignment(writer, input);
+  return undo;
+}
+
+/** Undoing writes both Categories' previous Assignments and Take-backs. */
+export function moveMoneyWithUndo(
+  writer: ChangeLogWriter,
+  input: MoveMoneyInput,
+): Undo {
+  const { fromCategoryId, toCategoryId, month } = input;
+  const undo = rememberMoney(writer, [
+    { categoryId: fromCategoryId, month },
+    { categoryId: toCategoryId, month },
+  ]);
+  moveMoney(writer, input);
+  return undo;
+}
+
+/** Undoing empties what it filled. A Category it left alone has nothing to write back. */
+export function copyLastMonthWithUndo(
+  writer: ChangeLogWriter,
+  input: Parameters<typeof copyLastMonth>[1],
+): { copied: number; undo: Undo } {
+  const { month } = input;
+  const lastMonth = previousMonth(month);
+  const places = [...currentAssignments(writer.changeLog.readAll()).values()]
+    .filter((current) => current.month === lastMonth)
+    .map(({ categoryId }) => ({ categoryId, month }));
+  const undo = rememberMoney(writer, places);
+  return { copied: copyLastMonth(writer, input), undo };
+}
+
+/** What the Budget's Assignments do when changed: the change, and its toast with Undo. */
+export function useAssignmentChanges() {
+  const writer = useChangeLogWriter();
+  const toast = useToast();
+  return useMemo(() => {
+    const nameOf = (id: string) =>
+      categoryGroups(writer.changeLog.readAll())
+        .flatMap(({ categories }) => categories)
+        .find((category) => category.id === id)?.name ?? "that Category";
+    return {
+      onAssign(input: AssignmentInput) {
+        const { amount, categoryId } = input;
+        const size = formatMoney(
+          money(Math.abs(amount.minorUnits), amount.currency),
+        );
+        const name = nameOf(categoryId);
+        toast({
+          text:
+            amount.minorUnits < 0
+              ? `Took ${size} back from ${name}`
+              : `Assigned ${size} to ${name}`,
+          onUndo: setAssignmentWithUndo(writer, input),
+        });
+      },
+      onMoveMoney(input: MoveMoneyInput) {
+        const { amount, fromCategoryId, toCategoryId } = input;
+        toast({
+          text: `Moved ${formatMoney(amount)} from ${nameOf(fromCategoryId)} to ${nameOf(toCategoryId)}`,
+          onUndo: moveMoneyWithUndo(writer, input),
+        });
+      },
+      onCopyLastMonth(month: Month, skipping: Iterable<string>) {
+        const { copied, undo } = copyLastMonthWithUndo(writer, {
+          month,
+          skipping,
+        });
+        if (copied === 0) return;
+        const assignments = copied === 1 ? "Assignment" : "Assignments";
+        toast({
+          text: `Copied ${copied} ${assignments} from ${monthNameAlone(previousMonth(month))}`,
+          onUndo: undo,
+        });
+      },
+    };
+  }, [writer, toast]);
 }
 
 /** What a history's rows do when changed: the change, and its toast with Undo. */
