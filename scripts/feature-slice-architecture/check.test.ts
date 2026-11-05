@@ -7,7 +7,7 @@ const example = (name: string) =>
   fileURLToPath(new URL(`./examples/${name}`, import.meta.url));
 
 describe("the feature slice architecture check", () => {
-  it("passes budjet's own source", () => {
+  it("passes Crownkeep's own source", () => {
     expect(
       findFeatureSliceViolations(
         fileURLToPath(new URL("../../src", import.meta.url)),

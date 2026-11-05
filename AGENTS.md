@@ -1,6 +1,6 @@
 # Agent rules
 
-budjet is a local-first React PWA. Read `GLOSSARY.md` for the domain language and `docs/adr/` for why the repo is set up the way it is.
+Crownkeep is a local-first React PWA. Read `GLOSSARY.md` for the domain language and `docs/adr/` for why the repo is set up the way it is.
 
 ## Toolchain
 
