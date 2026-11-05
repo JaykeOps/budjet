@@ -76,6 +76,10 @@ _Avoid_: Starting balance, initial amount
 A movement of money from one Account to another. It has no Category, does not count as spending, and leaves Ready to Assign unchanged.
 _Avoid_: Move, transaction pair
 
+**Statement**:
+One Month of an Account's history, or of every Account's together: the money in, the money out and the balance it ended at, like a bank's. Across every Account a Transfer shows once and counts as neither in nor out.
+_Avoid_: Report, ledger
+
 **Adjustment**:
 The difference budjet records when the user re-declares an Account's real balance. It goes into, or comes out of, Ready to Assign.
 _Avoid_: Correction, reconciliation, fix

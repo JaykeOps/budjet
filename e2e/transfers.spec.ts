@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { createBudget, goTo } from "./helpers";
+import { createBudget, goTo, show } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
 /** A Budget in USD with Checking holding $1,000 and Savings holding $500. */
@@ -43,26 +43,18 @@ test("a user moves money between Accounts and sees both balances change", async 
     await goTo(page, "Budget");
     await expect(readyToAssign).toHaveText(/\$1,500\.00/);
     await goTo(page, "Activity");
-    await page
-      .getByRole("region", { name: "Transactions", exact: true })
-      .getByRole("combobox", { name: /^Account/ })
-      .selectOption({ label: "Checking" });
-    const checking = page.getByRole("table", {
-      name: "Transactions in Checking",
-    });
+    await show(page, { account: "Checking" });
+    const checking = page.getByRole("table", { name: "History of Checking" });
     await expect(checking.getByRole("row").nth(1)).toContainText(
-      /2026-10-15.*Transfer to Savings.*Rainy day.*−\$200\.00/,
+      /To Savings.*Transfer.*−\$200\.00.*Oct 15/,
     );
-    await page
-      .getByRole("region", { name: "Transactions", exact: true })
-      .getByRole("combobox", { name: /^Account/ })
-      .selectOption({ label: "Savings" });
+    await show(page, { account: "Savings" });
     await expect(
       page
-        .getByRole("table", { name: "Transactions in Savings" })
+        .getByRole("table", { name: "History of Savings" })
         .getByRole("row")
         .nth(1),
-    ).toContainText(/Transfer from Checking.*Rainy day.*\$200\.00/);
+    ).toContainText(/From Checking.*Transfer.*\+\$200\.00/);
   };
   await expectMoved();
 
