@@ -204,10 +204,11 @@ describe("writing to the Data Folder", () => {
 
     folder.failWith(undefined);
     changeLog.append([record("c", OCT_31 + 2)]);
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    await settled(changeLog);
 
-    expect(changeLog.saveState()).toEqual({ status: "saved" });
+    // Not `settled`: unsaved stays up until a write succeeds, so it can resolve before the retry runs.
+    await vi.waitFor(() =>
+      expect(changeLog.saveState()).toEqual({ status: "saved" }),
+    );
     expect(
       lines(folder.files.get("phone-2026-10.jsonl")).map(({ id }) => id),
     ).toEqual(["a", "b", "c"]);
