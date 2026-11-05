@@ -4,7 +4,12 @@ import {
   useMemo,
   useSyncExternalStore,
 } from "react";
-import type { ChangeLog, ChangeLogWriter, ChangeRecord } from "./change-log";
+import type {
+  ChangeLog,
+  ChangeLogWriter,
+  ChangeRecord,
+  SaveState,
+} from "./change-log";
 
 const ChangeLogWriterContext = createContext<ChangeLogWriter | null>(null);
 
@@ -18,6 +23,15 @@ export function useChangeLogWriter(): ChangeLogWriter {
       "useChangeLogWriter needs a ChangeLogWriterProvider above it",
     );
   return writer;
+}
+
+/** Whether every change has reached where the Change Log keeps them. */
+export function useSaveState(): SaveState {
+  const { changeLog } = useChangeLogWriter();
+  return useSyncExternalStore(
+    changeLog.subscribeToSaveState,
+    changeLog.saveState,
+  );
 }
 
 type Query<Result> = (records: readonly ChangeRecord[]) => Result;
