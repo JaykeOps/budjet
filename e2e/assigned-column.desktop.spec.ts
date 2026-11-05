@@ -121,6 +121,26 @@ test("Cover focuses an Overspent row, whose panel offers to cover it", async ({
   ).toBeVisible();
 });
 
+test("Copy last Month opens the preview, and copies nothing until asked", async ({
+  page,
+}) => {
+  await field(page, "Rent").fill("100");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Next Month" }).click();
+  await expect(
+    page.getByRole("heading", { name: "November 2026" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Copy last Month" }).click();
+  const preview = page.getByRole("dialog", { name: "Copy October" });
+  await expect(preview.getByRole("checkbox", { name: /Rent/ })).toBeChecked();
+  await expect(field(page, "Rent")).toHaveValue("0.00");
+
+  await preview.getByRole("button", { name: "Copy 1 Assignment" }).click();
+  await expect(preview).toHaveCount(0);
+  await expect(field(page, "Rent")).toHaveValue("100.00");
+});
+
 test("Move money takes From, To and Amount", async ({ page }) => {
   await field(page, "Rent").fill("100");
   await page.keyboard.press("Enter");
