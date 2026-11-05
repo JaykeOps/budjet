@@ -5,9 +5,11 @@ import {
   assign,
   budgetRow,
   createBudget,
+  finishEditing,
   goTo,
   openAccount,
   show,
+  startEditing,
   toast,
 } from "./helpers";
 import { reloadWhenSaved } from "./reload";
@@ -142,6 +144,61 @@ test("Category narrows as you type, and each option has Available now and after"
   await expect(category(page)).toHaveValue("Groceries");
   await expect(amount(page)).toBeFocused();
   await expect(row(page)).toContainText("Groceries after this: $70.00 left");
+});
+
+async function aBudgetWithCarWashBeforeCar(page: Page) {
+  await createBudget(page, { categories: "Start blank" });
+  await goTo(page, "Budget");
+  await startEditing(page);
+  await page.getByRole("button", { name: "Add a Category Group" }).click();
+  const group = page.getByRole("textbox", { name: "Add a Category Group" });
+  await group.fill("Transport");
+  await group.press("Enter");
+  await group.blur();
+  await page
+    .getByRole("button", { name: "Add a Category to Transport" })
+    .click();
+  const added = page.getByRole("textbox", {
+    name: "Add a Category to Transport",
+  });
+  await added.fill("Car wash");
+  await added.press("Enter");
+  await added.fill("Car");
+  await added.press("Enter");
+  await finishEditing(page);
+}
+
+test("typing a Category's whole name prefers it to a longer one listed first", async ({
+  page,
+}) => {
+  await aBudgetWithCarWashBeforeCar(page);
+  await page.keyboard.press("Alt+n");
+
+  await category(page).focus();
+  await page.keyboard.type("car");
+
+  const car = options(page).filter({ hasText: /^Car(?! wash)/ });
+  const carWash = options(page).filter({ hasText: /^Car wash/ });
+  await expect(car).toHaveAttribute("data-focused", "true");
+  await expect(carWash).not.toHaveAttribute("data-focused", "true");
+
+  await page.keyboard.press("Enter");
+  await expect(category(page)).toHaveValue("Car");
+});
+
+test("a space after a Category's name still finds it", async ({ page }) => {
+  await aBudgetWithCarWashBeforeCar(page);
+  await page.keyboard.press("Alt+n");
+
+  await category(page).focus();
+  await page.keyboard.type("car ");
+
+  await expect(
+    options(page).filter({ hasText: /^Car(?! wash)/ }),
+  ).toHaveAttribute("data-focused", "true");
+
+  await page.keyboard.press("Enter");
+  await expect(category(page)).toHaveValue("Car");
 });
 
 test("arrows move through the Categories and Enter picks one", async ({
