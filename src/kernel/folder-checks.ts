@@ -72,12 +72,12 @@ function recentlyActive({ lastModified }: FileStamp) {
   return Date.now() - lastModified < RECENTLY_ACTIVE;
 }
 
-function sameStamp(a: FileStamp, b: FileStamp) {
+export function sameStamp(a: FileStamp, b: FileStamp) {
   return a.size === b.size && a.lastModified === b.lastModified;
 }
 
 /** A line that isn't a whole record is left out, and `whole` says so. */
-function parseRecords(text: string) {
+export function parseRecords(text: string) {
   const records: ChangeRecord[] = [];
   let whole = true;
   for (const line of text.split("\n")) {
