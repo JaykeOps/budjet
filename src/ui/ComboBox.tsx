@@ -14,6 +14,7 @@ import {
   ListBox,
   ListBoxItem,
   Popover,
+  useFilter,
 } from "react-aria-components";
 import styles from "./ComboBox.module.css";
 
@@ -83,7 +84,7 @@ export function ComboBox({
         tabbing={tabbing}
       />
       <Popover className={styles.popover} placement="bottom start">
-        {!free && <FirstOptionReady />}
+        {!free && <FirstOptionReady options={options} />}
         <ListBox className={styles.list} aria-label={label}>
           {(option: ComboBoxOption) => (
             <ListBoxItem
@@ -119,6 +120,7 @@ function ComboBoxInput({
   tabbing: RefObject<boolean>;
 }) {
   const state = useContext(ComboBoxStateContext);
+  const firstMatch = useFirstMatch(options ?? []);
   return (
     <Input
       ref={inputRef}
@@ -133,27 +135,32 @@ function ComboBoxInput({
         if (!typed || typed === chosen.toLowerCase()) return;
         event.preventDefault();
         event.stopPropagation();
-        const match = options.find(({ name }) =>
-          name.toLowerCase().includes(typed),
-        );
+        const match = firstMatch(typed);
         if (match) state.setSelectedKey(match.id);
       }}
     />
   );
 }
 
+/** What narrowing leaves first in the list, going by the list's own matching. */
+function useFirstMatch(options: readonly ComboBoxOption[]) {
+  const { contains } = useFilter({ sensitivity: "base" });
+  return (typed: string) => options.find(({ name }) => contains(name, typed));
+}
+
 /** Narrowing leaves the best match ready, so typing a few letters and Enter chooses it. */
-function FirstOptionReady() {
+function FirstOptionReady({ options }: { options: readonly ComboBoxOption[] }) {
   const state = useContext(ComboBoxStateContext);
   const typed = state?.inputValue;
+  const firstMatch = useFirstMatch(options);
   // biome-ignore lint/correctness/useExhaustiveDependencies: what's typed is what it runs on.
   useEffect(() => {
     if (!state?.isFocused || !state.isOpen || !typed) return;
     if (typed === state.selectedItem?.textValue) return;
+    // Not the state's collection: it hasn't narrowed yet, and Enter would choose its first option.
+    const first = firstMatch(typed)?.id ?? null;
     // After the state's own effect, which clears this whenever typing changes.
-    queueMicrotask(() =>
-      state.selectionManager.setFocusedKey(state.collection.getFirstKey()),
-    );
+    queueMicrotask(() => state.selectionManager.setFocusedKey(first));
   }, [typed]);
   return null;
 }

@@ -302,6 +302,43 @@ test("money in with a Category that matches nothing stays there and records noth
   await expect(toast(page)).toBeEmpty();
 });
 
+for (const [direction, sign, field] of [
+  ["in", "+", "Goes to"],
+  ["out", "-", "Category"],
+] as const) {
+  test(`money ${direction}: Enter straight after typing a Category chooses that Category`, async ({
+    page,
+  }) => {
+    await createBudget(page);
+    await page.keyboard.press("Alt+n");
+    await amount(page).fill("40");
+    await amount(page).press(sign);
+    await category(page).focus();
+    await expect(page.getByRole("listbox")).toBeVisible();
+
+    // Enter arriving before the list has narrowed, which is otherwise only a few
+    // milliseconds, so slow machines were the only ones to see this.
+    await category(page).evaluate(async (input: HTMLInputElement) => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(input, "Groceries");
+      input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+      await Promise.resolve();
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+
+    await expect(row(page).getByLabel(field)).toHaveValue("Groceries");
+    await expect(row(page).getByText("Groceries after this:")).toBeVisible();
+  });
+}
+
 test("a known Payee is suggested and fills in its last Category", async ({
   page,
 }) => {
