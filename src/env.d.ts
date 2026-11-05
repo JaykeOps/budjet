@@ -8,3 +8,13 @@ interface Window {
     mode: "readwrite";
   }): Promise<FileSystemDirectoryHandle>;
 }
+
+/** The parts of File System Access that TypeScript's DOM types leave out. */
+interface FileSystemHandle {
+  queryPermission(options: { mode: "readwrite" }): Promise<PermissionState>;
+  requestPermission(options: { mode: "readwrite" }): Promise<PermissionState>;
+}
+
+interface FileSystemDirectoryHandle {
+  keys(): AsyncIterableIterator<string>;
+}

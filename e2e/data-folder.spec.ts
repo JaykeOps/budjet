@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
-import { cancelNextFolderPicker, filesInFolder } from "./folder";
-import { addAccount, createBudget, goTo, openApp } from "./helpers";
+import { cancelNextFolderPicker, deliverFile, filesInFolder } from "./folder";
+import { addAccount, createBudget, goTo, hasRail, openApp } from "./helpers";
 import { folderWritesFinished, reloadWhenSaved } from "./reload";
 
 const button = (page: Page, name: string) =>
@@ -102,6 +102,48 @@ test("two tabs writing at once keep every record in the folder", async ({
       }),
   );
   expect(ids.sort()).toEqual(localIds.sort());
+});
+
+test("another device's changes appear on opening and on regaining focus", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await createBudget(page);
+  await folderWritesFinished(page);
+
+  const accountOpened = (await filesInFolder(page))
+    .flatMap(({ text }) => text.split("\n").filter(Boolean))
+    .map((line) => JSON.parse(line))
+    .find(({ type }) => type === "AccountOpened");
+  const fromLaptop = (name: string) =>
+    `${JSON.stringify({
+      ...accountOpened,
+      id: `record-of-${name}`,
+      subjectId: `account-${name}`,
+      deviceId: "laptop",
+      payload: { ...accountOpened.payload, name },
+    })}\n`;
+  // In the rail on desktop, on the Accounts tab on a phone.
+  const accountRow = (name: string) =>
+    page
+      .getByRole("navigation", { name: "Places" })
+      .getByRole("link", { name: new RegExp(`^${name}\\b`) })
+      .or(
+        page
+          .getByRole("region", { name: "Accounts", exact: true })
+          .getByRole("region", { name }),
+      );
+
+  await deliverFile(page, "any name at all", fromLaptop("Laptop savings"));
+  await page.reload();
+  if (!hasRail(page)) await goTo(page, "Accounts");
+  await expect(accountRow("Laptop savings")).toBeVisible();
+
+  await deliverFile(page, "another name", fromLaptop("Laptop holiday"));
+  await page.clock.fastForward(31_000);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(accountRow("Laptop holiday")).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
 test("an open tab reloads to give way to a newer version of the database", async ({

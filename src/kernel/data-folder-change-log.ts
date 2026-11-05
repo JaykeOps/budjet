@@ -14,10 +14,12 @@ import {
   SAVING,
   type UnsavedReason,
 } from "./change-log";
+import { type CheckScope, type FileStamp, readChanges } from "./folder-checks";
 import {
   markWritten,
   openDatabase,
   openLocalCopy,
+  readFileStamps,
   readUnwrittenRecords,
 } from "./indexed-db-change-log";
 
@@ -25,6 +27,15 @@ import {
 export type Folder = {
   /** Adds text to the end of a file in the `Crownkeep` subfolder, creating either if needed. */
   append(fileName: string, text: string): Promise<void>;
+  /**
+   * The name of every file in the `Crownkeep` subfolder, which is none when
+   * there's no subfolder yet. Rejects if the chosen folder itself is gone.
+   */
+  list(): Promise<string[]>;
+  /** A file's date and size. Far cheaper than reading it on a phone. */
+  stamp(fileName: string): Promise<FileStamp>;
+  /** A file's whole text. */
+  read(fileName: string): Promise<string>;
 };
 
 /** Runs work while no other tab of this browser is running theirs. */
@@ -33,8 +44,18 @@ export type OneTabAtATime = <Result>(
 ) => Promise<Result>;
 
 export type DataFolderChangeLog = ChangeLog & {
-  /** Writes from now on go to this folder, along with any held records. */
+  /** Writes from now on go to this newly chosen folder, along with any held records. */
   keepInFolder(folder: Folder): void;
+  /**
+   * The same, for the folder this Budget was already in, opened without it until
+   * the user is back. What the last check read there still counts.
+   */
+  returnToFolder(folder: Folder): void;
+  /**
+   * Merges what the folder holds that this Change Log doesn't. It stops between
+   * files once `keepGoing` says so, and says whether it got through the folder.
+   */
+  checkFolder(scope: CheckScope, keepGoing?: () => boolean): Promise<boolean>;
 };
 
 export async function openDataFolderChangeLog({
@@ -52,6 +73,8 @@ export async function openDataFolderChangeLog({
 } = {}): Promise<DataFolderChangeLog> {
   let folder = initialFolder;
   const database = await openDatabase(indexedDB, onGaveWay);
+  // Read before the records: a stamp newer than them could hide a file they lack.
+  let stamps = await readFileStamps(database);
   const localCopy = await openLocalCopy(database, () => folder !== undefined);
   const saveState = createSaveStateStore();
   let writing = false;
@@ -118,7 +141,25 @@ export async function openDataFolderChangeLog({
     subscribeToSaveState: saveState.subscribe,
     keepInFolder(chosen) {
       folder = chosen;
+      stamps = {};
+      localCopy.mergeFromFolder([], stamps);
       startWriting();
+    },
+    returnToFolder(remembered) {
+      folder = remembered;
+      startWriting();
+    },
+    async checkFolder(scope, keepGoing = () => true) {
+      if (!folder) return false;
+      const before = stamps;
+      const changes = await readChanges(folder, scope, stamps, keepGoing);
+      // The folder changed during the check, so what it found belongs to the old one.
+      if (stamps !== before) return false;
+      stamps = changes.stamps;
+      if (changes.records.length > 0 || stamps !== before) {
+        localCopy.mergeFromFolder(changes.records, stamps);
+      }
+      return changes.finished;
     },
   };
 }

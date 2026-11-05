@@ -99,6 +99,22 @@ export function overspentHint(name: string, row: CategoryRow): string {
   return `${name} had ${formatMoney(row.had)} and spent ${formatMoney(row.spending)}. Cover the ${short}, or it stays red, Month after Month.`;
 }
 
+/** A Category's row in a Month, from the records as they now stand. */
+export function categoryRowIn(
+  records: readonly ChangeRecord[],
+  categoryId: string,
+  of: Month,
+  currency: Currency,
+): CategoryRow {
+  const zero = money(0, currency);
+  return categoryRow({
+    carriedForward: available(records, categoryId, previousMonth(of)) ?? zero,
+    takenBack: takeBack(records, categoryId, of) ?? zero,
+    assigned: assignment(records, categoryId, of) ?? zero,
+    spending: spending(records, categoryId, of) ?? zero,
+  });
+}
+
 export function useCategoryRow(
   categoryId: string,
   of: Month,
@@ -106,16 +122,8 @@ export function useCategoryRow(
 ): CategoryRow {
   return useChangeLogQuery(
     useCallback(
-      (records: readonly ChangeRecord[]) => {
-        const zero = money(0, currency);
-        return categoryRow({
-          carriedForward:
-            available(records, categoryId, previousMonth(of)) ?? zero,
-          takenBack: takeBack(records, categoryId, of) ?? zero,
-          assigned: assignment(records, categoryId, of) ?? zero,
-          spending: spending(records, categoryId, of) ?? zero,
-        });
-      },
+      (records: readonly ChangeRecord[]) =>
+        categoryRowIn(records, categoryId, of, currency),
       [categoryId, of, currency],
     ),
   );

@@ -19,7 +19,11 @@ import {
 import { useChangeLogWriter } from "../kernel/use-change-log-query";
 import type { AccountKind } from "../slices/accounts";
 import { starterSet } from "../slices/categories/commands";
-import { hasFolderPicker, shouldSuggestHomeScreen } from "./browser";
+import {
+  chooseFolder,
+  hasFolderPicker,
+  shouldSuggestHomeScreen,
+} from "./browser";
 import styles from "./FirstRun.module.css";
 import { guessCurrency } from "./guess-currency";
 import { type CategoriesChoice, openMyBudget } from "./open-my-budget";
@@ -144,7 +148,7 @@ export function FirstRun({
 }
 
 /** The step's question. Takes focus when the step appears, so a screen reader follows along. */
-function Title({
+export function Title({
   children,
   titleRef,
 }: {
@@ -196,21 +200,6 @@ function DataFolderStep({
 }: {
   onChoose: (folder: FileSystemDirectoryHandle) => Promise<void>;
 }) {
-  async function choose() {
-    try {
-      const folder = await window.showDirectoryPicker?.({
-        id: "crownkeep",
-        mode: "readwrite",
-      });
-      if (folder) await onChoose(folder);
-    } catch (error) {
-      // Cancelling, and declining the browser's prompt, both arrive as AbortError.
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        console.error("Crownkeep could not use that folder", error);
-      }
-    }
-  }
-
   return (
     <>
       <Title>Where should your Budget live?</Title>
@@ -229,7 +218,11 @@ function DataFolderStep({
         then pick the folder.
       </p>
       <p className={styles.note}>Choose Allow when your browser asks.</p>
-      <button type="button" className={styles.primary} onClick={choose}>
+      <button
+        type="button"
+        className={styles.primary}
+        onClick={() => chooseFolder(onChoose)}
+      >
         Choose a folder
       </button>
     </>
