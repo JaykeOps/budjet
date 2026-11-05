@@ -175,7 +175,7 @@ test("Back keeps every answer and can change any of them, including the currency
 
   await goTo(page, "Budget");
   await expectCurrency(page, "SEK");
-  await expect(page.getByText("Rent")).toHaveCount(0);
+  await expect(page.getByText("No Categories yet.")).toBeVisible();
   await expectBalance(page, "Checking", "1,000.00");
 });
 

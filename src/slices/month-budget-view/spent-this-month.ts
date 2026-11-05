@@ -24,6 +24,8 @@ export type SpentThisMonth = {
   of: Money;
   /** Net Spending on each day with a counted Transaction, oldest first. */
   daily: DailySpending[];
+  /** The Month has a Transaction, whether or not it counts here. */
+  recorded: boolean;
 };
 
 /**
@@ -53,8 +55,11 @@ export function spentThisMonth(
   }
 
   const byDay = new Map<string, number>();
+  let recorded = false;
   for (const { categoryId, date, amount } of currentTransactions(records)) {
-    if (categoryId && counted.has(categoryId) && date.startsWith(`${of}-`)) {
+    if (!date.startsWith(`${of}-`)) continue;
+    recorded = true;
+    if (categoryId && counted.has(categoryId)) {
       byDay.set(date, (byDay.get(date) ?? 0) - amount.minorUnits);
     }
   }
@@ -63,7 +68,7 @@ export function spentThisMonth(
     spending: money(byDay.get(date) ?? 0, currency),
   }));
 
-  return { spent, of: assigned, daily };
+  return { spent, of: assigned, daily, recorded };
 }
 
 export function useSpentThisMonth(of: Month): SpentThisMonth | undefined {
