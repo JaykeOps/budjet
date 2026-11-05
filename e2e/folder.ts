@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-const PICKED_FOLDER = "picked-folder";
+export const PICKED_FOLDER = "picked-folder";
 
 /**
  * Makes `showDirectoryPicker` return a folder in the browser's private file
@@ -25,6 +25,41 @@ export async function cancelNextFolderPicker(page: Page): Promise<void> {
       throw new DOMException("The user aborted a request.", "AbortError");
     };
   });
+}
+
+/**
+ * Makes the browser treat folder access as lapsed from the next page load, as a
+ * phone does once the tab closes. The private file system never really lapses,
+ * so this answers the permission questions itself. Asking gives access.
+ */
+export async function lapseFolderAccess(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    let access: PermissionState = "prompt";
+    FileSystemHandle.prototype.queryPermission = async () => access;
+    FileSystemHandle.prototype.requestPermission = async () => {
+      access = "granted";
+      return access;
+    };
+  });
+}
+
+/** Makes the next request for folder access end as if the user declined it. */
+export async function declineNextFolderAccess(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const ask = FileSystemHandle.prototype.requestPermission;
+    FileSystemHandle.prototype.requestPermission = async () => {
+      FileSystemHandle.prototype.requestPermission = ask;
+      return "denied";
+    };
+  });
+}
+
+/** Removes the picked folder, as moving it would. The picker makes a new one. */
+export async function removeFolder(page: Page): Promise<void> {
+  await page.evaluate(async (name) => {
+    const root = await navigator.storage.getDirectory();
+    await root.removeEntry(name, { recursive: true });
+  }, PICKED_FOLDER);
 }
 
 /** The name and text of every file in the picked folder's `Crownkeep` subfolder. */
