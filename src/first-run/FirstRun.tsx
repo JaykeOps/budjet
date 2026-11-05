@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { FullReadProgress } from "../kernel/data-folder-change-log";
 import {
   addMoney,
   type Currency,
@@ -19,7 +20,11 @@ import {
 import { useChangeLogWriter } from "../kernel/use-change-log-query";
 import type { AccountKind } from "../slices/accounts";
 import { starterSet } from "../slices/categories/commands";
-import { hasFolderPicker, shouldSuggestHomeScreen } from "./browser";
+import {
+  chooseFolder,
+  hasFolderPicker,
+  shouldSuggestHomeScreen,
+} from "./browser";
 import styles from "./FirstRun.module.css";
 import { guessCurrency } from "./guess-currency";
 import { type CategoriesChoice, openMyBudget } from "./open-my-budget";
@@ -65,9 +70,15 @@ function readAmount(holds: string, currency: Currency): Money | undefined {
 export function FirstRun({
   keepInFolder,
 }: {
-  /** Keeps the Budget in the folder chosen. Absent where the browser has no folder picker. */
+  /**
+   * Keeps the Budget in the folder chosen. If the folder already holds one, it
+   * opens instead, reporting the read. Absent where the browser has no folder picker.
+   */
   keepInFolder:
-    | ((folder: FileSystemDirectoryHandle) => Promise<void>)
+    | ((
+        folder: FileSystemDirectoryHandle,
+        onProgress: (progress: FullReadProgress) => void,
+      ) => Promise<void>)
     | undefined;
 }) {
   const writer = useChangeLogWriter();
@@ -79,10 +90,13 @@ export function FirstRun({
   const [accounts, setAccounts] = useState<readonly AddedAccount[]>([]);
   const [draft, setDraft] = useState(BLANK_DRAFT);
   const [adding, setAdding] = useState(true);
+  const [reading, setReading] = useState<FullReadProgress>();
 
   const next = () => setStepIndex(stepIndex + 1);
   const steps = keepInFolder ? STEPS_WITH_FOLDER : STEPS;
   const step = steps[stepIndex];
+
+  if (reading) return <GettingYourBudget progress={reading} />;
 
   return (
     <main className={styles.page}>
@@ -104,8 +118,12 @@ export function FirstRun({
       {step === "folder" && keepInFolder && (
         <DataFolderStep
           onChoose={async (folder) => {
-            await keepInFolder(folder);
-            next();
+            try {
+              await keepInFolder(folder, setReading);
+              next();
+            } finally {
+              setReading(undefined);
+            }
           }}
         />
       )}
@@ -144,7 +162,7 @@ export function FirstRun({
 }
 
 /** The step's question. Takes focus when the step appears, so a screen reader follows along. */
-function Title({
+export function Title({
   children,
   titleRef,
 }: {
@@ -158,6 +176,23 @@ function Title({
     <h1 ref={ref} tabIndex={-1} className={styles.title}>
       {children}
     </h1>
+  );
+}
+
+/** The one screen for a full read, which blocks: there's never a partial Budget. */
+export function GettingYourBudget({
+  progress,
+}: {
+  progress: FullReadProgress;
+}) {
+  return (
+    <main className={styles.page}>
+      <p className={styles.brand}>Crownkeep</p>
+      <Title>Getting your Budget from your folder</Title>
+      <p className={styles.lead} role="status">
+        {progress.read} of {progress.of}
+      </p>
+    </main>
   );
 }
 
@@ -196,21 +231,6 @@ function DataFolderStep({
 }: {
   onChoose: (folder: FileSystemDirectoryHandle) => Promise<void>;
 }) {
-  async function choose() {
-    try {
-      const folder = await window.showDirectoryPicker?.({
-        id: "crownkeep",
-        mode: "readwrite",
-      });
-      if (folder) await onChoose(folder);
-    } catch (error) {
-      // Cancelling, and declining the browser's prompt, both arrive as AbortError.
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        console.error("Crownkeep could not use that folder", error);
-      }
-    }
-  }
-
   return (
     <>
       <Title>Where should your Budget live?</Title>
@@ -229,7 +249,15 @@ function DataFolderStep({
         then pick the folder.
       </p>
       <p className={styles.note}>Choose Allow when your browser asks.</p>
-      <button type="button" className={styles.primary} onClick={choose}>
+      <p className={styles.note}>
+        A folder already holding a Budget skips the remaining steps and opens
+        it.
+      </p>
+      <button
+        type="button"
+        className={styles.primary}
+        onClick={() => chooseFolder(onChoose)}
+      >
         Choose a folder
       </button>
     </>

@@ -28,20 +28,66 @@ export function Sheet({
   return (
     <DialogTrigger>
       <Button className={triggerClassName}>{trigger}</Button>
-      <ModalOverlay isDismissable className={styles.overlay}>
-        <Modal className={styles.sheet}>
-          <Dialog className={styles.dialog}>
-            {({ close }) => (
-              <>
-                <Heading slot="title" className={styles.title}>
-                  {title}
-                </Heading>
-                {children(close)}
-              </>
-            )}
-          </Dialog>
-        </Modal>
-      </ModalOverlay>
+      <Surface title={title}>{children}</Surface>
     </DialogTrigger>
+  );
+}
+
+/** The same sheet, for when something other than its own button opens it. */
+export function OpenableSheet({
+  title,
+  isOpen,
+  onClose,
+  children,
+}: {
+  title: string;
+  isOpen: boolean;
+  onClose: () => void;
+  children: (close: () => void) => ReactNode;
+}) {
+  return (
+    <Surface
+      title={title}
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      {children}
+    </Surface>
+  );
+}
+
+function Surface({
+  title,
+  isOpen,
+  onOpenChange,
+  children,
+}: {
+  title: string;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children: (close: () => void) => ReactNode;
+}) {
+  return (
+    <ModalOverlay
+      isDismissable
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      className={styles.overlay}
+    >
+      <Modal className={styles.sheet}>
+        <Dialog className={styles.dialog}>
+          {({ close }) => (
+            <>
+              <Heading slot="title" className={styles.title}>
+                {title}
+              </Heading>
+              {children(close)}
+            </>
+          )}
+        </Dialog>
+      </Modal>
+    </ModalOverlay>
   );
 }
