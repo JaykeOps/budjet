@@ -15,17 +15,10 @@ import {
   renameAccount,
 } from "./slices/accounts/commands";
 import { AccountHistory } from "./slices/transactions";
-import {
-  deleteTransaction,
-  editTransaction,
-} from "./slices/transactions/commands";
 import { type TransferDraft, TransferSheet } from "./slices/transfers";
-import {
-  deleteTransfer,
-  editTransfer,
-  makeTransfer,
-} from "./slices/transfers/commands";
+import { deleteTransfer, makeTransfer } from "./slices/transfers/commands";
 import { useToast } from "./ui/Toast";
+import { useHistoryChanges } from "./undo";
 import { pushAddress, useUrlParameter } from "./url-parameter";
 
 function go(address: string) {
@@ -48,6 +41,7 @@ export function AccountsPlace({
 }) {
   const writer = useChangeLogWriter();
   const toast = useToast();
+  const historyChanges = useHistoryChanges();
   const accounts = useAccounts();
   const [accountId] = useUrlParameter("account");
   const [transfer, setTransfer] = useState<TransferDraft>();
@@ -79,13 +73,7 @@ export function AccountsPlace({
             <AccountHistory
               account={account}
               currency={currency}
-              onEdit={(id, input) => editTransaction(writer, id, input)}
-              onDelete={(id) => deleteTransaction(writer, id)}
-              onDeleteRedeclaredBalance={(id) =>
-                deleteRedeclaredBalance(writer, id)
-              }
-              onEditTransfer={(id, input) => editTransfer(writer, id, input)}
-              onDeleteTransfer={(id) => deleteTransfer(writer, id)}
+              {...historyChanges}
             />
           }
           onBack={() => go(placeAddress("accounts"))}

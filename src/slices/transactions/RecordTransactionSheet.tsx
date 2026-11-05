@@ -16,6 +16,7 @@ import { monthOf } from "../../kernel/month";
 import { type Account, useAccounts } from "../accounts";
 import type { TransactionInput } from "./commands";
 import { useCategoryChoices, useKnownPayees } from "./hooks";
+import type { Transaction } from "./queries";
 import styles from "./RecordTransactionSheet.module.css";
 import {
   type CategoryChoices,
@@ -23,6 +24,7 @@ import {
   type Draft,
   dayBefore,
   draftAmount,
+  draftOf,
   matchingPayees,
   today,
   withDirection,
@@ -53,28 +55,37 @@ const signed = (amount: Money) =>
 /**
  * Records a Transaction one thing at a time: the amount, its Category, then the
  * rest. Going back to an earlier step from the review returns to the review.
- * The app shell decides what recording does; an error it throws is shown here.
+ * Given one that's `editing`, it starts at the review, as "Edit Transaction". The
+ * app shell decides what recording does; an error it throws is shown here.
  */
 export function RecordTransactionSheet({
   currency,
   defaultAccountId,
+  editing,
   onRecord,
+  onDelete,
   onClose,
 }: {
   currency: Currency;
   defaultAccountId?: string;
+  editing?: Transaction;
   onRecord: (input: TransactionInput) => void;
+  onDelete?: () => void;
   onClose: () => void;
 }) {
   const open = useAccounts().filter(({ closed }) => !closed);
-  const [draft, setDraft] = useState<Draft>(() => ({
-    direction: "out",
-    typed: "",
-    payee: "",
-    date: today(),
-    accountId: defaultAccountId ?? open[0]?.id ?? "",
-  }));
-  const [path, setPath] = useState<Step[]>(["amount"]);
+  const [draft, setDraft] = useState<Draft>(() =>
+    editing
+      ? draftOf(editing)
+      : {
+          direction: "out",
+          typed: "",
+          payee: "",
+          date: today(),
+          accountId: defaultAccountId ?? open[0]?.id ?? "",
+        },
+  );
+  const [path, setPath] = useState<Step[]>([editing ? "review" : "amount"]);
   const step = path.at(-1) ?? "amount";
   const amount = draftAmount(draft, currency);
   const dialog = useRef<HTMLElement>(null);
@@ -121,9 +132,13 @@ export function RecordTransactionSheet({
             )}
             <div className={styles.titled}>
               <Heading slot="title" className={styles.title}>
-                {STEPS[step].title(draft.direction)}
+                {editing && step === "review"
+                  ? "Edit Transaction"
+                  : STEPS[step].title(draft.direction)}
               </Heading>
-              <p className={styles.step}>{STEPS[step].number} of 3</p>
+              {!editing && (
+                <p className={styles.step}>{STEPS[step].number} of 3</p>
+              )}
             </div>
             <Button className={styles.close} slot="close">
               Close
@@ -142,6 +157,7 @@ export function RecordTransactionSheet({
             <CategoryStep
               draft={draft}
               amount={amount}
+              editing={editing}
               onPick={(categoryId) => {
                 setDraft({ ...draft, categoryId });
                 finish("review");
@@ -153,6 +169,7 @@ export function RecordTransactionSheet({
               draft={draft}
               amount={amount}
               accounts={open}
+              editing={editing}
               onChange={setDraft}
               onAmount={() => goTo("amount")}
               onCategory={() => goTo("category")}
@@ -160,6 +177,13 @@ export function RecordTransactionSheet({
                 onRecord(input);
                 onClose();
               }}
+              onDelete={
+                onDelete &&
+                (() => {
+                  onDelete();
+                  onClose();
+                })
+              }
             />
           )}
         </Dialog>
@@ -242,16 +266,19 @@ const READY_TO_ASSIGN = "Ready to Assign";
 function CategoryStep({
   draft,
   amount,
+  editing,
   onPick,
 }: {
   draft: Draft;
   amount: Money;
+  editing?: Transaction;
   onPick: (categoryId: string | undefined) => void;
 }) {
   const [search, setSearch] = useState("");
   const { readyToAssign, groups } = useCategoryChoices(
     monthOf(draft.date),
     amount.currency,
+    editing,
   );
   const found = (name: string) =>
     name.toLowerCase().includes(search.trim().toLowerCase());
@@ -373,23 +400,28 @@ function ReviewStep({
   draft,
   amount,
   accounts,
+  editing,
   onChange,
   onAmount,
   onCategory,
   onRecord,
+  onDelete,
 }: {
   draft: Draft;
   amount: Money;
   accounts: Account[];
+  editing?: Transaction;
   onChange: (draft: Draft) => void;
   onAmount: () => void;
   onCategory: () => void;
   onRecord: (input: TransactionInput) => void;
+  onDelete?: () => void;
 }) {
   const [error, setError] = useState<string>();
   const { readyToAssign, groups } = useCategoryChoices(
     monthOf(draft.date),
     amount.currency,
+    editing,
   );
   const account = accounts.find(({ id }) => id === draft.accountId);
   const moneyIn = draft.direction === "in";
@@ -405,6 +437,7 @@ function ReviewStep({
         amount,
         categoryId: draft.categoryId,
         payee: draft.payee,
+        memo: draft.memo,
       });
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
@@ -454,7 +487,13 @@ function ReviewStep({
         >
           {accounts.map(({ id, name, balance }) => (
             <option key={id} value={id}>
-              {name} · {formatMoney(balance)}
+              {name} ·{" "}
+              {formatMoney(
+                // Saving replaces the Transaction being edited, so its money doesn't count.
+                editing?.accountId === id
+                  ? added(balance, -editing.amount.minorUnits)
+                  : balance,
+              )}
             </option>
           ))}
         </select>
@@ -463,9 +502,16 @@ function ReviewStep({
         <p className={styles.note}>Add an Account to record this.</p>
       )}
       {error && <p role="alert">{error}</p>}
-      <button type="submit" className={styles.main} disabled={!canRecord}>
-        Record
-      </button>
+      <div className={styles.save}>
+        {onDelete && (
+          <button type="button" className={styles.delete} onClick={onDelete}>
+            Delete
+          </button>
+        )}
+        <button type="submit" className={styles.main} disabled={!canRecord}>
+          {editing ? "Save changes" : "Record"}
+        </button>
+      </div>
     </form>
   );
 }

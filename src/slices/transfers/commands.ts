@@ -63,6 +63,26 @@ export function deleteTransfer(writer: ChangeLogWriter, id: string): void {
 }
 
 /**
+ * Undoes `deleteTransfer`: a new Transfer with a fresh id, because a deleted one
+ * stays deleted (docs/adr/0006), with the same details and listed in the same
+ * place. Returns its id.
+ */
+export function restoreTransfer(
+  writer: ChangeLogWriter,
+  restores: string,
+  input: TransferInput,
+): string {
+  const details = validTransfer(writer.changeLog.readAll(), input);
+  const id = crypto.randomUUID();
+  writer.write<TransferMade["type"], TransferMade["payload"]>(
+    id,
+    "TransferMade",
+    { version: 1, restores, ...details },
+  );
+  return id;
+}
+
+/**
  * Checks the Transfer is in the Budget and both its Accounts are open: a
  * closed Account's history stays as it is.
  */

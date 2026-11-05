@@ -7,7 +7,26 @@
 }
 
 .actionsColumn {
-  width: 64px;
+  width: 0;
+}
+
+.entry {
+  position: relative;
+}
+
+/* A phone's rows open by tapping, anywhere on them. */
+.open {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  padding: 0;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+}
+
+.more {
+  display: none;
 }
 
 .statementCell {
@@ -177,4 +196,24 @@
   .recordForm {
     display: block;
   }
+  .actionsColumn {
+    width: 64px;
+  }
+  .open {
+    display: none;
+  }
+  .more {
+    display: inline;
+  }
+}
+
+.sheetAmount {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 650;
+}
+
+.delete {
+  padding: 12px;
+  color: var(--overspent);
 }

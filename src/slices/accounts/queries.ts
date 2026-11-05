@@ -185,9 +185,10 @@ const deletedRedeclarations = perSnapshot(
  * every record that moves an Account's balance, in Change Log order, so each
  * re-declared balance can be measured against the balance just before it. A
  * Transaction or Transfer counts as each of its records leaves it: an edit
- * moves the difference, a deletion takes it back out, so the latest record
- * of each wins (docs/adr/0004). It reads the Transactions and Transfers
- * records directly because both of those slices depend on Accounts.
+ * moves the difference, so the latest record of each wins (docs/adr/0004), and
+ * a deletion takes it back out, after which later records about it count for
+ * nothing (docs/adr/0006). It reads the Transactions and Transfers records
+ * directly because both of those slices depend on Accounts.
  */
 const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
   const deleted = deletedRedeclarations(records);
@@ -196,10 +197,12 @@ const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
     balances.set(accountId, (balances.get(accountId) ?? 0) + minorUnits);
   /** What each Transaction or Transfer currently does to which Accounts. */
   const effects = new Map<string, [accountId: string, minorUnits: number][]>();
+  const gone = new Set<string>();
   const replace = (
     subjectId: string,
     now: [accountId: string, minorUnits: number][],
   ) => {
+    if (gone.has(subjectId)) return;
     for (const [accountId, minorUnits] of effects.get(subjectId) ?? []) {
       move(accountId, -minorUnits);
     }
@@ -242,6 +245,7 @@ const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
       ]);
     } else if (isTransactionDeleted(record) || isTransferDeleted(record)) {
       replace(record.subjectId, []);
+      gone.add(record.subjectId);
     }
   }
   return {

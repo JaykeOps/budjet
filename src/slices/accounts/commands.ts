@@ -10,6 +10,7 @@ import type {
   BalanceRedeclared,
   RedeclaredBalanceDeleted,
 } from "./records";
+import { isBalanceRedeclared, isRedeclaredBalanceDeleted } from "./records";
 
 /** Adds an Account to the Budget and returns its id. */
 export function openAccount(
@@ -83,6 +84,40 @@ export function deleteRedeclaredBalance(
     RedeclaredBalanceDeleted["type"],
     RedeclaredBalanceDeleted["payload"]
   >(recordId, "RedeclaredBalanceDeleted", { version: 1 });
+}
+
+/**
+ * Undoes `deleteRedeclaredBalance`: the same balance, under a fresh id because a
+ * deleted record stays deleted (docs/adr/0006). An Adjustment is measured against
+ * the balance just before it, and a balance re-declared now would wipe out
+ * everything since, so it goes back to its old place in the Change Log. Returns
+ * the new record's id.
+ */
+export function restoreRedeclaredBalance(
+  writer: ChangeLogWriter,
+  recordId: string,
+): string {
+  const records = writer.changeLog.readAll();
+  const deleted = records.some(
+    (record) =>
+      isRedeclaredBalanceDeleted(record) && record.subjectId === recordId,
+  );
+  const redeclared = records
+    .filter(isBalanceRedeclared)
+    .find(({ id }) => id === recordId);
+  if (!redeclared || !deleted) {
+    throw new RangeError(`No deleted re-declared balance ${recordId}`);
+  }
+  openAccountWith(records, redeclared.subjectId);
+  return writer.writeAt<
+    BalanceRedeclared["type"],
+    BalanceRedeclared["payload"]
+  >(
+    redeclared.timestamp,
+    redeclared.subjectId,
+    "BalanceRedeclared",
+    redeclared.payload,
+  ).id;
 }
 
 /** Gives an Account a new name, open or closed. */

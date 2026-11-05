@@ -105,6 +105,18 @@ describe("writing to the Data Folder", () => {
     ]);
   });
 
+  it("files a record written at an earlier place by when it was written, where a quick check will find it", async () => {
+    const { folder, openTab } = aBrowser();
+    const changeLog = await openTab();
+    const placed = { ...record("a", OCT_31), writtenAt: NOV_1 };
+
+    changeLog.append([placed]);
+    await settled(changeLog);
+
+    expect([...folder.files.keys()]).toEqual(["phone-2026-11.jsonl"]);
+    expect(lines(folder.files.get("phone-2026-11.jsonl"))).toEqual([placed]);
+  });
+
   it("writes a burst of changes together", async () => {
     const { folder, openTab } = aBrowser();
     const changeLog = await openTab();
