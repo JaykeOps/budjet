@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { formatMoney } from "../../kernel/money";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
+import { EmptyState } from "../../ui/EmptyState";
 import styles from "./Accounts.module.css";
 import { checkedLine } from "./account-lines";
 import { BalanceCheck, type BalanceCheckActions } from "./BalanceCheck";
@@ -8,7 +9,8 @@ import { accounts, accountsTotal } from "./queries";
 
 /**
  * The total, then a card per open Account that asks whether it matches the
- * bank, then the closed ones folded away. Tapping an Account drills in.
+ * bank, then the closed ones folded away. Tapping an Account drills in. With
+ * none open, an empty state stands in for the total and the cards.
  */
 export function AccountsTab({
   onAdd,
@@ -35,19 +37,32 @@ export function AccountsTab({
           + Add
         </button>
       </header>
-      <div className={styles.graphite}>
-        <p id={totalId} className={styles.graphiteLine}>
-          Money in your Accounts
-        </p>
-        <div role="status" aria-labelledby={totalId}>
-          <strong className={styles.graphiteAmount}>
-            {total && formatMoney(total)}
-          </strong>
+      {open.length === 0 ? (
+        <EmptyState
+          actions={
+            <button type="button" data-primary onClick={onAdd}>
+              Add an Account
+            </button>
+          }
+        >
+          No Accounts yet. An Account is somewhere you keep money you could
+          spend soon: checking, savings or cash.
+        </EmptyState>
+      ) : (
+        <div className={styles.graphite}>
+          <p id={totalId} className={styles.graphiteLine}>
+            Money in your Accounts
+          </p>
+          <div role="status" aria-labelledby={totalId}>
+            <strong className={styles.graphiteAmount}>
+              {total && formatMoney(total)}
+            </strong>
+          </div>
+          <p className={styles.graphiteLine}>
+            Every dollar here is in your Budget.
+          </p>
         </div>
-        <p className={styles.graphiteLine}>
-          Every dollar here is in your Budget.
-        </p>
-      </div>
+      )}
       {open.map((account) => (
         <section
           key={account.id}
