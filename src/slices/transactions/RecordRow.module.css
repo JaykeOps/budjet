@@ -20,6 +20,17 @@
   }
 }
 
+/* Editing where it sits, among the rows either side of it. */
+.row.inList {
+  position: static;
+  display: flex;
+  margin: 0;
+}
+
+.danger {
+  color: var(--overspent);
+}
+
 .head,
 .foot {
   display: flex;

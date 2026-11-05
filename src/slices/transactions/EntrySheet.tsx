@@ -57,7 +57,7 @@ export function EntrySheet({
   );
 }
 
-function sheetTitle({ kind }: TransactionListEntry): string {
+export function sheetTitle({ kind }: TransactionListEntry): string {
   return {
     transaction: "Transaction",
     transfer: "Transfer",
@@ -67,7 +67,7 @@ function sheetTitle({ kind }: TransactionListEntry): string {
   }[kind];
 }
 
-function Details({
+export function Details({
   entry,
   closedAccountName,
   onDelete,

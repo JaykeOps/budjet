@@ -1,4 +1,10 @@
-import { type RefObject, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { formatMoney, type Money } from "../../kernel/money";
 import { currentMonth, type Month, monthName } from "../../kernel/month";
 import { Menu, type MenuAction } from "../../ui/Menu";
@@ -10,8 +16,14 @@ import type { Statement } from "./statements";
 
 /** Every row is this tall, so the list knows which rows are in view without measuring them. */
 const ROW_HEIGHT = 76;
-/** Rows rendered beyond each edge of the view, so fast scrolling shows no gaps. */
+/**
+ * Rows rendered beyond each edge of the view, so fast scrolling shows no gaps,
+ * and so a row open in place, a few rows taller, needn't be measured.
+ */
 const OVERSCAN = 10;
+
+/** Below this width, the CSS has a phone's layout and a row opens as a sheet. */
+const opensInPlace = () => window.matchMedia("(min-width: 720px)").matches;
 
 type Row =
   | { kind: "statement"; statement: Statement; open: boolean }
@@ -30,6 +42,7 @@ export function History({
   askedMonth,
   actionsFor,
   onOpen,
+  inPlace,
 }: {
   label: string;
   statements: Statement[];
@@ -37,12 +50,18 @@ export function History({
   accountId?: string;
   askedMonth?: Month;
   actionsFor: (entry: TransactionListEntry) => MenuAction[];
-  /** What tapping a row does on a phone, where it stands in for the More menu. */
+  /** What tapping a row does on a phone. */
   onOpen: (entry: TransactionListEntry) => void;
+  /** What a tapped row becomes on desktop. `close` can hand focus back to the row. */
+  inPlace: (
+    entry: TransactionListEntry,
+    close: (returnFocus: boolean) => void,
+  ) => ReactNode;
 }) {
   const [folding, setFolding] = useState<ReadonlyMap<Month, boolean>>(
     new Map(),
   );
+  const [returning, setReturning] = useState<ReturningTo>();
   const thisMonth = currentMonth();
   const rows: Row[] = statements.flatMap((statement) => {
     const { month, entries } = statement;
@@ -58,6 +77,24 @@ export function History({
   const table = useRef<HTMLTableElement>(null);
   const { first, last } = useRowsInView(table, rows.length);
   const describe = useDescribe(accountId);
+  const [openId, setOpenId] = useState<string>();
+  const isOpen = (row: Row) => row.kind === "entry" && row.entry.id === openId;
+  const openIndex = rows.findIndex(isOpen);
+  useReturningFocus(table, rows, returning, setReturning);
+
+  // An open row stays rendered wherever it's scrolled to, so it keeps what's typed.
+  const shown = [
+    ...(openIndex >= 0 && openIndex < first ? [openIndex] : []),
+    ...rows
+      .keys()
+      .drop(first)
+      .take(last - first),
+    ...(openIndex >= last ? [openIndex] : []),
+  ];
+  const spacer = (rowCount: number, key: string) =>
+    rowCount > 0 && (
+      <tr key={key} aria-hidden style={{ height: rowCount * ROW_HEIGHT }} />
+    );
 
   return (
     <table
@@ -72,14 +109,17 @@ export function History({
         <col className={styles.actionsColumn} />
       </colgroup>
       <tbody>
-        {first > 0 && <tr aria-hidden style={{ height: first * ROW_HEIGHT }} />}
-        {rows
-          .slice(first, last)
-          .map((row, index) =>
+        {shown.flatMap((index, at) => {
+          const row = rows[index];
+          if (!row) return [];
+          const rowIndex = index + 1;
+          const gap = index - (at === 0 ? 0 : (shown[at - 1] ?? 0) + 1);
+          return [
+            spacer(gap, `before ${index}`),
             row.kind === "statement" ? (
               <StatementRow
                 key={row.statement.month}
-                rowIndex={first + index + 1}
+                rowIndex={rowIndex}
                 statement={row.statement}
                 open={row.open}
                 onToggle={() =>
@@ -88,23 +128,33 @@ export function History({
                   )
                 }
               />
+            ) : isOpen(row) ? (
+              <tr key={row.entry.id} aria-rowindex={rowIndex}>
+                <td colSpan={3} className={styles.inPlace}>
+                  {inPlace(row.entry, (returnFocus) => {
+                    setOpenId(undefined);
+                    if (returnFocus) {
+                      setReturning({ id: row.entry.id, index });
+                    }
+                  })}
+                </td>
+              </tr>
             ) : (
               <EntryRow
                 key={row.entry.id}
-                rowIndex={first + index + 1}
+                rowIndex={rowIndex}
                 {...describe(row.entry)}
                 date={shortDate(row.entry.date)}
                 actions={actionsFor(row.entry)}
-                onOpen={() => onOpen(row.entry)}
+                onOpen={() => {
+                  if (opensInPlace()) setOpenId(row.entry.id);
+                  else onOpen(row.entry);
+                }}
               />
             ),
-          )}
-        {last < rows.length && (
-          <tr
-            aria-hidden
-            style={{ height: (rows.length - last) * ROW_HEIGHT }}
-          />
-        )}
+          ];
+        })}
+        {spacer(rows.length - ((shown.at(-1) ?? -1) + 1), "after")}
       </tbody>
     </table>
   );
@@ -295,6 +345,42 @@ export function shortDate(date: string): string {
     day: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${date}T00:00:00Z`));
+}
+
+type ReturningTo = { id: string; index: number };
+
+/**
+ * Hands focus back when an open row closes: to that row, wherever it now sits,
+ * or to whatever has taken its place if it's gone. Rendering it may take a scroll.
+ */
+function useReturningFocus(
+  list: RefObject<HTMLElement | null>,
+  rows: readonly Row[],
+  returning: ReturningTo | undefined,
+  done: (returning: undefined) => void,
+) {
+  useLayoutEffect(() => {
+    if (!returning || !list.current) return;
+    const found = rows.findIndex(
+      (row) => row.kind === "entry" && row.entry.id === returning.id,
+    );
+    const index = Math.min(
+      found >= 0 ? found : returning.index,
+      rows.length - 1,
+    );
+    const row = list.current.querySelector(`[aria-rowindex="${index + 1}"]`);
+    // A row's own button comes last, after its More menu.
+    const button = row && [...row.querySelectorAll("button")].at(-1);
+    if (button) {
+      button.focus();
+      done(undefined);
+    } else if (index >= 0) {
+      const top = list.current.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo(0, top + index * ROW_HEIGHT - window.innerHeight / 2);
+    } else {
+      done(undefined);
+    }
+  });
 }
 
 /**

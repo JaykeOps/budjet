@@ -391,6 +391,44 @@ test("a known Payee is suggested and fills in its last Category", async ({
   await expect(category(page)).toHaveValue("Groceries");
 });
 
+/** Records a Corner Shop Transaction in Groceries, so the row knows that Payee, and starts on the next. */
+async function knowCornerShop(page: Page) {
+  await page.keyboard.type("Corner Shop");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("gro");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("5");
+  await page.keyboard.press("Enter");
+  await expect(payee(page)).toBeFocused();
+}
+
+test("typing a Category straight after a known Payee fills one replaces it", async ({
+  page,
+}) => {
+  await createBudget(page);
+  await page.keyboard.press("Alt+n");
+  await knowCornerShop(page);
+
+  // Moving on before the field catches up with the Payee, which is otherwise only
+  // a few milliseconds: what's selected on arriving has to be its Category already.
+  await payee(page).evaluate(async (input: HTMLInputElement) => {
+    document.execCommand("insertText", false, "Corner Shop");
+    await Promise.resolve();
+    const field = input.form?.querySelector<HTMLInputElement>(
+      '[role="combobox"][placeholder="Type to find one"]',
+    );
+    field?.focus();
+    field?.select();
+    await Promise.resolve();
+    document.execCommand("insertText", false, "Rent");
+  });
+
+  await expect(category(page)).toHaveValue("Rent");
+  await page.keyboard.press("Enter");
+  await expect(row(page).getByText("Rent after this:")).toBeVisible();
+  await expect(category(page)).toHaveValue("Rent");
+});
+
 test("Activity narrowed to an Account makes that Account the default", async ({
   page,
 }) => {
