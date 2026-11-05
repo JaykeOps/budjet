@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { violationsInEachTheme } from "./axe";
 import {
   cancelNextFolderPicker,
   deliverFile,
@@ -211,6 +212,14 @@ test.describe("a Budget already in browser storage", () => {
 
     await page.reload();
     await expect(offer(page)).toBeVisible();
+  });
+
+  test("the offer has no accessibility violations in either theme", async ({
+    page,
+  }) => {
+    await aBudgetFromBeforeThePicker(page);
+
+    expect(await violationsInEachTheme(page)).toEqual({ light: [], dark: [] });
   });
 
   test("cancelling the picker leaves the offer as it was", async ({ page }) => {

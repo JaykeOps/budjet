@@ -1,5 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
+import { violationsInEachTheme } from "./axe";
 import {
   activity,
   addAccount,
@@ -45,12 +45,10 @@ async function closeOnlyAccount(page: Page, name: string) {
 }
 
 async function expectNoSeriousViolations(page: Page) {
-  const { violations } = await new AxeBuilder({ page }).analyze();
-  expect(
-    violations.filter(
-      ({ impact }) => impact === "serious" || impact === "critical",
-    ),
-  ).toEqual([]);
+  expect(await violationsInEachTheme(page, { seriousOnly: true })).toEqual({
+    light: [],
+    dark: [],
+  });
 }
 
 test("the coaching note and highlighted first Category stay until anything is assigned", async ({

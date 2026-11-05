@@ -1,5 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { violationsInEachTheme } from "./axe";
 import { createBudget, goTo, openAccount } from "./helpers";
 
 test("the Accounts tab with none open offers Add an Account, above the closed ones", async ({
@@ -21,12 +21,10 @@ test("the Accounts tab with none open offers Add an Account, above the closed on
   await expect(
     page.getByRole("status", { name: "Money in your Accounts" }),
   ).toBeHidden();
-  const { violations } = await new AxeBuilder({ page }).analyze();
-  expect(
-    violations.filter(
-      ({ impact }) => impact === "serious" || impact === "critical",
-    ),
-  ).toEqual([]);
+  expect(await violationsInEachTheme(page, { seriousOnly: true })).toEqual({
+    light: [],
+    dark: [],
+  });
 
   await page.getByRole("button", { name: "Add an Account" }).click();
   await expect(page.getByRole("dialog", { name: "Add Account" })).toBeVisible();
