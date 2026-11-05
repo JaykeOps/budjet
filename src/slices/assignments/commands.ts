@@ -6,6 +6,7 @@ import { assignment } from "./queries";
 import {
   type AssignmentSet,
   assignmentSubject,
+  type CurrentAssignment,
   currentAssignments,
   isAssignmentSet,
   type TakeBackSet,
@@ -82,6 +83,51 @@ export function moveMoney(
   const to = addMoney(assigned(toCategoryId), amount);
   write(writer, { categoryId: fromCategoryId, month, amount: from });
   write(writer, { categoryId: toCategoryId, month, amount: to });
+}
+
+/**
+ * Writes a Category's Assignment and Take-back in a Month back as they were,
+ * for Undo. Only what differs is written, so an Undo leaves alone anything it
+ * didn't change. Unset ones go back to zero, which reads the same.
+ */
+export function restoreAssignment(
+  writer: ChangeLogWriter,
+  { categoryId, month, assigned, takenBack }: CurrentAssignment,
+): void {
+  const budget = writer.changeLog.readAll().findLast(isBudgetCreated);
+  if (!budget) throw new Error("Create a Budget first");
+  const { currency } = budget.payload;
+  const subject = assignmentSubject(categoryId, month);
+  const stored = writer.changeLog
+    .readAll()
+    .filter(isAssignmentSet)
+    .findLast((record) => record.subjectId === subject)?.payload.amount;
+  // Compared as stored: one below zero has to be replaced to stop counting.
+  if ((stored?.minorUnits ?? 0) !== (assigned?.minorUnits ?? 0)) {
+    writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+      subject,
+      "AssignmentSet",
+      {
+        version: 1,
+        categoryId,
+        month,
+        amount: money(assigned?.minorUnits ?? 0, currency),
+      },
+    );
+  }
+  const now = currentAssignments(writer.changeLog.readAll()).get(subject);
+  if ((now?.takenBack?.minorUnits ?? 0) !== (takenBack?.minorUnits ?? 0)) {
+    writer.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+      subject,
+      "TakeBackSet",
+      {
+        version: 1,
+        categoryId,
+        month,
+        amount: money(takenBack?.minorUnits ?? 0, currency),
+      },
+    );
+  }
 }
 
 function checkInBudgetCurrency(writer: ChangeLogWriter, amount: Money): void {

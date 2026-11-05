@@ -109,6 +109,23 @@ export function assignedAfter(
   return false;
 }
 
+/** A Category's Assignments other than zero in Months after `of`, oldest first. */
+export function assignmentsAfter(
+  records: readonly ChangeRecord[],
+  categoryId: string,
+  of: Month,
+): { month: Month; amount: Money }[] {
+  const later: { month: Month; amount: Money }[] = [];
+  for (const { categoryId: id, month, assigned } of currentAssignments(
+    records,
+  ).values()) {
+    if (id === categoryId && month > of && assigned?.minorUnits) {
+      later.push({ month, amount: assigned });
+    }
+  }
+  return later.sort((a, b) => (a.month < b.month ? -1 : 1));
+}
+
 export type OverspentCategory = { categoryId: string; available: Money };
 
 /**

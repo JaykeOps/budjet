@@ -25,10 +25,12 @@ import {
   moveCategoryGroup,
   renameCategory,
   renameCategoryGroup,
+  restoreHidden,
   setCategoryGroupSpentThisMonth,
   unhideCategory,
 } from "./commands";
 import { type CategoryGroup, categoryGroups } from "./index";
+import { moveOutChoices } from "./move-out";
 
 function setUp() {
   const changeLog = createInMemoryChangeLog();
@@ -350,6 +352,76 @@ function budgetWithStarterSet() {
 }
 
 describe("Hiding Categories", () => {
+  it("hides a Category again whatever it holds when restoring", () => {
+    const budget = budgetWithStarterSet();
+    const phone = budget.id("Phone");
+    budget.assign(phone, "2026-10", 5000);
+
+    restoreHidden(budget.writer, phone);
+
+    expect(budget.find("Phone").hidden).toBe(true);
+  });
+
+  describe("where a Category's money can go", () => {
+    const choices = (
+      budget: ReturnType<typeof budgetWithStarterSet>,
+      name: string,
+    ) =>
+      moveOutChoices(
+        budget.writer.changeLog.readAll(),
+        budget.id(name),
+        "2026-10",
+      );
+
+    it("offers every other visible Category when moving money out", () => {
+      const budget = budgetWithStarterSet();
+      budget.assign(budget.id("Rent"), "2026-10", 75000);
+      budget.assign(budget.id("Power"), "2026-10", 1000);
+      hideCategory(budget.writer, budget.id("Phone"), {
+        currentMonth: "2026-10",
+      });
+
+      const found = choices(budget, "Rent");
+
+      expect(found?.left).toEqual(money(75000, "USD"));
+      expect(found?.others.map(({ name }) => name)).toEqual([
+        "Power",
+        "Internet",
+        "Groceries",
+        "Transport",
+        "Dining Out",
+        "Emergency Fund",
+      ]);
+      expect(found?.others[0]).toMatchObject({
+        groupName: "Bills",
+        available: money(1000, "USD"),
+      });
+    });
+
+    it("offers only Categories that can cover the whole amount when covering", () => {
+      const budget = budgetWithStarterSet();
+      budget.spend(budget.id("Rent"), "2026-10-02", 1800);
+      budget.assign(budget.id("Power"), "2026-09", 1800);
+      budget.assign(budget.id("Phone"), "2026-10", 1799);
+
+      expect(choices(budget, "Rent")?.others.map(({ name }) => name)).toEqual([
+        "Power",
+      ]);
+    });
+
+    it("lists later Months' Assignments, oldest first", () => {
+      const budget = budgetWithStarterSet();
+      budget.assign(budget.id("Rent"), "2027-01", 2000);
+      budget.assign(budget.id("Rent"), "2026-11", 1000);
+      budget.assign(budget.id("Rent"), "2026-10", 5000);
+
+      expect(choices(budget, "Rent")?.later).toEqual([
+        { month: "2026-11", amount: money(1000, "USD") },
+        { month: "2027-01", amount: money(2000, "USD") },
+      ]);
+    });
+  });
+
   it("hides a Category with nothing Available and nothing assigned later, and keeps it listed as hidden", () => {
     const budget = budgetWithStarterSet();
     const phone = budget.id("Phone");
