@@ -6,9 +6,12 @@ import {
   budgetRow,
   createBudget,
   expectAssigned,
+  finishEditing,
   goTo,
   hideCategory,
+  openMore,
   record,
+  startEditing,
 } from "./helpers";
 import { reloadWhenSaved } from "./reload";
 
@@ -30,6 +33,11 @@ test("the Budget opens on the current Month with every Category in its Category 
 }) => {
   await createBudget(page, { firstAccount: { openingBalance: "0" } });
   await goTo(page, "Budget");
+  await startEditing(page);
+  const savings = await openMore(page, "Savings");
+  await savings.getByRole("button", { name: "Up", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await finishEditing(page);
 
   const expectOutline = () =>
     expect
@@ -40,12 +48,12 @@ test("the Budget opens on the current Month with every Category in its Category 
         "Power",
         "Phone",
         "Internet",
+        "Savings",
+        "Emergency Fund",
         "Everyday",
         "Groceries",
         "Transport",
         "Dining Out",
-        "Savings",
-        "Emergency Fund",
       ]);
   await expect(monthHeading(page, "October 2026")).toBeVisible();
   await expectOutline();
