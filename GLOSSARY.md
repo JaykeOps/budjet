@@ -11,6 +11,10 @@ _Avoid_: Vault, workspace, sync folder, cloud storage
 **Browser storage**:
 Where a Budget lives when the browser can't use a Data Folder, tied to that one browser on that one device.
 
+**Local Copy**:
+This device's copy of a Budget's records, kept in the browser so the Budget opens without waiting for its Data Folder.
+_Avoid_: Cache, mirror. Say "folder" or Data Folder, not "backup", because the folder also syncs.
+
 ## Budgeting
 
 **Budget**:
