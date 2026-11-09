@@ -12,8 +12,22 @@ _Avoid_: Vault, workspace, sync folder, cloud storage
 Where a Budget lives when the browser can't use a Data Folder, tied to that one browser on that one device.
 
 **Local Copy**:
-This device's copy of a Budget's records, kept in the browser so the Budget opens without waiting for its Data Folder.
+This device's copy of a Budget's Change Log, kept in the browser so the Budget opens without waiting for its Data Folder.
 _Avoid_: Cache, mirror. Say "folder" or Data Folder, not "backup", because the folder also syncs.
+
+## Changes
+
+**Change Log**:
+The whole history of a Budget: every change the user has made to it, on every device, in the order they were made. Nothing in it is ever altered or taken out; even an Undo is a new change.
+_Avoid_: Event log, journal, ledger, history (an Account's money in and out is its Statement)
+
+**Change Record**:
+One change in the Change Log, such as a Transaction entered, a Transfer edited or a Category deleted.
+_Avoid_: Event, entry, mutation
+
+**Replay**:
+Reading the Change Log from the oldest Change Record to the newest to arrive at how the Budget stands now. When two Change Records change the same thing the most recent wins, and a delete wins over every edit.
+_Avoid_: Fold, rebuild, projection, reduce
 
 ## Budgeting
 
