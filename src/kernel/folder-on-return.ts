@@ -17,6 +17,42 @@ export type ReturningFolder = {
 
 export type OnReturn = "open" | "lapsed" | "lost";
 
+/** Long enough for a folder that's gone to say so, short enough not to feel like waiting. */
+const REACH_TIME_BOX = 1000;
+
+/**
+ * The same folder, except that `reach` stops waiting for an answer once the time
+ * is up, so the Budget opens from the Local Copy. Trying the folder carries on
+ * behind it, and a failure found later goes to `onLateFailure`.
+ */
+export function timeBoxed(
+  folder: ReturningFolder,
+  onLateFailure: (reason: UnsavedReason) => void,
+  timeIsUp: () => Promise<void> = () =>
+    new Promise((resolve) => setTimeout(resolve, REACH_TIME_BOX)),
+): ReturningFolder {
+  return {
+    ...folder,
+    async reach() {
+      let late = false;
+      const reaching = folder.reach();
+      reaching.catch((error) => {
+        if (!late) return;
+        const name = error instanceof DOMException ? error.name : undefined;
+        if (name === "NotAllowedError") onLateFailure("access-lapsed");
+        else if (name === "NotFoundError") onLateFailure("folder-gone");
+        else console.error("Crownkeep could not try the folder", error);
+      });
+      await Promise.race([
+        reaching,
+        timeIsUp().then(() => {
+          late = true;
+        }),
+      ]);
+    },
+  };
+}
+
 export async function tryFolderOnReturn(
   folder: ReturningFolder,
 ): Promise<OnReturn> {

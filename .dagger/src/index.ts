@@ -1,5 +1,5 @@
 /**
- * budjet's CI: every check, the build and the release.
+ * Crownkeep's CI: every check, the build and the release.
  *
  * Each function runs inside a Nix container using the repo's own flake, so the
  * tools are exactly the ones humans and agents get from `nix develop`
@@ -30,7 +30,7 @@ const CZ_NO_COMMITS_FOUND = 3;
 const CZ_NO_COMMITS_TO_BUMP = 21;
 
 @object()
-export class Budjet {
+export class Crownkeep {
   source: Directory;
 
   constructor(
@@ -216,8 +216,8 @@ export class Budjet {
       [
         "sh",
         "-c",
-        'cd dist && zip -qr "../budjet-$1.zip" . && cd .. && ' +
-          'gh release create "$1" --repo "$2" --target "$3" --title "$1" --notes-file notes.md "budjet-$1.zip"',
+        'cd dist && zip -qr "../crownkeep-$1.zip" . && cd .. && ' +
+          'gh release create "$1" --repo "$2" --target "$3" --title "$1" --notes-file notes.md "crownkeep-$1.zip"',
         "release",
         tag,
         repo,
@@ -254,7 +254,10 @@ export class Budjet {
   private workspace(): Container {
     const installed = this.inDevShell(
       this.toolchain()
-        .withMountedCache("/pnpm-store", dag.cacheVolume("budjet-pnpm-store"))
+        .withMountedCache(
+          "/pnpm-store",
+          dag.cacheVolume("crownkeep-pnpm-store"),
+        )
         .withDirectory("/src", this.source, {
           include: ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"],
         }),
@@ -266,7 +269,7 @@ export class Budjet {
   /** The workspace after a production build; the app's default version applies without `tag`. */
   private built(tag?: string): Container {
     const workspace = tag
-      ? this.workspace().withEnvVariable("BUDJET_VERSION", tag)
+      ? this.workspace().withEnvVariable("CROWNKEEP_VERSION", tag)
       : this.workspace();
     return this.inDevShell(workspace, ["pnpm", "build"]);
   }

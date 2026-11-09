@@ -19,6 +19,7 @@ import {
   type Draft,
   dayBefore,
   draftAmount,
+  draftChanged,
   draftOf,
   matchingPayees,
   missingField,
@@ -462,5 +463,38 @@ describe("the row on desktop", () => {
       afterThis({ ...withoutCategory, direction: "in" }, "USD", choices),
     ).toEqual({ name: "Ready to Assign", after: money(6850, "USD") });
     expect(afterThis(withoutCategory, "USD", choices)).toBeUndefined();
+  });
+});
+
+describe("draftChanged", () => {
+  const started: Draft = {
+    direction: "out",
+    typed: "20.00",
+    categoryId: "groceries",
+    payee: "Rewe",
+    date: "2026-10-15",
+    accountId: "checking",
+  };
+
+  it("sees the same Transaction however it's written", () => {
+    const same = { ...started, typed: "20", payee: " Rewe " };
+    expect(draftChanged(same, started, "USD")).toBe(false);
+  });
+
+  it("sees anything saving would change", () => {
+    for (const change of [
+      { typed: "21" },
+      { typed: "" },
+      { direction: "in" },
+      { categoryId: "rent" },
+      { categoryId: undefined },
+      { payee: "Aldi" },
+      { date: "2026-10-16" },
+      { accountId: "savings" },
+    ] satisfies Partial<Draft>[]) {
+      expect(draftChanged({ ...started, ...change }, started, "USD")).toBe(
+        true,
+      );
+    }
   });
 });

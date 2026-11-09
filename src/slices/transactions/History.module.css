@@ -34,6 +34,25 @@
   display: none;
 }
 
+.inPlace {
+  padding: 6px 0;
+}
+
+.reading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reading p {
+  margin: 0;
+}
+
+.readingTitle {
+  margin: 0;
+  font-size: 15px;
+}
+
 .statementCell {
   padding: 0;
 }
@@ -200,10 +219,12 @@
   .actionsColumn {
     width: 64px;
   }
-  .open {
-    display: none;
+  .open:hover {
+    background: color-mix(in srgb, var(--text) 5%, transparent);
   }
   .more {
+    position: relative;
+    z-index: 1;
     display: inline;
   }
 }
@@ -217,4 +238,13 @@
 .delete {
   padding: 12px;
   color: var(--overspent);
+}
+
+.reading > :last-child {
+  align-self: flex-end;
+}
+
+/* The screen's own heading, above its card, as on the other places. */
+.screenTitle {
+  margin: 0;
 }

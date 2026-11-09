@@ -14,9 +14,10 @@ function laterNote(
 ): string {
   const total = later.map(({ amount }) => amount).reduce(addMoney);
   const has = `${name}${also ? " also" : ""} has ${formatMoney(total)} assigned`;
+  const zero = formatMoney({ ...total, minorUnits: 0 });
   return later.length === 1
-    ? `${has} in ${monthName(later[0].month)}. Hiding sets that to $0.00, and it goes back to Ready to Assign.`
-    : `${has} across ${later.length} later Months. Hiding sets all of them to $0.00, and it goes back to Ready to Assign.`;
+    ? `${has} in ${monthName(later[0].month)}. Hiding sets that to ${zero}, and it goes back to Ready to Assign.`
+    : `${has} across ${later.length} later Months. Hiding sets all of them to ${zero}, and it goes back to Ready to Assign.`;
 }
 
 /**
@@ -94,7 +95,7 @@ export function MoveOutFlow({
       >
         {hasMoney
           ? `${moving ? "Move" : "Cover"} ${size}${hide ? " and hide" : ""}`
-          : "Set to $0.00 and hide"}
+          : `Set to ${formatMoney({ ...left, minorUnits: 0 })} and hide`}
       </button>
       <button type="button" onClick={onCancel}>
         Keep {name} as it is

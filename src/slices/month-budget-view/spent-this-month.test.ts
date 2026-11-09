@@ -133,6 +133,39 @@ function seed<Record extends { type: string; payload: unknown }>(
 }
 
 describe("Spent this Month", () => {
+  describe("whether anything is recorded in the Month", () => {
+    it("is false with no Transactions", () => {
+      const { records } = budget();
+      expect(spentThisMonth(records(), october)?.recorded).toBe(false);
+    });
+
+    it("is true when the only Transaction is in a left-out Group", () => {
+      const { leaveOut, record, records } = budget();
+      leaveOut("savings");
+      record("2026-10-05", -5000, "holiday");
+      const card = spentThisMonth(records(), october);
+      expect(card?.daily).toEqual([]);
+      expect(card?.recorded).toBe(true);
+    });
+
+    it("is true for money into Ready to Assign, and for a hidden Category", () => {
+      const inflow = budget();
+      inflow.record("2026-10-05", 5000);
+      expect(spentThisMonth(inflow.records(), october)?.recorded).toBe(true);
+
+      const hidden = budget();
+      hidden.hide("holiday");
+      hidden.record("2026-10-05", -5000, "holiday");
+      expect(spentThisMonth(hidden.records(), october)?.recorded).toBe(true);
+    });
+
+    it("is false when the Transactions are all in other Months", () => {
+      const { record, records } = budget();
+      record("2026-09-30", -5000, "groceries");
+      expect(spentThisMonth(records(), october)?.recorded).toBe(false);
+    });
+  });
+
   it("is undefined before a Budget exists", () => {
     expect(spentThisMonth([], october)).toBeUndefined();
   });

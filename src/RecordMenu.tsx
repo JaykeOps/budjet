@@ -63,7 +63,7 @@ export function RecordMenu({ currency }: { currency: Currency }) {
             >
               <span className={styles.label}>Make a Transfer</span>
               <span className={styles.description}>
-                Move money between your Accounts
+                Money from one of your Accounts to another
               </span>
             </MenuItem>
           </Menu>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { pickFolder } from "../../kernel/browser-folder";
 import type { MoveOutcome } from "../../kernel/data-folder-change-log";
 import styles from "./MoveIntoFolderOffer.module.css";
 
@@ -29,13 +30,8 @@ export function MoveIntoFolderOffer({
     setRefusal(undefined);
     let folder: FileSystemDirectoryHandle | undefined;
     try {
-      folder = await window.showDirectoryPicker?.({
-        id: "crownkeep",
-        mode: "readwrite",
-      });
+      folder = await pickFolder();
     } catch (error) {
-      // Cancelling, and declining the browser's prompt, both arrive as AbortError.
-      if (error instanceof DOMException && error.name === "AbortError") return;
       console.error("Crownkeep could not use that folder", error);
       setRefusal(REFUSALS.failed);
       return;

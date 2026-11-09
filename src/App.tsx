@@ -7,6 +7,7 @@ import {
 import { AccountsPlace } from "./AccountsPlace";
 import { useCategoryChanges } from "./category-changes";
 import { FolderBanner, type FolderConnection } from "./FolderBanner";
+import { useFirstCategoryChanges } from "./first-categories";
 import { FirstRun } from "./first-run/FirstRun";
 import type { ChangeLogWriter } from "./kernel/change-log";
 import { parseMonth } from "./kernel/month";
@@ -18,7 +19,7 @@ import { useMonthInUrl } from "./month-in-url";
 import { NavigationShell } from "./NavigationShell";
 import { requestPersistentStorage } from "./persistent-storage";
 import { placeAddress, usePlace } from "./place-in-url";
-import { useRecordingRow } from "./RecordingRow";
+import { isDesktop, useRecordingRow } from "./RecordingRow";
 import { RecordMenu } from "./RecordMenu";
 import {
   AddAccountSheet,
@@ -26,19 +27,18 @@ import {
   useAccounts,
 } from "./slices/accounts";
 import { openAccount } from "./slices/accounts/commands";
-import {
-  copyLastMonth,
-  moveMoney,
-  setAssignment,
-} from "./slices/assignments/commands";
 import { type Budget, useBudget } from "./slices/budget-setup";
 import { categoryGroups } from "./slices/categories";
 import { MoveIntoFolderOffer } from "./slices/data-folder";
 import { MonthBudget } from "./slices/month-budget-view";
-import { TransactionsScreen } from "./slices/transactions";
+import {
+  RecordTransactionSheet,
+  TransactionsScreen,
+} from "./slices/transactions";
 import { Toasts, useToast } from "./ui/Toast";
-import { useHistoryChanges } from "./undo";
+import { useAssignmentChanges, useHistoryChanges } from "./undo";
 import { pushAddress, useUrlParameter } from "./url-parameter";
+import { useRecordCommands } from "./use-record-commands";
 
 type KeepInFolder = ComponentProps<typeof FirstRun>["keepInFolder"];
 /** Absent where the browser has no folder picker. */
@@ -84,7 +84,7 @@ function Page({
   return (
     <main>
       {folderConnection && <FolderBanner connection={folderConnection} />}
-      {titled && <h1>budjet</h1>}
+      {titled && <h1>Crownkeep</h1>}
       {children}
       <p>Version {__APP_VERSION__}</p>
     </main>
@@ -144,6 +144,7 @@ function Shell({
   const place = usePlace();
   const toast = useToast();
   const historyChanges = useHistoryChanges();
+  const assignmentChanges = useAssignmentChanges();
   const [addingAccount, setAddingAccount] = useState(false);
   const recording = useRecordingRow(budget.currency);
 
@@ -165,25 +166,27 @@ function Shell({
       recordButton={recording.recordButton}
       plus={<RecordMenu currency={budget.currency} />}
     >
-      <Page titled={place === "activity"} folderConnection={folderConnection}>
+      <Page titled={false} folderConnection={folderConnection}>
         {folderOffer && <MoveIntoFolderOffer {...folderOffer} />}
         {place === "budget" && (
           <BudgetMonth
             firstMonth={budget.firstMonth}
             currency={budget.currency}
-            onAssign={(input) => setAssignment(writer, input)}
+            onAssign={assignmentChanges.onAssign}
             onCopyLastMonth={(month, unticked) =>
-              copyLastMonth(writer, {
-                month,
-                skipping: [...hiddenCategoryIds(writer), ...unticked],
-              })
+              assignmentChanges.onCopyLastMonth(month, [
+                ...hiddenCategoryIds(writer),
+                ...unticked,
+              ])
             }
-            onMoveMoney={(input) => moveMoney(writer, input)}
+            onMoveMoney={assignmentChanges.onMoveMoney}
           />
         )}
         {place === "activity" && (
           <AccountTransactions
             currency={budget.currency}
+            onAddAccount={() => setAddingAccount(true)}
+            onRecordInRow={() => recording.start()}
             recordRow={recording.row}
             {...historyChanges}
           />
@@ -214,22 +217,42 @@ function Shell({
 }
 
 /** The Transactions screen for what the address bar says it's showing (`?account=<id>&statement=YYYY-MM`). */
-function AccountTransactions(
-  props: Omit<ComponentProps<typeof TransactionsScreen>, "showing" | "onShow">,
-) {
+function AccountTransactions({
+  onRecordInRow,
+  ...props
+}: Omit<
+  ComponentProps<typeof TransactionsScreen>,
+  "showing" | "onShow" | "onRecordFirst"
+> & { onRecordInRow: () => void }) {
   const [accountId] = useUrlParameter("account");
   const [statementMonth] = useUrlParameter("statement");
+  const commands = useRecordCommands();
+  // The row only shows on desktop, so a phone records through the sheet.
+  const [recordingOnPhone, setRecordingOnPhone] = useState<{ into?: string }>();
   return (
-    <TransactionsScreen
-      showing={{
-        accountId: accountId ?? undefined,
-        month: parseMonth(statementMonth),
-      }}
-      onShow={({ accountId, month }) =>
-        pushAddress(placeAddress("activity", accountId, month))
-      }
-      {...props}
-    />
+    <>
+      <TransactionsScreen
+        showing={{
+          accountId: accountId ?? undefined,
+          month: parseMonth(statementMonth),
+        }}
+        onShow={({ accountId, month }) =>
+          pushAddress(placeAddress("activity", accountId, month))
+        }
+        onRecordFirst={(into) =>
+          isDesktop() ? onRecordInRow() : setRecordingOnPhone({ into })
+        }
+        {...props}
+      />
+      {recordingOnPhone && (
+        <RecordTransactionSheet
+          currency={props.currency}
+          defaultAccountId={recordingOnPhone.into}
+          onClose={() => setRecordingOnPhone(undefined)}
+          onRecord={commands.record}
+        />
+      )}
+    </>
   );
 }
 
@@ -247,11 +270,17 @@ function BudgetMonth({
   ...props
 }: Omit<
   ComponentProps<typeof MonthBudget>,
-  "month" | "onMonthChange" | "editing" | "onEditingChange" | "categoryChanges"
+  | "month"
+  | "onMonthChange"
+  | "editing"
+  | "onEditingChange"
+  | "categoryChanges"
+  | "firstCategoryChanges"
 >) {
   const [month, setMonth] = useMonthInUrl(firstMonth);
   const [edit, setEdit] = useUrlParameter("edit");
   const categoryChanges = useCategoryChanges();
+  const firstCategoryChanges = useFirstCategoryChanges();
   return (
     <MonthBudget
       month={month}
@@ -260,6 +289,7 @@ function BudgetMonth({
       editing={edit === "on"}
       onEditingChange={(on) => setEdit(on ? "on" : "off", "push")}
       categoryChanges={categoryChanges}
+      firstCategoryChanges={firstCategoryChanges}
       {...props}
     />
   );

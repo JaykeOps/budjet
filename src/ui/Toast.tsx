@@ -37,10 +37,14 @@ export function Toasts({ children }: { children: ReactNode }) {
   const focusBefore = useRef<Element | null>(null);
 
   const show = useCallback((next: Toast) => {
-    focusBefore.current = document.activeElement;
     setHeld(false);
     setToast(next);
   }, []);
+
+  // Once the change has landed: what was in use may have closed along with it.
+  useEffect(() => {
+    if (toast) focusBefore.current = document.activeElement;
+  }, [toast]);
 
   useEffect(() => {
     if (!toast || held) return;

@@ -62,8 +62,8 @@ describe("Categories", () => {
       ["Everyday", ["Groceries", "Transport", "Dining Out"]],
       ["Savings", ["Emergency Fund"]],
     ]);
-    const all = groups().flatMap((group) => [group, ...group.categories]);
-    expect(all.every((thing) => thing.hidden === false)).toBe(true);
+    const all = groups().flatMap(({ categories }) => categories);
+    expect(all.every((category) => category.hidden === false)).toBe(true);
   });
 
   it("adds a new Category Group, and Categories in it, at the end", () => {

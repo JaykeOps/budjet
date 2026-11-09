@@ -10,7 +10,7 @@ import styles from "./MonthBudget.module.css";
 import { type SpentChart, spentChart } from "./spent-chart";
 import { useSpentThisMonth } from "./spent-this-month";
 
-function anythingAssigned(records: readonly ChangeRecord[]): boolean {
+export function anythingAssigned(records: readonly ChangeRecord[]): boolean {
   return [...currentAssignments(records).values()].some(
     ({ assigned }) => assigned && assigned.minorUnits !== 0,
   );
@@ -88,7 +88,7 @@ export function SpentThisMonthCard({ month }: { month: Month }) {
           )}
         </span>
       </p>
-      {spent.daily.length === 0 ? (
+      {!spent.recorded ? (
         <p className={styles.small}>
           Nothing recorded yet. Spending shows up here as you record it.
         </p>

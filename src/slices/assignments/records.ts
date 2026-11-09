@@ -4,6 +4,7 @@
  */
 import {
   type ChangeRecord,
+  deletedSubjects,
   latestBySubject,
   perSnapshot,
 } from "../../kernel/change-log";
@@ -14,11 +15,18 @@ import type { Month } from "../../kernel/month";
  * The Assignment for one Category in one Month. Its subject is that Category
  * in that Month (see `assignmentSubject`), so the latest record for it wins.
  * Commands no longer store one below zero, but records from before Take-backs
- * can hold one; read them through `currentAssignments`.
+ * can hold one; read them through `currentAssignments`. An Undo back to no
+ * Assignment at all stores zero with `cleared`, so it reads as never having been set.
  */
 export type AssignmentSet = ChangeRecord<
   "AssignmentSet",
-  { version: 1; categoryId: string; month: Month; amount: Money }
+  {
+    version: 1;
+    categoryId: string;
+    month: Month;
+    amount: Money;
+    cleared?: true;
+  }
 >;
 
 export function isAssignmentSet(record: ChangeRecord): record is AssignmentSet {
@@ -55,10 +63,16 @@ export type CurrentAssignment = {
 /**
  * Every Category's Assignment and Take-back in every Month as they now stand,
  * by `assignmentSubject`: the latest of each wins, and a stored negative
- * Assignment reads as $0 plus a Take-back of the difference.
+ * Assignment reads as $0 plus a Take-back of the difference. A deleted Category
+ * has none, whatever another device wrote for it (docs/adr/0006). Records may
+ * import only the kernel, so its delete record is matched by the type it publishes.
  */
 export const currentAssignments = perSnapshot(
   (records: readonly ChangeRecord[]): Map<string, CurrentAssignment> => {
+    const deleted = deletedSubjects(
+      records,
+      ({ type }) => type === "CategoryDeleted",
+    );
     const current = new Map<string, CurrentAssignment>();
     const entry = (
       subject: string,
@@ -85,8 +99,10 @@ export const currentAssignments = perSnapshot(
       records.filter(isAssignmentSet),
     )) {
       const found = entry(subject, payload);
-      const { amount } = payload;
-      if (amount.minorUnits < 0) {
+      const { amount, cleared } = payload;
+      if (cleared) {
+        found.assigned = undefined;
+      } else if (amount.minorUnits < 0) {
         const difference = money(-amount.minorUnits, amount.currency);
         found.assigned = money(0, amount.currency);
         found.takenBack = found.takenBack
@@ -95,6 +111,9 @@ export const currentAssignments = perSnapshot(
       } else {
         found.assigned = amount;
       }
+    }
+    for (const [subject, { categoryId }] of current) {
+      if (deleted.has(categoryId)) current.delete(subject);
     }
     return current;
   },

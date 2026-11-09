@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import {
   Button,
   Dialog,
@@ -89,5 +89,64 @@ function Surface({
         </Dialog>
       </Modal>
     </ModalOverlay>
+  );
+}
+
+/**
+ * A sheet whose inside a slice lays out itself, with its own styles: steps, a
+ * back link, a title of its own. It's open while it's rendered, and Escape or
+ * tapping outside calls `onClose`. Put a `SheetTitle` inside, and a `SheetClose`
+ * if it shows one.
+ */
+export function SheetShell({
+  onClose,
+  classNames,
+  dialogRef,
+  children,
+}: {
+  onClose: () => void;
+  classNames: { overlay: string; sheet: string; dialog: string };
+  dialogRef?: Ref<HTMLElement>;
+  children: ReactNode;
+}) {
+  return (
+    <ModalOverlay
+      isOpen
+      isDismissable
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      className={classNames.overlay}
+    >
+      <Modal className={classNames.sheet}>
+        <Dialog ref={dialogRef} className={classNames.dialog}>
+          {children}
+        </Dialog>
+      </Modal>
+    </ModalOverlay>
+  );
+}
+
+/** The heading a `SheetShell` is named by. */
+export function SheetTitle({
+  className,
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Heading slot="title" className={className}>
+      {children}
+    </Heading>
+  );
+}
+
+/** Closes the `SheetShell` it's in. */
+export function SheetClose({ className }: { className?: string }) {
+  return (
+    <Button className={className} slot="close">
+      Close
+    </Button>
   );
 }

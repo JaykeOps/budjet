@@ -6,14 +6,17 @@ import {
   createInMemoryChangeLog,
 } from "./kernel/change-log";
 import { type Money, money } from "./kernel/money";
+import type { Month } from "./kernel/month";
 import { accounts, adjustments, balanceChecks } from "./slices/accounts";
 import {
   closeAccount,
   openAccount,
   redeclareBalance,
 } from "./slices/accounts/commands";
+import { assignment, takeBack } from "./slices/assignments";
+import { copyLastMonth, setAssignment } from "./slices/assignments/commands";
 import { createBudget } from "./slices/budget-setup/commands";
-import { available } from "./slices/budget-totals";
+import { available, readyToAssign } from "./slices/budget-totals";
 import {
   createCategory,
   createCategoryGroup,
@@ -27,11 +30,14 @@ import { currentTransactions } from "./slices/transactions/records";
 import { editTransfer, makeTransfer } from "./slices/transfers/commands";
 import { currentTransfers } from "./slices/transfers/records";
 import {
+  copyLastMonthWithUndo,
   deleteRedeclaredBalanceWithUndo,
   deleteTransactionWithUndo,
   deleteTransferWithUndo,
   editTransactionWithUndo,
   editTransferWithUndo,
+  moveMoneyWithUndo,
+  setAssignmentWithUndo,
 } from "./undo";
 
 const usd = (minorUnits: number): Money => money(minorUnits, "USD");
@@ -92,7 +98,17 @@ function twoDevices() {
       payee: "Corner Bistro",
       memo: "With Sam",
     });
-  return { phone, laptop, sync, checking, savings, groceries, balance, lunch };
+  return {
+    phone,
+    laptop,
+    sync,
+    checking,
+    savings,
+    group,
+    groceries,
+    balance,
+    lunch,
+  };
 }
 
 const listed = (records: readonly ChangeRecord[], accountId: string) =>
@@ -508,5 +524,166 @@ describe("Undo's records merging from two devices", () => {
 
     expect(undoEdit).toThrow(RangeError);
     expect(undoDelete).toThrow(RangeError);
+  });
+});
+
+describe("undoing Assignments", () => {
+  const october: Month = "2026-10";
+  const november: Month = "2026-11";
+
+  function aBudget() {
+    const { phone, group, groceries } = twoDevices();
+    const { writer } = phone;
+    const dining = createCategory(writer, {
+      groupId: group,
+      name: "Dining Out",
+    });
+    const assignedIn = (categoryId: string, of = october) =>
+      assignment(phone.records(), categoryId, of);
+    const takenBackIn = (categoryId: string, of = october) =>
+      takeBack(phone.records(), categoryId, of);
+    const ready = () => readyToAssign(phone.records());
+    return {
+      writer,
+      groceries,
+      dining,
+      assignedIn,
+      takenBackIn,
+      ready,
+    };
+  }
+
+  it("writes the previous Assignment back", () => {
+    const { writer, groceries, assignedIn, ready } = aBudget();
+    setAssignment(writer, {
+      categoryId: groceries,
+      month: october,
+      amount: usd(10000),
+    });
+    const before = ready();
+
+    const undo = setAssignmentWithUndo(writer, {
+      categoryId: groceries,
+      month: october,
+      amount: usd(25000),
+    });
+    expect(assignedIn(groceries)).toEqual(usd(25000));
+    undo();
+
+    expect(assignedIn(groceries)).toEqual(usd(10000));
+    expect(ready()).toEqual(before);
+  });
+
+  it("restores the Take-back a typed negative added", () => {
+    const { writer, groceries, assignedIn, takenBackIn, ready } = aBudget();
+    setAssignment(writer, {
+      categoryId: groceries,
+      month: october,
+      amount: usd(10000),
+    });
+    const before = ready();
+
+    const undo = setAssignmentWithUndo(writer, {
+      categoryId: groceries,
+      month: october,
+      amount: usd(-500),
+    });
+    expect(takenBackIn(groceries)).toEqual(usd(500));
+    undo();
+
+    expect(assignedIn(groceries)).toEqual(usd(10000));
+    expect(takenBackIn(groceries)?.minorUnits ?? 0).toBe(0);
+    expect(ready()).toEqual(before);
+  });
+
+  it("puts both ends of a move back, Take-back included", () => {
+    const { writer, groceries, dining, assignedIn, takenBackIn, ready } =
+      aBudget();
+    setAssignment(writer, {
+      categoryId: groceries,
+      month: october,
+      amount: usd(1000),
+    });
+    const before = ready();
+
+    const undo = moveMoneyWithUndo(writer, {
+      fromCategoryId: groceries,
+      toCategoryId: dining,
+      month: october,
+      amount: usd(1500),
+    });
+    expect(takenBackIn(groceries)).toEqual(usd(500));
+    undo();
+
+    expect(assignedIn(groceries)).toEqual(usd(1000));
+    expect(assignedIn(dining)).toBeUndefined();
+    expect(takenBackIn(groceries)?.minorUnits ?? 0).toBe(0);
+    expect(ready()).toEqual(before);
+  });
+
+  it("empties what a copy filled, so the same copy can run again", () => {
+    const { writer, groceries, dining, assignedIn } = aBudget();
+    setAssignment(writer, {
+      categoryId: groceries,
+      month: october,
+      amount: usd(1000),
+    });
+    setAssignment(writer, {
+      categoryId: dining,
+      month: october,
+      amount: usd(2000),
+    });
+    setAssignment(writer, {
+      categoryId: dining,
+      month: november,
+      amount: usd(300),
+    });
+
+    const { copied, undo } = copyLastMonthWithUndo(writer, {
+      month: november,
+    });
+    expect(copied).toBe(1);
+    expect(assignedIn(groceries, november)).toEqual(usd(1000));
+    undo();
+
+    expect(assignedIn(groceries, november)).toBeUndefined();
+    expect(assignedIn(dining, november)).toEqual(usd(300));
+
+    copyLastMonth(writer, { month: november });
+    expect(assignedIn(groceries, november)).toEqual(usd(1000));
+  });
+
+  it("goes back to an Assignment set to zero, which a copy leaves alone", () => {
+    const { writer, groceries, assignedIn } = aBudget();
+    setAssignment(writer, {
+      categoryId: groceries,
+      month: october,
+      amount: usd(1000),
+    });
+    setAssignment(writer, {
+      categoryId: groceries,
+      month: november,
+      amount: usd(0),
+    });
+
+    setAssignmentWithUndo(writer, {
+      categoryId: groceries,
+      month: november,
+      amount: usd(70),
+    })();
+
+    expect(assignedIn(groceries, november)).toEqual(usd(0));
+  });
+
+  it("leaves nothing assigned behind after undoing a first Assignment to zero", () => {
+    const { writer, groceries, assignedIn } = aBudget();
+
+    setAssignmentWithUndo(writer, {
+      categoryId: groceries,
+      month: october,
+      amount: usd(0),
+    })();
+
+    expect(assignedIn(groceries)).toBeUndefined();
   });
 });

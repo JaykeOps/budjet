@@ -1,11 +1,10 @@
-import type { ChangeRecord } from "../../kernel/change-log";
+import { type ChangeRecord, deletedSubjects } from "../../kernel/change-log";
 import { isCategoriesRecord } from "./records";
 
 export type Category = { id: string; name: string; hidden: boolean };
 export type CategoryGroup = {
   id: string;
   name: string;
-  hidden: boolean;
   leftOutOfSpentThisMonth: boolean;
   categories: Category[];
 };
@@ -27,7 +26,10 @@ export function categoryGroups(
     Placed & { groupId: string; hidden: boolean }
   >();
   // Once deleted, a thing stays deleted, whatever other devices did to it.
-  const deleted = new Set<string>();
+  const deleted = deletedSubjects(
+    records,
+    ({ type }) => type === "CategoryDeleted" || type === "CategoryGroupDeleted",
+  );
 
   // Records come oldest first, so each later record overwrites what it changes.
   for (const record of records) {
@@ -37,7 +39,11 @@ export function categoryGroups(
     const category = categories.get(id);
     switch (record.type) {
       case "CategoryGroupCreated":
-        groups.set(id, { id, ...pick(record.payload), leftOut: false });
+        groups.set(id, {
+          id,
+          ...nameAndPosition(record.payload),
+          leftOut: false,
+        });
         break;
       case "CategoryGroupRenamed":
         if (group) group.name = record.payload.name;
@@ -51,7 +57,7 @@ export function categoryGroups(
       case "CategoryCreated":
         categories.set(id, {
           id,
-          ...pick(record.payload),
+          ...nameAndPosition(record.payload),
           groupId: record.payload.groupId,
           hidden: false,
         });
@@ -69,10 +75,6 @@ export function categoryGroups(
       case "CategoryUnhidden":
         if (category) category.hidden = record.type === "CategoryHidden";
         break;
-      case "CategoryDeleted":
-      case "CategoryGroupDeleted":
-        deleted.add(id);
-        break;
     }
   }
 
@@ -81,7 +83,6 @@ export function categoryGroups(
   return inOrder(kept).map((group) => ({
     id: group.id,
     name: group.name,
-    hidden: false,
     leftOutOfSpentThisMonth: group.leftOut,
     categories: inOrder(all.filter(({ groupId }) => groupId === group.id)).map(
       ({ id, name, hidden }) => ({ id, name, hidden }),
@@ -89,7 +90,13 @@ export function categoryGroups(
   }));
 }
 
-function pick({ name, position }: { name: string; position: number }) {
+function nameAndPosition({
+  name,
+  position,
+}: {
+  name: string;
+  position: number;
+}) {
   return { name, position };
 }
 

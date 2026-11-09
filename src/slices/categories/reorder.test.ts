@@ -13,7 +13,6 @@ function group(id: string, ...categoryIds: string[]): CategoryGroup {
   return {
     id,
     name: id,
-    hidden: false,
     leftOutOfSpentThisMonth: false,
     categories: categoryIds.map((category) => ({
       id: category,

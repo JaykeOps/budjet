@@ -1,6 +1,11 @@
 import { IDBFactory } from "fake-indexeddb";
 import { describe, expect, it, vi } from "vitest";
-import type { ChangeLog, ChangeRecord, SaveState } from "./change-log";
+import {
+  type ChangeLog,
+  type ChangeRecord,
+  SAVED,
+  type SaveState,
+} from "./change-log";
 import {
   type DataFolderChangeLog,
   openDataFolderChangeLog,
@@ -456,6 +461,31 @@ describe("moving a Budget from browser storage into a folder", () => {
     ).toContain("from-the-other-tab");
   });
 
+  it("writes a change another tab made after the switch, before it reloaded", async () => {
+    const { indexedDB, chosen, openTab, changeLog } =
+      await aBudgetInBrowserStorage();
+    const other = await openTab();
+
+    await changeLog.moveIntoFolder(chosen, HANDLE);
+    other.append([record("around-the-move", NOV_1 + 1)]);
+    await settled(other);
+
+    const reloaded = await openDataFolderChangeLog({
+      indexedDB,
+      oneTabAtATime: chosen.oneTabAtATime,
+      budgetIds,
+      onTwoBudgets: () => {},
+    });
+    reloaded.returnToFolder(chosen);
+    await vi.waitFor(async () =>
+      expect(await reloaded.hasUnsavedChanges()).toBe(false),
+    );
+
+    expect(
+      lines(chosen.files.get("phone-2026-11.jsonl")).map(({ id }) => id),
+    ).toContain("around-the-move");
+  });
+
   it("writes a change made while the copy was running", async () => {
     const { chosen, changeLog } = await aBudgetInBrowserStorage();
 
@@ -599,6 +629,47 @@ describe("checking the Data Folder for other devices' changes", () => {
 
     expect(ids(changeLog).sort()).toEqual(["mine", "old", "other"]);
     expect((await openTab()).readAll()).toHaveLength(3);
+  });
+
+  it("takes a failure found outside a write as unsaved, until a write succeeds", async () => {
+    const { openTab, folder } = aBrowser();
+    const changeLog = await openTab();
+
+    changeLog.folderFailed("folder-gone");
+    expect(changeLog.saveState()).toEqual({
+      status: "unsaved",
+      reason: "folder-gone",
+    });
+
+    changeLog.returnToFolder(folder);
+    await vi.waitFor(() => expect(changeLog.saveState()).toEqual(SAVED));
+  });
+
+  it("skips a file it can't write for NotReadableError, writes the rest, and retries it on the next check", async () => {
+    const { folder, openTab } = aBrowser();
+    const changeLog = await openTab();
+    const states = saveStates(changeLog);
+    folder.failAppending("phone-2026-10.jsonl", "NotReadableError");
+
+    changeLog.append([record("busy", OCT_31), record("fine", NOV_1)]);
+    await vi.waitFor(() =>
+      expect(lines(folder.files.get("phone-2026-11.jsonl"))).toEqual([
+        record("fine", NOV_1),
+      ]),
+    );
+    expect(folder.files.has("phone-2026-10.jsonl")).toBe(false);
+    expect(await changeLog.hasUnsavedChanges()).toBe(true);
+    expect(states.map(({ status }) => status)).not.toContain("unsaved");
+
+    folder.failAppending("phone-2026-10.jsonl", undefined);
+    await changeLog.checkFolder("quick");
+    await vi.waitFor(() => expect(changeLog.saveState()).toEqual(SAVED));
+
+    expect(lines(folder.files.get("phone-2026-10.jsonl"))).toEqual([
+      record("busy", OCT_31),
+    ]);
+    expect(await changeLog.hasUnsavedChanges()).toBe(false);
+    expect(states.map(({ status }) => status)).not.toContain("unsaved");
   });
 
   it("skips a NotReadableError file, reads the rest, and retries it on the next check", async () => {

@@ -1,11 +1,11 @@
-# budjet
+# Crownkeep
 
 A local-first budgeting app that runs in the browser and keeps the user's data on their own device.
 
 ## Language
 
 **Data Folder**:
-The directory on the user's device, chosen by the user, where budjet keeps their data. Getting it onto other devices is the job of whatever sync service the user points at that folder; budjet never talks to a sync service itself.
+The directory on the user's device, chosen by the user, where Crownkeep keeps their data. Getting it onto other devices is the job of whatever sync service the user points at that folder; Crownkeep never talks to a sync service itself.
 _Avoid_: Vault, workspace, sync folder, cloud storage
 
 **Browser storage**:
@@ -13,7 +13,7 @@ Where a Budget lives when the browser can't use a Data Folder, tied to that one 
 
 **Local Copy**:
 This device's copy of a Budget's records, kept in the browser so the Budget opens without waiting for its Data Folder.
-_Avoid_: Cache, mirror. Say "folder" or Data Folder, not "backup", because the folder also syncs.
+_Avoid_: cache, mirror. Say "folder" or Data Folder, not "backup", because the folder also syncs.
 
 ## Budgeting
 
@@ -22,7 +22,7 @@ The user's whole plan for their money, in a single currency chosen when it is cr
 _Avoid_: Plan, book, ledger
 
 **Account**:
-A place where the user holds money they could spend or move soon: a checking account, a savings account or cash. Every dollar in an Account is budgeted. Investments, property and debts are not Accounts, and budjet does not track them.
+A place where the user holds money they could spend or move soon: a checking account, a savings account or cash. Every dollar in an Account is budgeted. Investments, property and debts are not Accounts, and Crownkeep does not track them.
 _Avoid_: Wallet, asset, bank
 
 **Category**:
@@ -42,8 +42,8 @@ The amount the user gives to one Category in one Month.
 _Avoid_: Allocation, budgeted amount, envelope fill
 
 **Take-back**:
-Money leaving a Category beyond that Month's Assignment, which comes out of what the Category carried forward and goes to Ready to Assign. An Assignment never goes below $0, so the rest is a Take-back. Each Category has one Take-back total per Month, and raising its Assignment later doesn't reduce it.
-_Avoid_: Negative Assignment, withdrawal, refund
+Money the user takes, in one Month, out of what a Category carried forward from earlier Months. It lowers that Category's Available and goes to Ready to Assign. Earlier Months are left as they were.
+_Avoid_: Release, unassignment, negative Assignment, re-assign
 
 **Available**:
 The money a Category has to spend in a Month: what it carried forward from the previous Month, minus that Month's Take-back, plus that Month's Assignment, minus that Month's Spending in it. Available always carries forward to the next Month, whether positive or negative.
@@ -52,6 +52,7 @@ _Avoid_: Balance (that word belongs to Accounts), remaining
 **Spending**:
 What a Category's Transactions took out of the Budget in one Month: money going out, less refunds coming back in. A Month whose refunds outweigh its money going out has negative Spending. Transfers and Adjustments are never Spending.
 _Avoid_: Expenses, activity, outflow
+Activity, capitalised, is the name of the screen that lists every Account's Transactions and Transfers, not a word for Spending.
 
 **Spent this Month**:
 The Spending of a Month across the Budget's Categories, of that Month's Assignments to them, leaving out any Category Group the user has left out of it so that saving doesn't read as spending. A Category counts by the Category Group it is in now, even for past Months. Nothing else changes when a Category Group is left out.
@@ -85,7 +86,7 @@ One Month of an Account's history, or of every Account's together: the money in,
 _Avoid_: Report, ledger
 
 **Adjustment**:
-The difference budjet records when the user re-declares an Account's real balance. It goes into, or comes out of, Ready to Assign.
+The difference Crownkeep records when the user re-declares an Account's real balance. It goes into, or comes out of, Ready to Assign.
 _Avoid_: Correction, reconciliation, fix
 
 **Balance check**:
@@ -95,5 +96,5 @@ _Avoid_: Reconciliation, verify, $0 Adjustment
 ## Delivery
 
 **Release**:
-A version of budjet identified by a git tag, with its release notes and its deployed build.
+A version of Crownkeep identified by a git tag, with its release notes and its deployed build.
 _Avoid_: Deploy (a deploy is one step of a release), version bump

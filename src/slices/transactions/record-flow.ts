@@ -148,6 +148,22 @@ export function categoryChoices(
   };
 }
 
+/** Whether the Draft now says something other than what it started as. */
+export function draftChanged(
+  draft: Draft,
+  started: Draft,
+  currency: Currency,
+): boolean {
+  return (
+    draftAmount(draft, currency)?.minorUnits !==
+      draftAmount(started, currency)?.minorUnits ||
+    draft.categoryId !== started.categoryId ||
+    draft.payee.trim() !== started.payee.trim() ||
+    draft.date !== started.date ||
+    draft.accountId !== started.accountId
+  );
+}
+
 /** The Draft to start on once this one is recorded. Date and Account stay: several in a row usually share them. */
 export function nextDraft({ date, accountId }: Draft): Draft {
   return { direction: "out", typed: "", payee: "", date, accountId };
@@ -193,6 +209,13 @@ export function today(): string {
 
 /** The calendar date before this one. */
 export function dayBefore(date: string): string {
+  const day = localDay(date);
+  day.setDate(day.getDate() - 1);
+  return calendarDate(day);
+}
+
+/** A calendar date ("YYYY-MM-DD") as midnight on that day, in this device's time zone. */
+export function localDay(date: string): Date {
   const [year = 0, month = 1, day = 1] = date.split("-").map(Number);
-  return calendarDate(new Date(year, month - 1, day - 1));
+  return new Date(year, month - 1, day);
 }

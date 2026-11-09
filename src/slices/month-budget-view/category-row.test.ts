@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
+import {
+  createChangeLogWriter,
+  createInMemoryChangeLog,
+} from "../../kernel/change-log";
 import { money } from "../../kernel/money";
+import type { Month } from "../../kernel/month";
+import {
+  type AssignmentSet,
+  assignmentSubject,
+  type TakeBackSet,
+} from "../assignments/records";
+import type { BudgetCreated } from "../budget-setup/records";
+import { available } from "../budget-totals";
+import type { TransactionRecorded } from "../transactions/records";
 import {
   type CategoryAmounts,
   categoryRow,
+  categoryRowIn,
   overspentHint,
 } from "./category-row";
 
@@ -122,5 +136,59 @@ describe("categoryRow", () => {
     it("names a Take-back alone when nothing carried forward", () => {
       expect(row({ takenBack: 42.5 }).carried).toBe("$42.50 taken back");
     });
+  });
+});
+
+describe("categoryRowIn", () => {
+  it("agrees with Budget Totals' Available, which stays the one calculation of it", () => {
+    const log = createInMemoryChangeLog();
+    const writer = createChangeLogWriter(log, "phone");
+    writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+      "budget",
+      "BudgetCreated",
+      { version: 1, currency: "USD" },
+    );
+    const amountIn = (month: Month, dollars: number) => ({
+      version: 1 as const,
+      categoryId: "groceries",
+      month,
+      amount: usd(dollars),
+    });
+    writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+      assignmentSubject("groceries", "2026-10"),
+      "AssignmentSet",
+      amountIn("2026-10", 300),
+    );
+    writer.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+      assignmentSubject("groceries", "2026-11"),
+      "TakeBackSet",
+      amountIn("2026-11", 40),
+    );
+    writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+      assignmentSubject("groceries", "2026-11"),
+      "AssignmentSet",
+      amountIn("2026-11", 25),
+    );
+    writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      "lunch",
+      "TransactionRecorded",
+      {
+        version: 1,
+        accountId: "checking",
+        date: "2026-11-03",
+        amount: usd(-312.5),
+        categoryId: "groceries",
+      },
+    );
+    const records = log.readAll();
+
+    for (const of of ["2026-10", "2026-11", "2026-12"] as const) {
+      expect(categoryRowIn(records, "groceries", of, "USD").available).toEqual(
+        available(records, "groceries", of),
+      );
+    }
+    expect(
+      categoryRowIn(records, "groceries", "2026-11", "USD").available,
+    ).toEqual(usd(-27.5));
   });
 });

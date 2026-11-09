@@ -5,9 +5,11 @@ import {
   assign,
   budgetRow,
   createBudget,
+  finishEditing,
   goTo,
   openAccount,
   show,
+  startEditing,
   toast,
 } from "./helpers";
 import { reloadWhenSaved } from "./reload";
@@ -142,6 +144,61 @@ test("Category narrows as you type, and each option has Available now and after"
   await expect(category(page)).toHaveValue("Groceries");
   await expect(amount(page)).toBeFocused();
   await expect(row(page)).toContainText("Groceries after this: $70.00 left");
+});
+
+async function aBudgetWithCarWashBeforeCar(page: Page) {
+  await createBudget(page, { categories: "Start blank" });
+  await goTo(page, "Budget");
+  await startEditing(page);
+  await page.getByRole("button", { name: "Add a Category Group" }).click();
+  const group = page.getByRole("textbox", { name: "Add a Category Group" });
+  await group.fill("Transport");
+  await group.press("Enter");
+  await group.blur();
+  await page
+    .getByRole("button", { name: "Add a Category to Transport" })
+    .click();
+  const added = page.getByRole("textbox", {
+    name: "Add a Category to Transport",
+  });
+  await added.fill("Car wash");
+  await added.press("Enter");
+  await added.fill("Car");
+  await added.press("Enter");
+  await finishEditing(page);
+}
+
+test("typing a Category's whole name prefers it to a longer one listed first", async ({
+  page,
+}) => {
+  await aBudgetWithCarWashBeforeCar(page);
+  await page.keyboard.press("Alt+n");
+
+  await category(page).focus();
+  await page.keyboard.type("car");
+
+  const car = options(page).filter({ hasText: /^Car(?! wash)/ });
+  const carWash = options(page).filter({ hasText: /^Car wash/ });
+  await expect(car).toHaveAttribute("data-focused", "true");
+  await expect(carWash).not.toHaveAttribute("data-focused", "true");
+
+  await page.keyboard.press("Enter");
+  await expect(category(page)).toHaveValue("Car");
+});
+
+test("a space after a Category's name still finds it", async ({ page }) => {
+  await aBudgetWithCarWashBeforeCar(page);
+  await page.keyboard.press("Alt+n");
+
+  await category(page).focus();
+  await page.keyboard.type("car ");
+
+  await expect(
+    options(page).filter({ hasText: /^Car(?! wash)/ }),
+  ).toHaveAttribute("data-focused", "true");
+
+  await page.keyboard.press("Enter");
+  await expect(category(page)).toHaveValue("Car");
 });
 
 test("arrows move through the Categories and Enter picks one", async ({
@@ -391,6 +448,44 @@ test("a known Payee is suggested and fills in its last Category", async ({
   await expect(category(page)).toHaveValue("Groceries");
 });
 
+/** Records a Corner Shop Transaction in Groceries, so the row knows that Payee, and starts on the next. */
+async function knowCornerShop(page: Page) {
+  await page.keyboard.type("Corner Shop");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("gro");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("5");
+  await page.keyboard.press("Enter");
+  await expect(payee(page)).toBeFocused();
+}
+
+test("typing a Category straight after a known Payee fills one replaces it", async ({
+  page,
+}) => {
+  await createBudget(page);
+  await page.keyboard.press("Alt+n");
+  await knowCornerShop(page);
+
+  // Moving on before the field catches up with the Payee, which is otherwise only
+  // a few milliseconds: what's selected on arriving has to be its Category already.
+  await payee(page).evaluate(async (input: HTMLInputElement) => {
+    document.execCommand("insertText", false, "Corner Shop");
+    await Promise.resolve();
+    const field = input.form?.querySelector<HTMLInputElement>(
+      '[role="combobox"][placeholder="Type to find one"]',
+    );
+    field?.focus();
+    field?.select();
+    await Promise.resolve();
+    document.execCommand("insertText", false, "Rent");
+  });
+
+  await expect(category(page)).toHaveValue("Rent");
+  await page.keyboard.press("Enter");
+  await expect(row(page).getByText("Rent after this:")).toBeVisible();
+  await expect(category(page)).toHaveValue("Rent");
+});
+
 test("Activity narrowed to an Account makes that Account the default", async ({
   page,
 }) => {
@@ -610,7 +705,7 @@ test("with one Account there's nowhere to Transfer to, and the row says so", asy
   await amount(page).fill("10");
 
   await expect(row(page)).toContainText(
-    "There's no other Account to move money to yet.",
+    "There's no other Account to transfer to yet.",
   );
   await amount(page).press("Enter");
 

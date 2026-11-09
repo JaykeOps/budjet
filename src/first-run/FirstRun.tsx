@@ -186,14 +186,15 @@ export function Title({
 export function GettingYourBudget({
   progress,
 }: {
-  progress: FullReadProgress;
+  /** Absent until the folder has said what it holds. */
+  progress?: FullReadProgress;
 }) {
   return (
     <main className={styles.page}>
       <p className={styles.brand}>Crownkeep</p>
       <Title>Getting your Budget from your folder</Title>
       <p className={styles.lead} role="status">
-        {progress.read} of {progress.of}
+        {progress && `${progress.read} of ${progress.of}`}
       </p>
     </main>
   );
@@ -349,14 +350,14 @@ function Choice({
   return (
     <button
       type="button"
-      aria-label={title}
       aria-describedby={detailId}
       aria-pressed={pressed}
       className={styles.choice}
       onClick={onClick}
     >
       <b>{title}</b>
-      <span id={detailId} className={styles.note}>
+      {/* Read as the description, so the name is the title the user sees first. */}
+      <span id={detailId} aria-hidden="true" className={styles.note}>
         {detail}
       </span>
     </button>

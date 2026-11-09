@@ -3,6 +3,7 @@ import {
   type ChangeRecord,
   createChangeLogWriter,
   createInMemoryChangeLog,
+  deletedSubjects,
   latestBySubject,
   perSnapshot,
 } from "./change-log";
@@ -124,6 +125,21 @@ describe("Change Log", () => {
         ]),
       );
     });
+  });
+});
+
+describe("deletedSubjects", () => {
+  it("names every subject with a delete record, wherever it falls among the rest", () => {
+    const log = createInMemoryChangeLog();
+    const phone = createChangeLogWriter(log, "phone");
+    phone.write("kept", "Named", { name: "Rent" });
+    phone.write("gone", "Named", { name: "Power" });
+    phone.write("gone", "Deleted", {});
+    phone.write("gone", "Named", { name: "Water" });
+
+    expect(
+      deletedSubjects(log.readAll(), ({ type }) => type === "Deleted"),
+    ).toEqual(new Set(["gone"]));
   });
 });
 

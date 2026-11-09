@@ -94,16 +94,15 @@ test("a user edits and deletes Transactions and Available, Ready to Assign and t
 
   await transactions
     .getByRole("row", { name: /Corner Shop/ })
-    .getByRole("button", { name: /^More/ })
+    .getByRole("button", { name: /^Open/ })
     .click();
-  await page.getByRole("menuitem", { name: "Edit" }).click();
   const edit = page.getByRole("form", { name: "Edit Transaction" });
   await expect(edit.getByLabel("Date")).toHaveValue("2026-10-15");
   await expect(edit.getByLabel("Amount")).toHaveValue("45.50");
   await expect(edit.getByLabel("Payee")).toHaveValue("Corner Shop");
   await edit.getByLabel("Amount").fill("60");
   await edit.getByLabel("Payee").fill("Corner Store");
-  await edit.getByRole("button", { name: "Save Transaction" }).click();
+  await edit.getByRole("button", { name: /^Save changes/ }).click();
   await expect(edit).toHaveCount(0);
   await transactions
     .getByRole("row", { name: /Employer/ })

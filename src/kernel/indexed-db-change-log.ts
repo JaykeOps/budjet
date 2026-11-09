@@ -16,6 +16,7 @@ import {
 } from "./change-log";
 import type { FileStamp, FileStamps } from "./folder-checks";
 
+/** The name from before Crownkeep. Renaming it would strand everyone's Local Copy. */
 const DATABASE = "budjet";
 const RECORDS = "records";
 /** A copy of each record not yet written to the Data Folder, so a reload keeps trying. */
@@ -77,7 +78,9 @@ export type FileRead = { stamp?: FileStamp; records: ChangeRecord[] };
 
 /**
  * The records in browser storage, served from memory. Appended records are also
- * marked unwritten, in the same transaction, while `holdForFolder` says so.
+ * marked unwritten, in the same transaction, while `holdForFolder` says so or a
+ * folder is remembered: another tab may have moved the Budget into one, and this
+ * tab is about to reload.
  */
 export async function openLocalCopy(
   database: IDBDatabase,
@@ -93,7 +96,7 @@ export async function openLocalCopy(
 
   function put(
     records: readonly ChangeRecord[],
-    hold: boolean,
+    hold: boolean | "if-folder-remembered",
     stamps?: FileStamps,
     finishingFullRead = false,
   ) {
@@ -106,7 +109,18 @@ export async function openLocalCopy(
     for (const record of records) {
       const payload = toPayload(record);
       transaction.objectStore(RECORDS).put(payload, record.id);
-      if (hold) transaction.objectStore(UNWRITTEN).put(payload, record.id);
+      if (hold === true) {
+        transaction.objectStore(UNWRITTEN).put(payload, record.id);
+      }
+    }
+    if (hold === "if-folder-remembered") {
+      const remembered = transaction.objectStore(DEVICE).get(FOLDER_HANDLE);
+      remembered.onsuccess = () => {
+        if (remembered.result === undefined) return;
+        for (const record of records) {
+          transaction.objectStore(UNWRITTEN).put(toPayload(record), record.id);
+        }
+      };
     }
     track(transaction);
   }
@@ -123,14 +137,14 @@ export async function openLocalCopy(
     // An abort means the writes are gone, so this stays until the next open.
     transaction.onabort = () => {
       writesUnderway--;
-      console.error("budjet could not save a change", transaction.error);
+      console.error("Crownkeep could not save a change", transaction.error);
       saveState.set({ status: "unsaved", reason: "write-failed" });
     };
   }
 
   return {
     append(records) {
-      put(records, holdForFolder());
+      put(records, holdForFolder() || "if-folder-remembered");
       inMemory.append(records);
     },
     merge(arriving) {

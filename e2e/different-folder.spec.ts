@@ -1,5 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
+import { violationsInEachTheme } from "./axe";
 import {
   deliverFile,
   filesInFolder,
@@ -76,8 +76,7 @@ async function lapseToLostScreen(page: Page) {
   await expect(heading(page, LOST)).toBeVisible();
 }
 
-const axeViolations = async (page: Page) =>
-  (await new AxeBuilder({ page }).analyze()).violations.map(({ id }) => id);
+const axeViolations = violationsInEachTheme;
 
 const startFirstRun = async (page: Page) => {
   await button(page, "Get started").click();
@@ -96,7 +95,7 @@ test("first run says so for an empty folder, and only then goes to setup", async
   await expect(button(page, "Choose another")).toBeVisible();
   await expect(button(page, "Put my Budget here")).toHaveCount(0);
   await expect(page.getByLabel("Currency")).toHaveCount(0);
-  expect(await axeViolations(page)).toEqual([]);
+  expect(await axeViolations(page)).toEqual({ light: [], dark: [] });
 
   await button(page, "Start a new Budget").click();
   await expect(page.getByLabel("Currency")).toBeVisible();
@@ -171,7 +170,7 @@ test("Reconnect with unsaved changes refuses a different Budget until they're di
   await pickFolderNext(page, OTHER_FOLDER);
   await button(page, "Reconnect").click();
   await expect(heading(page, REFUSAL)).toBeFocused();
-  expect(await axeViolations(page)).toEqual([]);
+  expect(await axeViolations(page)).toEqual({ light: [], dark: [] });
 
   await button(page, "Discard my changes and open it").click();
   await goTo(page, "Budget");
@@ -243,7 +242,7 @@ test("a background check finding a different Budget stops, naming the folder, an
   await expect(
     page.getByText("Pick a clean folder to keep your Budget in."),
   ).toBeVisible();
-  expect(await axeViolations(page)).toEqual([]);
+  expect(await axeViolations(page)).toEqual({ light: [], dark: [] });
 
   // A clean folder gets the Budget, with none of the other in it.
   await pickFolderNext(page, "clean");

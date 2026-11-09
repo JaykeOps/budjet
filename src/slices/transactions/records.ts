@@ -2,7 +2,11 @@
  * The change records Transactions publishes. Other slices may read them; they
  * are versioned contracts, so changing one is a cross-slice change (docs/adr/0005).
  */
-import { type ChangeRecord, perSnapshot } from "../../kernel/change-log";
+import {
+  type ChangeRecord,
+  deletedSubjects,
+  perSnapshot,
+} from "../../kernel/change-log";
 import type { Money } from "../../kernel/money";
 
 /** What a Transaction says: its Account, date, amount, and optional Category, Payee and memo. */
@@ -89,11 +93,9 @@ function replayTransactions(
   // recent record replaces the value. An edit before the Transaction's
   // first TransactionRecorded is replaced by that record anyway.
   const latest = new Map<string, TransactionRecorded | TransactionEdited>();
-  const deleted = new Set<string>();
+  const deleted = deletedSubjects(records, isTransactionDeleted);
   for (const record of records) {
-    if (isTransactionDeleted(record)) {
-      deleted.add(record.subjectId);
-    } else if (
+    if (
       isTransactionRecorded(record) ||
       (isTransactionEdited(record) && latest.has(record.subjectId))
     ) {
