@@ -79,9 +79,9 @@ export type CurrentTransaction = { id: string } & TransactionFields;
  * Every slice that counts Transactions reads them through this. Expects records
  * oldest first, as `readAll` returns them.
  */
-export const currentTransactions = perSnapshot(foldTransactions);
+export const currentTransactions = perSnapshot(replayTransactions);
 
-function foldTransactions(
+function replayTransactions(
   records: readonly ChangeRecord[],
 ): readonly CurrentTransaction[] {
   // One pass over every record, ten years of them on a phone, so no copies:

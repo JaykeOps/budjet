@@ -8,19 +8,19 @@ import {
 } from "./change-log";
 
 describe("perSnapshot", () => {
-  it("folds each Change Log snapshot once, and again after an append", () => {
+  it("replays each Change Log snapshot once, and again after an append", () => {
     const log = createInMemoryChangeLog();
-    let folds = 0;
+    let replays = 0;
     const count = perSnapshot((records) => {
-      folds += 1;
+      replays += 1;
       return records.length;
     });
     expect(count(log.readAll())).toBe(0);
     expect(count(log.readAll())).toBe(0);
-    expect(folds).toBe(1);
+    expect(replays).toBe(1);
     createChangeLogWriter(log, "device").write("thing", "Named", {});
     expect(count(log.readAll())).toBe(1);
-    expect(folds).toBe(2);
+    expect(replays).toBe(2);
   });
 });
 
