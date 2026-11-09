@@ -104,7 +104,7 @@ export function latestBySubject<Record extends ChangeRecord>(
 
 /**
  * Every subject with a delete record. A deleted thing stays deleted whatever else
- * is written about it, before or after (docs/adr/0006), so folds leave out these
+ * is written about it, before or after (docs/adr/0006), so Replays leave out these
  * subjects' other records.
  */
 export function deletedSubjects(
@@ -164,7 +164,7 @@ export type ChangeLogWriter = {
   /**
    * Writes a new record at the place an earlier one holds in the Change Log, by
    * taking its timestamp. For Undo, when what a record means depends on what came
-   * before it and it has to come back to where it was: a fold replaying the log
+   * before it and it has to come back to where it was: a Replay of the log
    * then meets it there, on every device.
    */
   writeAt<Type extends string, Payload>(
@@ -226,17 +226,17 @@ function nextTimestamp(
 }
 
 /**
- * Wraps a fold over every record so it runs once per Change Log snapshot:
+ * Wraps a Replay of every record so it runs once per Change Log snapshot:
  * `readAll` returns the same array until the next append, so every query
  * reading the same records shares one result.
  */
 export function perSnapshot<Result>(
-  fold: (records: readonly ChangeRecord[]) => Result,
+  replay: (records: readonly ChangeRecord[]) => Result,
 ): (records: readonly ChangeRecord[]) => Result {
   const results = new WeakMap<readonly ChangeRecord[], Result>();
   return (records) => {
     if (results.has(records)) return results.get(records) as Result;
-    const result = fold(records);
+    const result = replay(records);
     results.set(records, result);
     return result;
   };
