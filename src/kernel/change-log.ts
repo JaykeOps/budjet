@@ -3,10 +3,14 @@
  * domain state (docs/adr/0004, docs/adr/0005).
  */
 
-export type ChangeRecord<Type extends string = string, Payload = unknown> = {
+export type ChangeRecord<
+  Type extends string = string,
+  Payload = unknown,
+  Subject extends string = string,
+> = {
   id: string;
-  /** The id of the thing this record changes. */
-  subjectId: string;
+  /** The id of the thing this record changes. Each record type says what kind. */
+  subjectId: Subject;
   deviceId: string;
   timestamp: Timestamp;
   /** When a record written at an earlier place in the log really was written. See `writeAt`. */
@@ -42,21 +46,21 @@ export type DeviceChangeLog = Pick<
   ChangeLog,
   "readAll" | "subscribe" | "saveState" | "subscribeToSaveState"
 > & {
-  write<Type extends string, Payload>(
-    subjectId: string,
+  write<Type extends string, Payload, Subject extends string = string>(
+    subjectId: Subject,
     type: Type,
-  ): Write<Type, Payload>;
+  ): Write<Type, Payload, Subject>;
   /**
    * Writes a new record at the place an earlier one holds in the Change Log, by
    * taking its timestamp. For Undo, when what a record means depends on what came
    * before it and it has to come back to where it was: a Replay of the log
    * then meets it there, on every device.
    */
-  writeAt<Type extends string, Payload>(
+  writeAt<Type extends string, Payload, Subject extends string = string>(
     timestamp: Timestamp,
-    subjectId: string,
+    subjectId: Subject,
     type: Type,
-  ): Write<Type, Payload>;
+  ): Write<Type, Payload, Subject>;
   /**
    * Writes any number of records from one check, each stamped after the last,
    * all together or none. For a change that is several records, such as a
@@ -81,9 +85,11 @@ export type NewChangeRecord<Record extends ChangeRecord = ChangeRecord> =
     ? Pick<Record, "subjectId" | "type" | "payload">
     : never;
 
-export type Write<Type extends string, Payload> = {
+export type Write<Type extends string, Payload, Subject extends string> = {
   ensure<Found>(check: Check<Found>): {
-    commit(payload: (found: Found) => Payload): ChangeRecord<Type, Payload>;
+    commit(
+      payload: (found: Found) => Payload,
+    ): ChangeRecord<Type, Payload, Subject>;
   };
 };
 
@@ -91,7 +97,7 @@ export type WriteMany<Record extends ChangeRecord> = {
   ensure<Found>(check: Check<Found>): {
     commit(
       records: (found: Found) => readonly NewChangeRecord<Record>[],
-    ): ChangeRecord<Record["type"], Record["payload"]>[];
+    ): ChangeRecord<Record["type"], Record["payload"], Record["subjectId"]>[];
   };
 };
 
@@ -218,8 +224,8 @@ export function recordsToMerge(
  */
 export function latestBySubject<Record extends ChangeRecord>(
   records: readonly Record[],
-): Map<string, Record> {
-  const latest = new Map<string, Record>();
+): Map<Record["subjectId"], Record> {
+  const latest = new Map<Record["subjectId"], Record>();
   for (const record of records) latest.set(record.subjectId, record);
   return latest;
 }
@@ -229,6 +235,14 @@ export function latestBySubject<Record extends ChangeRecord>(
  * is written about it, before or after (docs/adr/0006), so Replays leave out these
  * subjects' other records.
  */
+export function deletedSubjects<Deleted extends ChangeRecord>(
+  records: readonly ChangeRecord[],
+  isDelete: (record: ChangeRecord) => record is Deleted,
+): Set<Deleted["subjectId"]>;
+export function deletedSubjects(
+  records: readonly ChangeRecord[],
+  isDelete: (record: ChangeRecord) => boolean,
+): Set<string>;
 export function deletedSubjects(
   records: readonly ChangeRecord[],
   isDelete: (record: ChangeRecord) => boolean,
