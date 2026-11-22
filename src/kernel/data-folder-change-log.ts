@@ -22,6 +22,7 @@ import {
   readChanges,
   sameStamp,
 } from "./folder-checks";
+import type { BudgetId } from "./id";
 import {
   type FileRead,
   forgetFilesRead,
@@ -157,7 +158,7 @@ export async function openDataFolderChangeLog({
   /** What to do after giving way to a newer tab. Reloads the page by default. */
   onGaveWay?: () => void;
   /** The id on each `BudgetCreated` among these records, which is the Budget's identity. */
-  budgetIds: (records: readonly ChangeRecord[]) => readonly string[];
+  budgetIds: (records: readonly ChangeRecord[]) => readonly BudgetId[];
   /** A check found a different Budget's records in the folder this Budget is kept in. */
   onTwoBudgets: () => void;
 }): Promise<DataFolderChangeLog> {

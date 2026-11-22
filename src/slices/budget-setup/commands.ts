@@ -1,4 +1,5 @@
 import type { DeviceChangeLog } from "../../kernel/change-log";
+import { type BudgetId, newId } from "../../kernel/id";
 import { type Currency, isCurrency } from "../../kernel/money";
 import { currentMonth } from "../../kernel/month";
 import { budget } from "./queries";
@@ -14,7 +15,7 @@ export function createBudget(
   }
   log
     .write<BudgetCreated["type"], BudgetCreated["payload"]>(
-      crypto.randomUUID(),
+      newId<BudgetId>(),
       "BudgetCreated",
     )
     .ensure((records) => {

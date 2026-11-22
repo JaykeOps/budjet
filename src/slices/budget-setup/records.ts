@@ -3,6 +3,7 @@
  * are versioned contracts, so changing one is a cross-slice change (docs/adr/0005).
  */
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { BudgetId } from "../../kernel/id";
 import type { Currency } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 
@@ -14,7 +15,8 @@ import type { Month } from "../../kernel/month";
 export type BudgetCreated = ChangeRecord<
   "BudgetCreated",
   | { version: 1; currency: Currency }
-  | { version: 2; currency: Currency; firstMonth: Month }
+  | { version: 2; currency: Currency; firstMonth: Month },
+  BudgetId
 >;
 
 export function isBudgetCreated(record: ChangeRecord): record is BudgetCreated {
@@ -22,6 +24,6 @@ export function isBudgetCreated(record: ChangeRecord): record is BudgetCreated {
 }
 
 /** The id on each `BudgetCreated`: a Budget's identity. */
-export function budgetIds(records: readonly ChangeRecord[]): string[] {
+export function budgetIds(records: readonly ChangeRecord[]): BudgetId[] {
   return records.filter(isBudgetCreated).map(({ subjectId }) => subjectId);
 }
