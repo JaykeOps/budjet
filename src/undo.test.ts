@@ -5,7 +5,7 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "./kernel/change-log";
-import type { AccountId, CategoryId } from "./kernel/id";
+import type { AccountId, CategoryId, TransactionId } from "./kernel/id";
 import { type Money, money } from "./kernel/money";
 import type { Month } from "./kernel/month";
 import { accounts, adjustments, balanceChecks } from "./slices/accounts";
@@ -117,6 +117,20 @@ const listed = (records: readonly ChangeRecord[], accountId: AccountId) =>
     .filter(({ kind }) => kind !== "opening-balance")
     .map((entry) => entry.id);
 
+/** The id of the second entry listed, which the test needs to be a Transaction. */
+function secondTransaction(
+  records: readonly ChangeRecord[],
+  accountId: AccountId,
+): TransactionId {
+  const entry = transactionList(records, accountId).filter(
+    ({ kind }) => kind !== "opening-balance",
+  )[1];
+  if (entry?.kind !== "transaction") {
+    throw new Error("Expected the second entry listed to be a Transaction");
+  }
+  return entry.id;
+}
+
 describe("undoing a Transaction's delete", () => {
   it("writes a new Transaction with a fresh id, the same content and the same place in the list", () => {
     const { phone, checking, groceries, balance, lunch } = twoDevices();
@@ -169,9 +183,9 @@ describe("undoing a Transaction's delete", () => {
     });
 
     deleteTransactionWithUndo(phone.log, first)();
-    const restored = listed(phone.records(), checking)[1] ?? "";
+    const restored = secondTransaction(phone.records(), checking);
     deleteTransactionWithUndo(phone.log, restored)();
-    const again = listed(phone.records(), checking)[1] ?? "";
+    const again = secondTransaction(phone.records(), checking);
     editTransaction(phone.log, again, {
       accountId: checking,
       date: "2026-10-12",

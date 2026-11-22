@@ -1,5 +1,10 @@
 import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
-import type { AccountId, CategoryId } from "../../kernel/id";
+import {
+  type AccountId,
+  type CategoryId,
+  newId,
+  type TransactionId,
+} from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import { monthOf } from "../../kernel/month";
 import { accounts } from "../accounts";
@@ -32,8 +37,8 @@ export type TransactionInput = {
 export function recordTransaction(
   log: DeviceChangeLog,
   input: TransactionInput,
-): string {
-  const id = crypto.randomUUID();
+): TransactionId {
+  const id = newId<TransactionId>();
   log
     .write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
       id,
@@ -50,7 +55,7 @@ export function recordTransaction(
  */
 export function editTransaction(
   log: DeviceChangeLog,
-  id: string,
+  id: TransactionId,
   input: TransactionInput,
 ): void {
   log
@@ -66,7 +71,10 @@ export function editTransaction(
 }
 
 /** Removes a Transaction, in any Month, unless its Account is closed. */
-export function deleteTransaction(log: DeviceChangeLog, id: string): void {
+export function deleteTransaction(
+  log: DeviceChangeLog,
+  id: TransactionId,
+): void {
   log
     .write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
       id,
@@ -84,8 +92,8 @@ export function deleteTransaction(log: DeviceChangeLog, id: string): void {
 export function restoreTransaction(
   log: DeviceChangeLog,
   { id: restores, ...input }: CurrentTransaction,
-): string {
-  const id = crypto.randomUUID();
+): TransactionId {
+  const id = newId<TransactionId>();
   log
     .write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
       id,
@@ -100,7 +108,10 @@ export function restoreTransaction(
  * Checks the Transaction is in the Budget and its Account is open: a closed
  * Account's history stays as it is.
  */
-function checkChangeable(records: readonly ChangeRecord[], id: string): void {
+function checkChangeable(
+  records: readonly ChangeRecord[],
+  id: TransactionId,
+): void {
   const transaction = currentTransactions(records).find(
     (transaction) => transaction.id === id,
   );

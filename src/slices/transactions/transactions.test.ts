@@ -9,6 +9,7 @@ import {
   asId,
   type CategoryGroupId,
   type CategoryId,
+  type TransactionId,
 } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
@@ -30,6 +31,10 @@ import {
 } from "./commands";
 import { accountTransactions, payees, transactionList } from "./index";
 import type { TransactionDeleted, TransactionEdited } from "./records";
+
+const lunchId = asId<TransactionId>("lunch");
+
+const lunch = lunchId;
 
 const everyday = asId<CategoryGroupId>("everyday");
 
@@ -288,7 +293,7 @@ describe("Transactions", () => {
     function edit(deviceId: string, wallTime: number): TransactionEdited {
       return {
         id: `edit-${deviceId}`,
-        subjectId: "lunch",
+        subjectId: lunch,
         deviceId,
         timestamp: { wallTime, counter: 0 },
         type: "TransactionEdited",
@@ -305,7 +310,7 @@ describe("Transactions", () => {
     function deletion(deviceId: string, wallTime: number): TransactionDeleted {
       return {
         id: `delete-${deviceId}`,
-        subjectId: "lunch",
+        subjectId: lunch,
         deviceId,
         timestamp: { wallTime, counter: 0 },
         type: "TransactionDeleted",

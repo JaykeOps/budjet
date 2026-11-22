@@ -8,6 +8,7 @@ import {
   asId,
   type CategoryGroupId,
   type CategoryId,
+  type TransactionId,
 } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
@@ -34,6 +35,9 @@ import {
   withDirection,
   withPayee,
 } from "./record-flow";
+
+const lunchId = asId<TransactionId>("lunch");
+const paycheckId = asId<TransactionId>("paycheck");
 
 const everyday = asId<CategoryGroupId>("everyday");
 
@@ -318,7 +322,7 @@ describe("categoryChoices", () => {
 
 describe("categoryChoices while editing a Transaction", () => {
   const lunch = {
-    id: "lunch",
+    id: lunchId,
     accountId: checking,
     date: "2026-10-12",
     amount: money(-1850, "USD"),
@@ -358,7 +362,7 @@ describe("categoryChoices while editing a Transaction", () => {
   it("leaves money that came in to Ready to Assign out of Ready to Assign", () => {
     const { log, records } = budget();
     const paycheck = {
-      id: "paycheck",
+      id: paycheckId,
       accountId: checking,
       date: "2026-10-12",
       amount: money(5000, "USD"),
@@ -390,7 +394,7 @@ describe("draftOf", () => {
   it("starts from what the Transaction says, keeping the memo the phone doesn't show", () => {
     expect(
       draftOf({
-        id: "lunch",
+        id: lunchId,
         accountId: checking,
         date: "2026-10-12",
         amount: money(-1850, "USD"),
@@ -412,7 +416,7 @@ describe("draftOf", () => {
   it("reads money coming in, with no Payee or Category", () => {
     expect(
       draftOf({
-        id: "paycheck",
+        id: paycheckId,
         accountId: checking,
         date: "2026-10-12",
         amount: money(5000, "USD"),

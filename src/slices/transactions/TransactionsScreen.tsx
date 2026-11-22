@@ -1,5 +1,5 @@
 import { type ReactNode, useId, useState } from "react";
-import type { AccountId } from "../../kernel/id";
+import type { AccountId, TransactionId } from "../../kernel/id";
 import type { Currency } from "../../kernel/money";
 import { EmptyState } from "../../ui/EmptyState";
 import type { MenuAction } from "../../ui/Menu";
@@ -18,8 +18,8 @@ import { type Showing, ShowingPicker } from "./ShowingPicker";
 /** What the app shell does with the rows of a history. */
 type HistoryActions = {
   currency: Currency;
-  onEdit: (id: string, input: TransactionInput) => void;
-  onDelete: (id: string) => void;
+  onEdit: (id: TransactionId, input: TransactionInput) => void;
+  onDelete: (id: TransactionId) => void;
   /** `what` names it for a toast: "Adjustment" or "Balance check". */
   onDeleteRedeclaredBalance: (recordId: string, what: string) => void;
   onEditTransfer: (id: string, input: TransferInput) => void;
