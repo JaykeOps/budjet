@@ -38,3 +38,5 @@ export type CategoryId = Id<"Category">;
 export type CategoryGroupId = Id<"CategoryGroup">;
 export type TransactionId = Id<"Transaction">;
 export type TransferId = Id<"Transfer">;
+/** A Category in one Month, which its Assignment and Take-back records change. */
+export type AssignmentId = Id<"Assignment">;

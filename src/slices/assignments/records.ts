@@ -8,7 +8,7 @@ import {
   latestBySubject,
   perSnapshot,
 } from "../../kernel/change-log";
-import type { CategoryId } from "../../kernel/id";
+import { type AssignmentId, asId, type CategoryId } from "../../kernel/id";
 import { addMoney, type Money, money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 
@@ -27,7 +27,8 @@ export type AssignmentSet = ChangeRecord<
     month: Month;
     amount: Money;
     cleared?: true;
-  }
+  },
+  AssignmentId
 >;
 
 export function isAssignmentSet(record: ChangeRecord): record is AssignmentSet {
@@ -41,19 +42,23 @@ export function isAssignmentSet(record: ChangeRecord): record is AssignmentSet {
  */
 export type TakeBackSet = ChangeRecord<
   "TakeBackSet",
-  { version: 1; categoryId: CategoryId; month: Month; amount: Money }
+  { version: 1; categoryId: CategoryId; month: Month; amount: Money },
+  AssignmentId
 >;
 
 export function isTakeBackSet(record: ChangeRecord): record is TakeBackSet {
   return record.type === "TakeBackSet";
 }
 
-/** The subject id of a Category's Assignment or Take-back in a Month. */
+/**
+ * The subject id of a Category's Assignment or Take-back in a Month. It is made
+ * from the two, not new, so every device writes to the same subject.
+ */
 export function assignmentSubject(
   categoryId: CategoryId,
   month: Month,
-): string {
-  return `${categoryId}/${month}`;
+): AssignmentId {
+  return asId<AssignmentId>(`${categoryId}/${month}`);
 }
 
 /** A Category's money in a Month: each is undefined until it has been set. */
@@ -72,14 +77,14 @@ export type CurrentAssignment = {
  * import only the kernel, so its delete record is matched by the type it publishes.
  */
 export const currentAssignments = perSnapshot(
-  (records: readonly ChangeRecord[]): Map<string, CurrentAssignment> => {
+  (records: readonly ChangeRecord[]): Map<AssignmentId, CurrentAssignment> => {
     const deleted = deletedSubjects(
       records,
       ({ type }) => type === "CategoryDeleted",
     );
-    const current = new Map<string, CurrentAssignment>();
+    const current = new Map<AssignmentId, CurrentAssignment>();
     const entry = (
-      subject: string,
+      subject: AssignmentId,
       { categoryId, month }: { categoryId: CategoryId; month: Month },
     ) => {
       let found = current.get(subject);
