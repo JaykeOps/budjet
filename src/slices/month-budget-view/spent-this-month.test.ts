@@ -4,7 +4,12 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId, type CategoryId } from "../../kernel/id";
+import {
+  type AccountId,
+  asId,
+  type CategoryGroupId,
+  type CategoryId,
+} from "../../kernel/id";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -22,6 +27,12 @@ import type {
 } from "../categories/records";
 import type { TransactionRecorded } from "../transactions/records";
 import { spentThisMonth } from "./index";
+
+const everydayId = asId<CategoryGroupId>("everyday");
+const savingsId = asId<CategoryGroupId>("savings");
+
+const everyday = everydayId;
+const savings = savingsId;
 
 const groceriesId = asId<CategoryId>("groceries");
 const holidayId = asId<CategoryId>("holiday");
@@ -54,7 +65,7 @@ function budget() {
       name: id,
       position,
     });
-  const category = (id: string, groupId: string) =>
+  const category = (id: string, groupId: CategoryGroupId) =>
     seed<CategoryCreated>(log, id, "CategoryCreated", {
       version: 1,
       groupId,
@@ -63,8 +74,8 @@ function budget() {
     });
   group("everyday", 0);
   group("savings", 1);
-  category("groceries", "everyday");
-  category("holiday", "savings");
+  category("groceries", everyday);
+  category("holiday", savings);
 
   return {
     assign(categoryId: CategoryId, of: Month, amount: number) {
@@ -95,7 +106,7 @@ function budget() {
         },
       );
     },
-    leaveOut(groupId: string) {
+    leaveOut(groupId: CategoryGroupId) {
       seed<CategoryGroupSpentThisMonthSet>(
         log,
         groupId,
@@ -103,7 +114,7 @@ function budget() {
         { version: 1, leftOut: true },
       );
     },
-    move(categoryId: CategoryId, groupId: string) {
+    move(categoryId: CategoryId, groupId: CategoryGroupId) {
       seed<CategoryPlaced>(log, categoryId, "CategoryPlaced", {
         version: 1,
         groupId,
@@ -151,7 +162,7 @@ describe("Spent this Month", () => {
 
     it("is true when the only Transaction is in a left-out Group", () => {
       const { leaveOut, record, records } = budget();
-      leaveOut("savings");
+      leaveOut(savings);
       record("2026-10-05", -5000, holiday);
       const card = spentThisMonth(records(), october);
       expect(card?.daily).toEqual([]);
@@ -229,7 +240,7 @@ describe("Spent this Month", () => {
     b.record("2026-10-01", -1_000, groceries);
     b.record("2026-10-02", -5_000, holiday);
 
-    b.leaveOut("savings");
+    b.leaveOut(savings);
 
     expect(b.card()).toEqual({
       spent: 1_000,
@@ -244,7 +255,7 @@ describe("Spent this Month", () => {
     b.record("2026-10-01", 4_000, holiday);
     b.record("2026-10-02", 4_000, holiday);
 
-    b.leaveOut("savings");
+    b.leaveOut(savings);
 
     expect(b.card()).toEqual({
       spent: 1_000,
@@ -257,12 +268,12 @@ describe("Spent this Month", () => {
     const b = budget();
     b.assign(groceries, september, 60_000);
     b.record("2026-09-15", -1_000, groceries);
-    b.leaveOut("savings");
+    b.leaveOut(savings);
 
-    b.move(groceries, "savings");
+    b.move(groceries, savings);
     expect(b.card(september)).toEqual({ spent: 0, of: 0, daily: [] });
 
-    b.move(groceries, "everyday");
+    b.move(groceries, everyday);
     expect(b.card(september)).toEqual({
       spent: 1_000,
       of: 60_000,
@@ -295,7 +306,7 @@ describe("Spent this Month", () => {
     });
     const before = figures();
 
-    b.leaveOut("savings");
+    b.leaveOut(savings);
 
     expect(figures()).toEqual(before);
     expect(before.available?.minorUnits).toBe(15_000);

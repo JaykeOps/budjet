@@ -7,27 +7,30 @@
  * ties (from two devices adding at once) fall back to the thing's id.
  */
 import type { ChangeRecord } from "../../kernel/change-log";
-import type { CategoryId } from "../../kernel/id";
+import type { CategoryGroupId, CategoryId } from "../../kernel/id";
 
 export type CategoryGroupCreated = ChangeRecord<
   "CategoryGroupCreated",
-  { version: 1; name: string; position: number }
+  { version: 1; name: string; position: number },
+  CategoryGroupId
 >;
 
 export type CategoryGroupRenamed = ChangeRecord<
   "CategoryGroupRenamed",
-  { version: 1; name: string }
+  { version: 1; name: string },
+  CategoryGroupId
 >;
 
 /** A Category Group's new place among the Category Groups. */
 export type CategoryGroupPlaced = ChangeRecord<
   "CategoryGroupPlaced",
-  { version: 1; position: number }
+  { version: 1; position: number },
+  CategoryGroupId
 >;
 
 export type CategoryCreated = ChangeRecord<
   "CategoryCreated",
-  { version: 1; groupId: string; name: string; position: number },
+  { version: 1; groupId: CategoryGroupId; name: string; position: number },
   CategoryId
 >;
 
@@ -40,7 +43,7 @@ export type CategoryRenamed = ChangeRecord<
 /** A Category's new Category Group and its place among that group's Categories. */
 export type CategoryPlaced = ChangeRecord<
   "CategoryPlaced",
-  { version: 1; groupId: string; position: number },
+  { version: 1; groupId: CategoryGroupId; position: number },
   CategoryId
 >;
 
@@ -68,7 +71,8 @@ export type CategoryDeleted = ChangeRecord<
 /** An empty Category Group is gone for good. */
 export type CategoryGroupDeleted = ChangeRecord<
   "CategoryGroupDeleted",
-  { version: 1 }
+  { version: 1 },
+  CategoryGroupId
 >;
 
 /**
@@ -78,7 +82,8 @@ export type CategoryGroupDeleted = ChangeRecord<
  */
 export type CategoryGroupSpentThisMonthSet = ChangeRecord<
   "CategoryGroupSpentThisMonthSet",
-  { version: 1; leftOut: boolean }
+  { version: 1; leftOut: boolean },
+  CategoryGroupId
 >;
 
 export type CategoriesRecord =

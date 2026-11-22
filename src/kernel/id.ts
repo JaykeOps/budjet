@@ -35,3 +35,4 @@ export function asId<Of extends Id<IdKind>>(value: string): Of {
 
 export type AccountId = Id<"Account">;
 export type CategoryId = Id<"Category">;
+export type CategoryGroupId = Id<"CategoryGroup">;

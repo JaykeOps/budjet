@@ -4,7 +4,12 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId, type CategoryId } from "../../kernel/id";
+import {
+  type AccountId,
+  asId,
+  type CategoryGroupId,
+  type CategoryId,
+} from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import type {
@@ -25,6 +30,8 @@ import {
 } from "./commands";
 import { accountTransactions, payees, transactionList } from "./index";
 import type { TransactionDeleted, TransactionEdited } from "./records";
+
+const everyday = asId<CategoryGroupId>("everyday");
 
 const groceriesId = asId<CategoryId>("groceries");
 const rent = asId<CategoryId>("rent");
@@ -64,7 +71,12 @@ function budget() {
     log,
     "groceries",
     "CategoryCreated",
-    { version: 1, name: "Groceries", groupId: "everyday", position: 0 },
+    {
+      version: 1,
+      name: "Groceries",
+      groupId: everyday,
+      position: 0,
+    },
   );
   return {
     log,

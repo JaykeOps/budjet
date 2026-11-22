@@ -3,7 +3,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { asId, type CategoryId } from "../../kernel/id";
+import { asId, type CategoryGroupId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -15,6 +15,8 @@ import type {
   CategoryHidden,
 } from "../categories/records";
 import { hiddenWithMoney } from "./hidden-money";
+
+const everyday = asId<CategoryGroupId>("everyday");
 
 const october: Month = "2026-10";
 
@@ -40,7 +42,12 @@ function budget() {
       log,
       id,
       "CategoryCreated",
-      { version: 1, groupId: "everyday", name, position },
+      {
+        version: 1,
+        groupId: everyday,
+        name,
+        position,
+      },
     );
     position += 1;
     return id;

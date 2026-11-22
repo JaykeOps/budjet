@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { asId, type CategoryId } from "../../kernel/id";
+import { asId, type CategoryGroupId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { categoryRow } from "./category-row";
 import type { SheetBudget, SheetCategory } from "./category-sheet";
 import { moveChange, movePlan, moveStart, READY_TO_ASSIGN } from "./move-money";
+
+const group = asId<CategoryGroupId>("group");
 
 const diningId = asId<CategoryId>("dining");
 const holidayId = asId<CategoryId>("holiday");
@@ -19,7 +21,7 @@ function category(
   return {
     id: asId<CategoryId>(name.toLowerCase()),
     name,
-    groupId: "group",
+    groupId: group,
     groupName: "Group",
     lastMonth: usd(0),
     nothingAssigned: false,

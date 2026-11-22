@@ -5,7 +5,7 @@
  */
 import { useMemo } from "react";
 import type { DeviceChangeLog } from "./kernel/change-log";
-import type { CategoryId } from "./kernel/id";
+import type { CategoryGroupId, CategoryId } from "./kernel/id";
 import { formatMoney, money, subtractMoney } from "./kernel/money";
 import { currentMonth, type Month } from "./kernel/month";
 import { useDeviceChangeLog } from "./kernel/use-change-log-query";
@@ -39,7 +39,7 @@ function groupsNow(log: DeviceChangeLog) {
   return categoryGroups(log.readAll());
 }
 
-function groupNow(log: DeviceChangeLog, groupId: string) {
+function groupNow(log: DeviceChangeLog, groupId: CategoryGroupId) {
   const groups = groupsNow(log);
   const index = groups.findIndex(({ id }) => id === groupId);
   if (index < 0) throw new RangeError(`No Category Group ${groupId}`);
@@ -61,7 +61,7 @@ function hide(log: DeviceChangeLog, categoryId: CategoryId): void {
 /** Undoing deletes it. */
 export function createCategoryWithUndo(
   log: DeviceChangeLog,
-  input: { groupId: string; name: string },
+  input: { groupId: CategoryGroupId; name: string },
 ): Undo {
   const id = createCategory(log, input);
   return () => deleteCategory(log, id);
@@ -90,7 +90,7 @@ export function renameCategoryWithUndo(
 /** Undoing writes the previous name as a new record. */
 export function renameCategoryGroupWithUndo(
   log: DeviceChangeLog,
-  groupId: string,
+  groupId: CategoryGroupId,
   input: { name: string },
 ): Undo {
   const { name } = groupNow(log, groupId).group;
@@ -216,7 +216,7 @@ export function deleteCategoryWithUndo(
 function restoreGroup(
   log: DeviceChangeLog,
   { name, leftOut, index }: { name: string; leftOut: boolean; index: number },
-): string {
+): CategoryGroupId {
   const id = createCategoryGroup(log, { name });
   if (leftOut) setCategoryGroupSpentThisMonth(log, id, { leftOut });
   moveCategoryGroup(log, id, { toIndex: index });
@@ -226,7 +226,7 @@ function restoreGroup(
 /** Undoing writes a new Category Group, with a fresh id, in the same place. */
 export function deleteCategoryGroupWithUndo(
   log: DeviceChangeLog,
-  groupId: string,
+  groupId: CategoryGroupId,
 ): Undo {
   const { group, index } = groupNow(log, groupId);
   deleteCategoryGroup(log, groupId);
@@ -246,8 +246,8 @@ export function deleteCategoryGroupWithUndo(
  */
 export function moveThemAndDeleteWithUndo(
   log: DeviceChangeLog,
-  groupId: string,
-  toGroupId: string,
+  groupId: CategoryGroupId,
+  toGroupId: CategoryGroupId,
 ): Undo {
   const { group, index } = groupNow(log, groupId);
   let toIndex = groupNow(log, toGroupId).group.categories.length;
@@ -274,7 +274,7 @@ export function moveThemAndDeleteWithUndo(
 export function moveCategoryWithUndo(
   log: DeviceChangeLog,
   categoryId: CategoryId,
-  to: { groupId: string; toIndex: number },
+  to: { groupId: CategoryGroupId; toIndex: number },
 ): Undo {
   const { group, index } = categoryNow(log, categoryId);
   moveCategory(log, categoryId, to);
@@ -285,7 +285,7 @@ export function moveCategoryWithUndo(
 /** Undoing puts it back where it was, as new records. */
 export function moveCategoryGroupWithUndo(
   log: DeviceChangeLog,
-  groupId: string,
+  groupId: CategoryGroupId,
   to: { toIndex: number },
 ): Undo {
   const { index } = groupNow(log, groupId);
@@ -296,7 +296,7 @@ export function moveCategoryGroupWithUndo(
 /** Undoing writes the previous setting as a new record. */
 export function setSpentThisMonthWithUndo(
   log: DeviceChangeLog,
-  groupId: string,
+  groupId: CategoryGroupId,
   { leftOut }: { leftOut: boolean },
 ): Undo {
   const { group } = groupNow(log, groupId);

@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CategoryId } from "../../kernel/id";
+import { asId, type CategoryGroupId, type CategoryId } from "../../kernel/id";
 import styles from "./CategoryEditor.module.css";
 import type { Category, CategoryGroup } from "./queries";
 import {
@@ -24,13 +24,13 @@ type Named<Id extends string = string> = { id: Id; name: string };
 
 export type Moves = {
   moveCategory: (category: Named<CategoryId>, to: CategoryPlace) => void;
-  moveGroup: (group: Named, toIndex: number) => void;
+  moveGroup: (group: Named<CategoryGroupId>, toIndex: number) => void;
 };
 
 /** What a handle moves: a Category or a Category Group, each with its own kind of id. */
 export type Handled =
   | { kind: "category"; thing: Named<CategoryId> }
-  | { kind: "group"; thing: Named };
+  | { kind: "group"; thing: Named<CategoryGroupId> };
 
 /** How near the viewport's edges a drag scrolls. The bottom clears the tab bar. */
 const SCROLL_ZONE = { top: 56, bottom: 120 };
@@ -59,11 +59,11 @@ export function useReorder(
   });
 
   function drop(handled: Handled, ended: CategoryGroup[]) {
-    const { thing } = handled;
     if (handled.kind === "group") {
-      const from = groups.findIndex(({ id }) => id === thing.id);
-      const to = ended.findIndex(({ id }) => id === thing.id);
-      if (from !== to) moves.moveGroup(thing, to);
+      const group = handled.thing;
+      const from = groups.findIndex(({ id }) => id === group.id);
+      const to = ended.findIndex(({ id }) => id === group.id);
+      if (from !== to) moves.moveGroup(group, to);
       return;
     }
     const category = handled.thing;
@@ -174,8 +174,10 @@ function rearranged(
 ): CategoryGroup[] {
   const under = document.elementFromPoint(x, y);
   const groupElement = under?.closest<HTMLElement>("[data-group-id]");
-  const groupId = groupElement?.dataset.groupId;
-  if (!under || !groupElement || !groupId) return current;
+  const shownGroupId = groupElement?.dataset.groupId;
+  if (!under || !groupElement || !shownGroupId) return current;
+  // The page names the Category Group under the pointer; trust it as one.
+  const groupId = asId<CategoryGroupId>(shownGroupId);
   const before = (element: Element) => {
     const { top, height } = element.getBoundingClientRect();
     return y < top + height / 2;
