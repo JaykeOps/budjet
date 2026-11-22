@@ -4,7 +4,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -33,6 +33,10 @@ import {
 } from "./commands";
 import { type CategoryGroup, categoryGroups } from "./index";
 import { moveOutChoices } from "./move-out";
+
+const nothingId = asId<CategoryId>("nothing");
+
+const nothing = nothingId;
 
 const checking = asId<AccountId>("checking");
 
@@ -115,7 +119,7 @@ describe("Categories", () => {
     addStarterSet(log);
     const rent = groups()[0].categories[0];
 
-    expect(() => renameCategory(log, "nothing", { name: "X" })).toThrow(
+    expect(() => renameCategory(log, nothing, { name: "X" })).toThrow(
       /no such Category/,
     );
     expect(() => renameCategory(log, rent.id, { name: "" })).toThrow(
@@ -333,7 +337,7 @@ function budgetWithStarterSet() {
     groups,
     find,
     id: (name: string) => find(name).id,
-    assign(categoryId: string, month: Month, amount: number) {
+    assign(categoryId: CategoryId, month: Month, amount: number) {
       seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
         log,
         assignmentSubject(categoryId, month),
@@ -341,7 +345,7 @@ function budgetWithStarterSet() {
         { version: 1, categoryId, month, amount: money(amount, "USD") },
       );
     },
-    spend(categoryId: string, date: string, amount: number) {
+    spend(categoryId: CategoryId, date: string, amount: number) {
       seedRecord<TransactionRecorded["type"], TransactionRecorded["payload"]>(
         log,
         crypto.randomUUID(),

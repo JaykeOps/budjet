@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import {
   type Currency,
   formatMoney,
@@ -261,7 +261,7 @@ function CategoryStep({
   draft: Draft;
   amount: Money;
   editing?: Transaction;
-  onPick: (categoryId: string | undefined) => void;
+  onPick: (categoryId: CategoryId | undefined) => void;
 }) {
   const [search, setSearch] = useState("");
   const { readyToAssign, groups } = useCategoryChoices(

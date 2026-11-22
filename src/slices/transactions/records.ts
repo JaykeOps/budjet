@@ -7,7 +7,7 @@ import {
   deletedSubjects,
   perSnapshot,
 } from "../../kernel/change-log";
-import type { AccountId } from "../../kernel/id";
+import type { AccountId, CategoryId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 
 /** What a Transaction says: its Account, date, amount, and optional Category, Payee and memo. */
@@ -17,7 +17,7 @@ type TransactionFields = {
   date: string;
   /** Negative for money going out of the Account, positive for money coming in. */
   amount: Money;
-  categoryId?: string;
+  categoryId?: CategoryId;
   payee?: string;
   memo?: string;
 };

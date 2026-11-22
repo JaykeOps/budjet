@@ -3,7 +3,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import { accountBalance } from "../accounts";
@@ -13,6 +13,10 @@ import type { BudgetCreated } from "../budget-setup/records";
 import { available, readyToAssign } from "../budget-totals";
 import { deleteTransfer, editTransfer, makeTransfer } from "./commands";
 import { transfers } from "./index";
+
+const groceriesId = asId<CategoryId>("groceries");
+
+const groceries = groceriesId;
 
 const checking = asId<AccountId>("checking");
 const savings = asId<AccountId>("savings");
@@ -75,7 +79,7 @@ describe("Transfers", () => {
       "AssignmentSet",
       {
         version: 1,
-        categoryId: "groceries",
+        categoryId: groceries,
         month: "2026-10",
         amount: money(40000, "USD"),
       },
@@ -89,7 +93,7 @@ describe("Transfers", () => {
     });
 
     expect(readyToAssign(changeLog.readAll())).toEqual(money(110000, "USD"));
-    expect(available(changeLog.readAll(), "groceries", "2026-10")).toEqual(
+    expect(available(changeLog.readAll(), groceries, "2026-10")).toEqual(
       money(40000, "USD"),
     );
   });

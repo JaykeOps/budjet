@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { CategoryId } from "../../kernel/id";
 import styles from "./CategoryEditor.module.css";
 import type { Category, CategoryGroup } from "./queries";
 import {
@@ -19,14 +20,17 @@ import {
   withGroupAt,
 } from "./reorder";
 
-type Named = { id: string; name: string };
+type Named<Id extends string = string> = { id: Id; name: string };
 
 export type Moves = {
-  moveCategory: (category: Named, to: CategoryPlace) => void;
+  moveCategory: (category: Named<CategoryId>, to: CategoryPlace) => void;
   moveGroup: (group: Named, toIndex: number) => void;
 };
 
-type Kind = "category" | "group";
+/** What a handle moves: a Category or a Category Group, each with its own kind of id. */
+export type Handled =
+  | { kind: "category"; thing: Named<CategoryId> }
+  | { kind: "group"; thing: Named };
 
 /** How near the viewport's edges a drag scrolls. The bottom clears the tab bar. */
 const SCROLL_ZONE = { top: 56, bottom: 120 };
@@ -54,22 +58,28 @@ export function useReorder(
     refocus.current = undefined;
   });
 
-  function drop(kind: Kind, thing: Named, ended: CategoryGroup[]) {
-    if (kind === "group") {
+  function drop(handled: Handled, ended: CategoryGroup[]) {
+    const { thing } = handled;
+    if (handled.kind === "group") {
       const from = groups.findIndex(({ id }) => id === thing.id);
       const to = ended.findIndex(({ id }) => id === thing.id);
       if (from !== to) moves.moveGroup(thing, to);
       return;
     }
-    const from = categoryAt(groups, thing.id);
-    const to = categoryAt(ended, thing.id);
+    const category = handled.thing;
+    const from = categoryAt(groups, category.id);
+    const to = categoryAt(ended, category.id);
     if (to && (from?.groupId !== to.groupId || from.toIndex !== to.toIndex)) {
-      moves.moveCategory(thing, { groupId: to.groupId, toIndex: to.toIndex });
+      moves.moveCategory(category, {
+        groupId: to.groupId,
+        toIndex: to.toIndex,
+      });
     }
   }
 
-  function startDrag(event: PointerEvent, kind: Kind, thing: Named) {
+  function startDrag(event: PointerEvent, handled: Handled) {
     if (event.button !== 0) return;
+    const { thing } = handled;
     // On the list, because a row remounts on crossing Category Groups, which
     // would end a touch held by the handle.
     list.current?.setPointerCapture(event.pointerId);
@@ -79,7 +89,7 @@ export function useReorder(
     let y = event.clientY;
 
     const place = () => {
-      const next = rearranged(current, kind, thing.id, x, y);
+      const next = rearranged(current, handled, x, y);
       if (next === current) return;
       current = next;
       setShown(next);
@@ -110,42 +120,44 @@ export function useReorder(
       place();
       stop();
       refocus.current = thing.id;
-      drop(kind, thing, current);
+      drop(handled, current);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", stop);
   }
 
-  function onKeyDown(event: KeyboardEvent, kind: Kind, thing: Named) {
+  function onKeyDown(event: KeyboardEvent, handled: Handled) {
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
     event.preventDefault();
     const by = event.key === "ArrowUp" ? -1 : 1;
-    if (kind === "group") {
-      const toIndex = groupStep(groups, thing.id, by);
+    if (handled.kind === "group") {
+      const group = handled.thing;
+      const toIndex = groupStep(groups, group.id, by);
       if (toIndex === undefined) return;
-      refocus.current = thing.id;
-      moves.moveGroup(thing, toIndex);
+      refocus.current = group.id;
+      moves.moveGroup(group, toIndex);
       return;
     }
-    const to = categoryStep(groups, thing.id, by);
+    const category = handled.thing;
+    const to = categoryStep(groups, category.id, by);
     if (!to) return;
-    refocus.current = thing.id;
-    moves.moveCategory(thing, to);
+    refocus.current = category.id;
+    moves.moveCategory(category, to);
   }
 
   return {
     /** The list as it should look now: mid-drag, as the drag has left it. */
     shown: shown ?? groups,
     dragging,
-    handle: (kind: Kind, thing: Named) => (
+    handle: (handled: Handled) => (
       <button
         type="button"
         className={styles.handle}
-        data-handle={thing.id}
-        aria-label={`Move ${thing.name}. Use the up and down arrow keys.`}
-        onPointerDown={(event) => startDrag(event, kind, thing)}
-        onKeyDown={(event) => onKeyDown(event, kind, thing)}
+        data-handle={handled.thing.id}
+        aria-label={`Move ${handled.thing.name}. Use the up and down arrow keys.`}
+        onPointerDown={(event) => startDrag(event, handled)}
+        onKeyDown={(event) => onKeyDown(event, handled)}
       >
         ⠿
       </button>
@@ -156,8 +168,7 @@ export function useReorder(
 /** The list with the dragged thing where the pointer now says, or `current` if that's where it is. */
 function rearranged(
   current: CategoryGroup[],
-  kind: Kind,
-  id: string,
+  handled: Handled,
   x: number,
   y: number,
 ): CategoryGroup[] {
@@ -170,7 +181,8 @@ function rearranged(
     return y < top + height / 2;
   };
 
-  if (kind === "group") {
+  if (handled.kind === "group") {
+    const { id } = handled.thing;
     if (groupId === id) return current;
     const others = current.filter((group) => group.id !== id);
     const over = others.findIndex((group) => group.id === groupId);
@@ -180,6 +192,7 @@ function rearranged(
       : withGroupAt(current, id, toIndex);
   }
 
+  const { id } = handled.thing;
   const row = under.closest<HTMLElement>("[data-row-id]");
   if (row?.dataset.rowId === id) return current;
   const here = categoryAt(current, id);

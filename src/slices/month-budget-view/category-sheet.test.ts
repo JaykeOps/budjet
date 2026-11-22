@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { type CategoryAmounts, categoryRow } from "./category-row";
 import {
@@ -24,7 +25,7 @@ function category(
     spending = 0,
   } = amounts;
   return {
-    id: name.toLowerCase(),
+    id: asId<CategoryId>(name.toLowerCase()),
     name,
     groupId: "group",
     groupName: "Group",

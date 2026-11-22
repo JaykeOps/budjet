@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { CategoryId } from "../../kernel/id";
 import { type Currency, formatMoney } from "../../kernel/money";
 import { type Month, monthNameAlone, previousMonth } from "../../kernel/month";
 import { copyPreview, walkQueue } from "./assign-walk";
@@ -11,7 +12,7 @@ import {
 import styles from "./CategorySheet.module.css";
 import { type SheetBudget, useSheetBudget } from "./category-sheet";
 
-type OnCopy = (unticked: ReadonlySet<string>) => void;
+type OnCopy = (unticked: ReadonlySet<CategoryId>) => void;
 
 /** Assign: offers Copy last Month if it would fill anything, then walks what's left. */
 export function AssignWalk({
@@ -126,7 +127,7 @@ function CopyPreview({
   onCopied: () => void;
   onNotNow?: () => void;
 }) {
-  const [unticked, setUnticked] = useState<ReadonlySet<string>>(new Set());
+  const [unticked, setUnticked] = useState<ReadonlySet<CategoryId>>(new Set());
   const [error, setError] = useState<string>();
   const { lines, copying, readyToAssignAfter, warning } = copyPreview(
     budget,
@@ -135,7 +136,7 @@ function CopyPreview({
   const thisMonth = monthNameAlone(month);
   const lastMonth = monthNameAlone(previousMonth(month));
 
-  function toggle(id: string) {
+  function toggle(id: CategoryId) {
     const next = new Set(unticked);
     if (!next.delete(id)) next.add(id);
     setUnticked(next);

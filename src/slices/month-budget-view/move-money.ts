@@ -1,3 +1,4 @@
+import { asId, type CategoryId } from "../../kernel/id";
 import {
   addMoney,
   formatMoney,
@@ -16,11 +17,23 @@ import {
 /** Stands for Ready to Assign among the Category ids in From and To. */
 export const READY_TO_ASSIGN = "ready-to-assign";
 
-const find = (budget: SheetBudget, id: string): SheetCategory | undefined =>
+/** One end of a move: a Category, or Ready to Assign. */
+export type MoveEnd = CategoryId | typeof READY_TO_ASSIGN;
+
+/** The end a From or To picker's value names. */
+export function moveEnd(value: string): MoveEnd {
+  return value === READY_TO_ASSIGN ? READY_TO_ASSIGN : asId<CategoryId>(value);
+}
+
+const find = (budget: SheetBudget, id: MoveEnd): SheetCategory | undefined =>
   budget.categories.find((category) => category.id === id);
 
 /** Where Move money opens: on covering the first Overspent Category, if any. */
-export function moveStart({ categories }: SheetBudget) {
+export function moveStart({ categories }: SheetBudget): {
+  from: MoveEnd;
+  to: MoveEnd;
+  amount?: Money;
+} {
   const overspent = categories.find(({ row }) => row.state === "overspent");
   return {
     from: READY_TO_ASSIGN,
@@ -32,8 +45,8 @@ export function moveStart({ categories }: SheetBudget) {
 /** What moving `amount` would do, and whether it can go ahead. */
 export function movePlan(
   budget: SheetBudget,
-  from: string,
-  to: string,
+  from: MoveEnd,
+  to: MoveEnd,
   amount: Money | undefined,
   of: Month,
 ) {
@@ -73,11 +86,11 @@ export function movePlan(
 }
 
 export type MoveChange =
-  | { kind: "assign"; categoryId: string; amount: Money }
+  | { kind: "assign"; categoryId: CategoryId; amount: Money }
   | {
       kind: "move";
-      fromCategoryId: string;
-      toCategoryId: string;
+      fromCategoryId: CategoryId;
+      toCategoryId: CategoryId;
       amount: Money;
     };
 
@@ -87,25 +100,31 @@ export type MoveChange =
  */
 export function moveChange(
   budget: SheetBudget,
-  from: string,
-  to: string,
+  from: MoveEnd,
+  to: MoveEnd,
   amount: Money,
 ): MoveChange {
-  const assignedTo = (id: string) =>
+  const assignedTo = (id: CategoryId) =>
     find(budget, id)?.row.assigned ?? money(0, amount.currency);
-  if (from === READY_TO_ASSIGN) {
+  if (from === to) {
+    throw new RangeError("Move money between two different Categories");
+  }
+  if (from === READY_TO_ASSIGN && to !== READY_TO_ASSIGN) {
     return {
       kind: "assign",
       categoryId: to,
       amount: addMoney(assignedTo(to), amount),
     };
   }
-  if (to === READY_TO_ASSIGN) {
+  if (to === READY_TO_ASSIGN && from !== READY_TO_ASSIGN) {
     return {
       kind: "assign",
       categoryId: from,
       amount: subtractMoney(assignedTo(from), amount),
     };
+  }
+  if (from === READY_TO_ASSIGN || to === READY_TO_ASSIGN) {
+    throw new RangeError("Move money between two different Categories");
   }
   return { kind: "move", fromCategoryId: from, toCategoryId: to, amount };
 }

@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import {
   addMoney,
   type Currency,
@@ -17,7 +18,7 @@ import { type CategoryRow, categoryRowIn } from "./category-row";
 import { visibleCategoryGroups } from "./visible-categories";
 
 export type SheetCategory = {
-  id: string;
+  id: CategoryId;
   name: string;
   groupId: string;
   groupName: string;

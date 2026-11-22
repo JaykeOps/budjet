@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import {
   addMoney,
   type Currency,
@@ -107,7 +108,7 @@ export function overspentHint(name: string, row: CategoryRow): string {
 /** A Category's row in a Month, from the records as they now stand. */
 export function categoryRowIn(
   records: readonly ChangeRecord[],
-  categoryId: string,
+  categoryId: CategoryId,
   of: Month,
   currency: Currency,
 ): CategoryRow {
@@ -121,7 +122,7 @@ export function categoryRowIn(
 }
 
 export function useCategoryRow(
-  categoryId: string,
+  categoryId: CategoryId,
   of: Month,
   currency: Currency,
 ): CategoryRow {

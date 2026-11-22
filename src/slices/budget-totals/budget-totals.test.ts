@@ -3,7 +3,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -28,6 +28,17 @@ import {
   readyToAssign,
   spending,
 } from "./index";
+
+const diningOutId = asId<CategoryId>("dining-out");
+const giftsId = asId<CategoryId>("gifts");
+const groceriesId = asId<CategoryId>("groceries");
+const holidayId = asId<CategoryId>("holiday");
+const rentId = asId<CategoryId>("rent");
+
+const diningOut = diningOutId;
+const gifts = giftsId;
+const holiday = holidayId;
+const rent = rentId;
 
 const checking = asId<AccountId>("checking");
 
@@ -55,7 +66,7 @@ function budget() {
         },
       );
     },
-    assign(categoryId: string, assigned: Month, amount: number) {
+    assign(categoryId: CategoryId, assigned: Month, amount: number) {
       seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
         log,
         assignmentSubject(categoryId, assigned),
@@ -68,7 +79,7 @@ function budget() {
         },
       );
     },
-    takeBack(categoryId: string, of: Month, amount: number) {
+    takeBack(categoryId: CategoryId, of: Month, amount: number) {
       seedRecord<TakeBackSet["type"], TakeBackSet["payload"]>(
         log,
         assignmentSubject(categoryId, of),
@@ -82,7 +93,7 @@ function budget() {
       );
     },
     /** Records a Transaction: a negative amount goes out, a positive one comes in. */
-    record(date: string, amount: number, categoryId?: string): string {
+    record(date: string, amount: number, categoryId?: CategoryId): string {
       const id = crypto.randomUUID();
       seedRecord<TransactionRecorded["type"], TransactionRecorded["payload"]>(
         log,
@@ -99,7 +110,7 @@ function budget() {
       return id;
     },
     /** Edits a Transaction to say this instead. */
-    edit(id: string, date: string, amount: number, categoryId?: string) {
+    edit(id: string, date: string, amount: number, categoryId?: CategoryId) {
       seedRecord<TransactionEdited["type"], TransactionEdited["payload"]>(
         log,
         id,
@@ -139,13 +150,14 @@ function budget() {
       );
     },
     readyToAssign: () => readyToAssign(changeLog.readAll()),
-    spending: (categoryId: string, of: Month) =>
+    spending: (categoryId: CategoryId, of: Month) =>
       spending(changeLog.readAll(), categoryId, of),
-    available: (categoryId: string, of: Month) =>
+    available: (categoryId: CategoryId, of: Month) =>
       available(changeLog.readAll(), categoryId, of),
     overspent: (of: Month) => overspent(changeLog.readAll(), of),
-    used: (categoryId: string) => categoryUsed(changeLog.readAll(), categoryId),
-    assignedAfter: (categoryId: string, of: Month) =>
+    used: (categoryId: CategoryId) =>
+      categoryUsed(changeLog.readAll(), categoryId),
+    assignedAfter: (categoryId: CategoryId, of: Month) =>
       assignedAfter(changeLog.readAll(), categoryId, of),
   };
 }
@@ -170,9 +182,9 @@ describe("Budget Totals", () => {
     const totals = budget();
     totals.openAccount(100000);
 
-    totals.assign("rent", "2026-10", 80000);
-    totals.assign("groceries", "2026-10", 30000);
-    totals.assign("rent", "2026-11", 10000);
+    totals.assign(rent, "2026-10", 80000);
+    totals.assign(groceriesId, "2026-10", 30000);
+    totals.assign(rent, "2026-11", 10000);
 
     // Opening Balances of $1,000 and Assignments of $1,200 give −$200.
     expect(totals.readyToAssign()).toEqual(money(-20000, "USD"));
@@ -182,8 +194,8 @@ describe("Budget Totals", () => {
     const totals = budget();
     totals.openAccount(100000);
 
-    totals.assign("rent", "2026-10", 80000);
-    totals.assign("rent", "2026-10", 60000);
+    totals.assign(rent, "2026-10", 80000);
+    totals.assign(rent, "2026-10", 60000);
 
     expect(totals.readyToAssign()).toEqual(money(40000, "USD"));
   });
@@ -193,8 +205,8 @@ describe("Budget Totals", () => {
     totals.openAccount(100000);
 
     totals.record("2026-10-25", 300000);
-    totals.record("2026-10-12", -4550, "groceries");
-    totals.record("2026-10-13", 1000, "groceries");
+    totals.record("2026-10-12", -4550, groceriesId);
+    totals.record("2026-10-13", 1000, groceriesId);
 
     expect(totals.readyToAssign()).toEqual(money(400000, "USD"));
   });
@@ -202,14 +214,14 @@ describe("Budget Totals", () => {
   it("moves Ready to Assign by each Adjustment: the difference from the balance just before it", () => {
     const totals = budget();
     totals.openAccount(100000, "checking");
-    const groceries = totals.record("2026-10-12", -20000, "groceries");
+    const groceries = totals.record("2026-10-12", -20000, groceriesId);
 
     // The balance is $800, so declaring $850 adds $50.
     totals.redeclare(85000);
     expect(totals.readyToAssign()).toEqual(money(105000, "USD"));
 
     // Changes after it count on top: an edit to the earlier Transaction too.
-    totals.edit(groceries, "2026-10-12", -25000, "groceries");
+    totals.edit(groceries, "2026-10-12", -25000, groceriesId);
     totals.record("2026-10-20", 10000);
     // The balance is now $850 - $50 + $100 = $900; declaring $800 takes $100.
     totals.redeclare(80000);
@@ -220,7 +232,7 @@ describe("Budget Totals", () => {
   it("leaves Ready to Assign alone when a re-declared balance equals the current one", () => {
     const totals = budget();
     totals.openAccount(100000, "checking");
-    totals.record("2026-10-12", -20000, "groceries");
+    totals.record("2026-10-12", -20000, groceriesId);
     const before = totals.readyToAssign();
 
     totals.redeclare(80000);
@@ -231,27 +243,27 @@ describe("Budget Totals", () => {
   it("calculates a Category's spending and Available in a Month from its Assignment and Transactions", () => {
     const totals = budget();
     totals.openAccount(100000);
-    totals.assign("groceries", "2026-10", 40000);
+    totals.assign(groceriesId, "2026-10", 40000);
 
-    totals.record("2026-10-01", -4550, "groceries");
-    totals.record("2026-10-31", -10000, "groceries");
-    totals.record("2026-10-15", 1000, "groceries");
+    totals.record("2026-10-01", -4550, groceriesId);
+    totals.record("2026-10-31", -10000, groceriesId);
+    totals.record("2026-10-15", 1000, groceriesId);
     // Later Months, other Categories and money with no Category don't count.
-    totals.record("2026-11-01", -2000, "groceries");
-    totals.record("2026-12-31", -3000, "groceries");
-    totals.record("2026-10-12", -7000, "rent");
+    totals.record("2026-11-01", -2000, groceriesId);
+    totals.record("2026-12-31", -3000, groceriesId);
+    totals.record("2026-10-12", -7000, rent);
     totals.record("2026-10-25", 300000);
 
     // $145.50 going out less the $10 refund.
-    expect(totals.spending("groceries", "2026-10")).toEqual(
+    expect(totals.spending(groceriesId, "2026-10")).toEqual(
       money(13550, "USD"),
     );
     // $400 assigned + $10 coming in − $145.50 going out.
-    expect(totals.available("groceries", "2026-10")).toEqual(
+    expect(totals.available(groceriesId, "2026-10")).toEqual(
       money(26450, "USD"),
     );
-    expect(totals.spending("dining-out", "2026-10")).toEqual(money(0, "USD"));
-    expect(totals.available("dining-out", "2026-10")).toEqual(money(0, "USD"));
+    expect(totals.spending(diningOut, "2026-10")).toEqual(money(0, "USD"));
+    expect(totals.available(diningOut, "2026-10")).toEqual(money(0, "USD"));
   });
 
   it.each([
@@ -278,15 +290,15 @@ describe("Budget Totals", () => {
     ({ refunded, expectedSpending, expectedAvailable }) => {
       const totals = budget();
       totals.openAccount(100000);
-      totals.assign("groceries", "2026-10", 10000);
+      totals.assign(groceriesId, "2026-10", 10000);
 
-      totals.record("2026-10-03", -5000, "groceries");
-      totals.record("2026-10-20", refunded, "groceries");
+      totals.record("2026-10-03", -5000, groceriesId);
+      totals.record("2026-10-20", refunded, groceriesId);
 
-      expect(totals.spending("groceries", "2026-10")).toEqual(
+      expect(totals.spending(groceriesId, "2026-10")).toEqual(
         money(expectedSpending, "USD"),
       );
-      expect(totals.available("groceries", "2026-10")).toEqual(
+      expect(totals.available(groceriesId, "2026-10")).toEqual(
         money(expectedAvailable, "USD"),
       );
     },
@@ -294,58 +306,58 @@ describe("Budget Totals", () => {
 
   it("counts a refund only in its own Month's Spending", () => {
     const totals = budget();
-    totals.record("2026-10-03", -5000, "groceries");
-    totals.record("2026-11-02", 1200, "groceries");
+    totals.record("2026-10-03", -5000, groceriesId);
+    totals.record("2026-11-02", 1200, groceriesId);
 
-    expect(totals.spending("groceries", "2026-10")).toEqual(money(5000, "USD"));
-    expect(totals.spending("groceries", "2026-11")).toEqual(
+    expect(totals.spending(groceriesId, "2026-10")).toEqual(money(5000, "USD"));
+    expect(totals.spending(groceriesId, "2026-11")).toEqual(
       money(-1200, "USD"),
     );
   });
 
   it("lets spending take a Category's Available below zero", () => {
     const totals = budget();
-    totals.assign("groceries", "2026-10", 1000);
+    totals.assign(groceriesId, "2026-10", 1000);
 
-    totals.record("2026-10-01", -4550, "groceries");
+    totals.record("2026-10-01", -4550, groceriesId);
 
-    expect(totals.available("groceries", "2026-10")).toEqual(
+    expect(totals.available(groceriesId, "2026-10")).toEqual(
       money(-3550, "USD"),
     );
   });
 
   it("counts a Transaction in the Month of its date, even a future one", () => {
     const totals = budget();
-    totals.assign("gifts", "2026-12", 20000);
+    totals.assign(gifts, "2026-12", 20000);
 
-    totals.record("2026-12-20", -15000, "gifts");
+    totals.record("2026-12-20", -15000, gifts);
 
-    expect(totals.spending("gifts", "2026-12")).toEqual(money(15000, "USD"));
-    expect(totals.available("gifts", "2026-12")).toEqual(money(5000, "USD"));
-    expect(totals.spending("gifts", "2026-10")).toEqual(money(0, "USD"));
+    expect(totals.spending(gifts, "2026-12")).toEqual(money(15000, "USD"));
+    expect(totals.available(gifts, "2026-12")).toEqual(money(5000, "USD"));
+    expect(totals.spending(gifts, "2026-10")).toEqual(money(0, "USD"));
   });
 
   it("counts back-dated edits and deletions in the Month they change, and in Ready to Assign", () => {
     const totals = budget();
     totals.openAccount(100000);
-    totals.assign("groceries", "2026-09", 40000);
-    const shopping = totals.record("2026-09-12", -4550, "groceries");
+    totals.assign(groceriesId, "2026-09", 40000);
+    const shopping = totals.record("2026-09-12", -4550, groceriesId);
     const salary = totals.record("2026-09-25", 300000);
-    const refund = totals.record("2026-09-20", 1000, "groceries");
-    totals.record("2026-10-03", -2000, "groceries");
+    const refund = totals.record("2026-09-20", 1000, groceriesId);
+    totals.record("2026-10-03", -2000, groceriesId);
 
     // Recorded in the wrong Month, for the wrong amount.
-    totals.edit(shopping, "2026-08-31", -5000, "groceries");
+    totals.edit(shopping, "2026-08-31", -5000, groceriesId);
     totals.edit(salary, "2026-09-25", 250000);
     totals.delete(refund);
 
-    expect(totals.spending("groceries", "2026-09")).toEqual(money(0, "USD"));
+    expect(totals.spending(groceriesId, "2026-09")).toEqual(money(0, "USD"));
     // $400 assigned less the −$50 carried forward from August.
-    expect(totals.available("groceries", "2026-09")).toEqual(
+    expect(totals.available(groceriesId, "2026-09")).toEqual(
       money(35000, "USD"),
     );
-    expect(totals.spending("groceries", "2026-08")).toEqual(money(5000, "USD"));
-    expect(totals.spending("groceries", "2026-10")).toEqual(money(2000, "USD"));
+    expect(totals.spending(groceriesId, "2026-08")).toEqual(money(5000, "USD"));
+    expect(totals.spending(groceriesId, "2026-10")).toEqual(money(2000, "USD"));
     // $1,000 Opening Balance + $2,500 salary − $400 assigned.
     expect(totals.readyToAssign()).toEqual(money(310000, "USD"));
   });
@@ -361,124 +373,131 @@ describe("Budget Totals", () => {
 
   it("carries a Category's leftover Available forward through later Months", () => {
     const totals = budget();
-    totals.assign("groceries", "2026-10", 40000);
-    totals.record("2026-10-05", -30000, "groceries");
-    totals.assign("groceries", "2026-11", 20000);
-    totals.record("2026-11-20", 2500, "groceries");
-    totals.record("2026-11-21", -5000, "groceries");
+    totals.assign(groceriesId, "2026-10", 40000);
+    totals.record("2026-10-05", -30000, groceriesId);
+    totals.assign(groceriesId, "2026-11", 20000);
+    totals.record("2026-11-20", 2500, groceriesId);
+    totals.record("2026-11-21", -5000, groceriesId);
 
     // October: $400 − $300 leaves $100.
-    expect(totals.available("groceries", "2026-10")).toEqual(
+    expect(totals.available(groceriesId, "2026-10")).toEqual(
       money(10000, "USD"),
     );
     // November: $100 carried + $200 assigned + $25 back − $50 spent.
-    expect(totals.available("groceries", "2026-11")).toEqual(
+    expect(totals.available(groceriesId, "2026-11")).toEqual(
       money(27500, "USD"),
     );
     // December and January: nothing new, so all of it carries on.
-    expect(totals.available("groceries", "2026-12")).toEqual(
+    expect(totals.available(groceriesId, "2026-12")).toEqual(
       money(27500, "USD"),
     );
-    expect(totals.available("groceries", "2027-01")).toEqual(
+    expect(totals.available(groceriesId, "2027-01")).toEqual(
       money(27500, "USD"),
     );
     // Spending is the Month's own, never carried.
-    expect(totals.spending("groceries", "2026-12")).toEqual(money(0, "USD"));
+    expect(totals.spending(groceriesId, "2026-12")).toEqual(money(0, "USD"));
   });
 
   it("carries a negative Available forward until an Assignment covers it", () => {
     const totals = budget();
-    totals.assign("dining-out", "2026-10", 5000);
-    totals.record("2026-10-10", -8000, "dining-out");
+    totals.assign(diningOut, "2026-10", 5000);
+    totals.record("2026-10-10", -8000, diningOut);
 
-    expect(totals.available("dining-out", "2026-10")).toEqual(
-      money(-3000, "USD"),
-    );
-    expect(totals.available("dining-out", "2026-11")).toEqual(
-      money(-3000, "USD"),
-    );
-    expect(totals.available("dining-out", "2026-12")).toEqual(
-      money(-3000, "USD"),
-    );
+    expect(totals.available(diningOut, "2026-10")).toEqual(money(-3000, "USD"));
+    expect(totals.available(diningOut, "2026-11")).toEqual(money(-3000, "USD"));
+    expect(totals.available(diningOut, "2026-12")).toEqual(money(-3000, "USD"));
 
-    totals.assign("dining-out", "2026-12", 3000);
+    totals.assign(diningOut, "2026-12", 3000);
 
-    expect(totals.available("dining-out", "2026-11")).toEqual(
-      money(-3000, "USD"),
-    );
-    expect(totals.available("dining-out", "2026-12")).toEqual(money(0, "USD"));
-    expect(totals.available("dining-out", "2027-01")).toEqual(money(0, "USD"));
+    expect(totals.available(diningOut, "2026-11")).toEqual(money(-3000, "USD"));
+    expect(totals.available(diningOut, "2026-12")).toEqual(money(0, "USD"));
+    expect(totals.available(diningOut, "2027-01")).toEqual(money(0, "USD"));
   });
 
   it("flows a back-dated change forward into every later Month", () => {
     const totals = budget();
-    totals.assign("rent", "2026-11", 80000);
-    totals.record("2026-11-01", -80000, "rent");
-    expect(totals.available("rent", "2027-02")).toEqual(money(0, "USD"));
+    totals.assign(rent, "2026-11", 80000);
+    totals.record("2026-11-01", -80000, rent);
+    expect(totals.available(rent, "2027-02")).toEqual(money(0, "USD"));
 
-    totals.record("2026-09-15", -1000, "rent");
-    totals.assign("rent", "2026-10", 5000);
+    totals.record("2026-09-15", -1000, rent);
+    totals.assign(rent, "2026-10", 5000);
 
-    expect(totals.available("rent", "2026-09")).toEqual(money(-1000, "USD"));
-    expect(totals.available("rent", "2027-02")).toEqual(money(4000, "USD"));
+    expect(totals.available(rent, "2026-09")).toEqual(money(-1000, "USD"));
+    expect(totals.available(rent, "2027-02")).toEqual(money(4000, "USD"));
   });
 
   it("lists the Overspent Categories in a Month until each is covered", () => {
     const totals = budget();
-    totals.assign("groceries", "2026-10", 10000);
-    totals.record("2026-10-03", -15000, "groceries");
-    totals.assign("rent", "2026-10", 80000);
-    totals.record("2026-10-01", -80000, "rent");
-    totals.record("2026-11-02", -2000, "dining-out");
+    totals.assign(groceriesId, "2026-10", 10000);
+    totals.record("2026-10-03", -15000, groceriesId);
+    totals.assign(rent, "2026-10", 80000);
+    totals.record("2026-10-01", -80000, rent);
+    totals.record("2026-11-02", -2000, diningOut);
 
     expect(totals.overspent("2026-09")).toEqual([]);
     expect(totals.overspent("2026-10")).toEqual([
-      { categoryId: "groceries", available: money(-5000, "USD") },
+      {
+        categoryId: groceriesId,
+        available: money(-5000, "USD"),
+      },
     ]);
     expect(totals.overspent("2026-11")).toEqual([
-      { categoryId: "dining-out", available: money(-2000, "USD") },
-      { categoryId: "groceries", available: money(-5000, "USD") },
+      {
+        categoryId: diningOutId,
+        available: money(-2000, "USD"),
+      },
+      {
+        categoryId: groceriesId,
+        available: money(-5000, "USD"),
+      },
     ]);
 
-    totals.assign("groceries", "2026-11", 5000);
+    totals.assign(groceriesId, "2026-11", 5000);
 
     expect(totals.overspent("2026-11")).toEqual([
-      { categoryId: "dining-out", available: money(-2000, "USD") },
+      {
+        categoryId: diningOutId,
+        available: money(-2000, "USD"),
+      },
     ]);
     expect(totals.overspent("2026-10")).toHaveLength(1);
   });
 
   it("carries an edited or deleted Transaction's change into every later Month", () => {
     const totals = budget();
-    totals.assign("groceries", "2026-09", 40000);
-    const shopping = totals.record("2026-09-12", -10000, "groceries");
-    const takeaway = totals.record("2026-09-18", -5000, "groceries");
-    expect(totals.available("groceries", "2026-12")).toEqual(
+    totals.assign(groceriesId, "2026-09", 40000);
+    const shopping = totals.record("2026-09-12", -10000, groceriesId);
+    const takeaway = totals.record("2026-09-18", -5000, groceriesId);
+    expect(totals.available(groceriesId, "2026-12")).toEqual(
       money(25000, "USD"),
     );
 
-    totals.edit(shopping, "2026-09-12", -30000, "groceries");
+    totals.edit(shopping, "2026-09-12", -30000, groceriesId);
 
-    expect(totals.available("groceries", "2026-12")).toEqual(
+    expect(totals.available(groceriesId, "2026-12")).toEqual(
       money(5000, "USD"),
     );
 
     totals.delete(takeaway);
 
-    expect(totals.available("groceries", "2026-10")).toEqual(
+    expect(totals.available(groceriesId, "2026-10")).toEqual(
       money(10000, "USD"),
     );
-    expect(totals.available("groceries", "2026-12")).toEqual(
+    expect(totals.available(groceriesId, "2026-12")).toEqual(
       money(10000, "USD"),
     );
 
-    totals.edit(shopping, "2026-09-12", -30000, "dining-out");
+    totals.edit(shopping, "2026-09-12", -30000, diningOut);
 
-    expect(totals.available("groceries", "2026-12")).toEqual(
+    expect(totals.available(groceriesId, "2026-12")).toEqual(
       money(40000, "USD"),
     );
     expect(totals.overspent("2026-12")).toEqual([
-      { categoryId: "dining-out", available: money(-30000, "USD") },
+      {
+        categoryId: diningOutId,
+        available: money(-30000, "USD"),
+      },
     ]);
   });
 
@@ -487,93 +506,85 @@ describe("Budget Totals", () => {
     totals.openAccount(100000);
     totals.record("2026-10-01", 300000);
 
-    expect(totals.used("rent")).toBe(false);
-    expect(totals.used("groceries")).toBe(false);
+    expect(totals.used(rent)).toBe(false);
+    expect(totals.used(groceriesId)).toBe(false);
 
-    totals.assign("rent", "2026-10", 80000);
-    totals.record("2026-10-12", -4550, "groceries");
-    totals.assign("gifts", "2026-10", 0);
+    totals.assign(rent, "2026-10", 80000);
+    totals.record("2026-10-12", -4550, groceriesId);
+    totals.assign(gifts, "2026-10", 0);
 
-    expect(totals.used("rent")).toBe(true);
-    expect(totals.used("groceries")).toBe(true);
-    expect(totals.used("gifts")).toBe(false);
-    expect(totals.used("dining-out")).toBe(false);
+    expect(totals.used(rent)).toBe(true);
+    expect(totals.used(groceriesId)).toBe(true);
+    expect(totals.used(gifts)).toBe(false);
+    expect(totals.used(diningOut)).toBe(false);
   });
 
   it("forgets an Assignment once it is cleared back to zero", () => {
     const totals = budget();
-    totals.assign("rent", "2026-10", 80000);
-    totals.assign("rent", "2026-11", 80000);
+    totals.assign(rent, "2026-10", 80000);
+    totals.assign(rent, "2026-11", 80000);
 
-    totals.assign("rent", "2026-10", 0);
-    expect(totals.used("rent")).toBe(true);
+    totals.assign(rent, "2026-10", 0);
+    expect(totals.used(rent)).toBe(true);
 
-    totals.assign("rent", "2026-11", 0);
-    expect(totals.used("rent")).toBe(false);
+    totals.assign(rent, "2026-11", 0);
+    expect(totals.used(rent)).toBe(false);
   });
 
   it("forgets a Transaction's Category once the Transaction is deleted or moved to another Category", () => {
     const totals = budget();
-    const shopping = totals.record("2026-10-12", -4550, "groceries");
-    const takeaway = totals.record("2026-10-13", -2000, "dining-out");
+    const shopping = totals.record("2026-10-12", -4550, groceriesId);
+    const takeaway = totals.record("2026-10-13", -2000, diningOut);
 
     totals.delete(shopping);
-    totals.edit(takeaway, "2026-10-13", -2000, "groceries");
+    totals.edit(takeaway, "2026-10-13", -2000, groceriesId);
 
-    expect(totals.used("dining-out")).toBe(false);
-    expect(totals.used("groceries")).toBe(true);
+    expect(totals.used(diningOut)).toBe(false);
+    expect(totals.used(groceriesId)).toBe(true);
   });
 
   it("knows whether a Category has Assignments in Months after a Month", () => {
     const totals = budget();
-    totals.assign("rent", "2026-10", 80000);
-    totals.assign("gifts", "2026-12", 0);
+    totals.assign(rent, "2026-10", 80000);
+    totals.assign(gifts, "2026-12", 0);
 
-    expect(totals.assignedAfter("rent", "2026-09")).toBe(true);
-    expect(totals.assignedAfter("rent", "2026-10")).toBe(false);
+    expect(totals.assignedAfter(rent, "2026-09")).toBe(true);
+    expect(totals.assignedAfter(rent, "2026-10")).toBe(false);
     // An Assignment of zero gives the Category no money in that Month.
-    expect(totals.assignedAfter("gifts", "2026-10")).toBe(false);
+    expect(totals.assignedAfter(gifts, "2026-10")).toBe(false);
   });
 
   describe("Take-backs", () => {
     it("takes a Take-back out of Available, in its Month and every later one", () => {
       const totals = budget();
-      totals.assign("holiday", "2026-09", 60000);
-      totals.assign("holiday", "2026-10", 10000);
-      totals.record("2026-10-12", -2500, "holiday");
+      totals.assign(holiday, "2026-09", 60000);
+      totals.assign(holiday, "2026-10", 10000);
+      totals.record("2026-10-12", -2500, holiday);
 
-      totals.takeBack("holiday", "2026-10", 4250);
+      totals.takeBack(holiday, "2026-10", 4250);
 
       // carried forward 600.00 - taken back 42.50 + assigned 100.00 - spent 25.00
-      expect(totals.available("holiday", "2026-10")).toEqual(
-        money(63250, "USD"),
-      );
-      expect(totals.available("holiday", "2026-09")).toEqual(
-        money(60000, "USD"),
-      );
-      expect(totals.available("holiday", "2026-11")).toEqual(
-        money(63250, "USD"),
-      );
+      expect(totals.available(holiday, "2026-10")).toEqual(money(63250, "USD"));
+      expect(totals.available(holiday, "2026-09")).toEqual(money(60000, "USD"));
+      expect(totals.available(holiday, "2026-11")).toEqual(money(63250, "USD"));
     });
 
     it("counts only the latest Take-back for a Category in a Month", () => {
       const totals = budget();
-      totals.assign("holiday", "2026-09", 60000);
+      totals.assign(holiday, "2026-09", 60000);
 
-      totals.takeBack("holiday", "2026-10", 4000);
-      totals.takeBack("holiday", "2026-10", 1000);
+      totals.takeBack(holiday, "2026-10", 4000);
+      totals.takeBack(holiday, "2026-10", 1000);
 
-      expect(totals.available("holiday", "2026-10")).toEqual(
-        money(59000, "USD"),
-      );
+      expect(totals.available(holiday, "2026-10")).toEqual(money(59000, "USD"));
     });
 
     it("puts a Take-back back in Ready to Assign", () => {
       const totals = budget();
       totals.openAccount(100000);
-      totals.assign("holiday", "2026-09", 60000);
+      totals.assign(holiday, "2026-09", 60000);
 
-      totals.takeBack("holiday", "2026-10", 4250);
+      totals.takeBack(holiday, "2026-10", 4250);
 
       expect(totals.readyToAssign()).toEqual(money(44250, "USD"));
     });
@@ -581,32 +592,30 @@ describe("Budget Totals", () => {
     it("keeps a Budget's numbers when it stored a negative Assignment", () => {
       const totals = budget();
       totals.openAccount(100000);
-      totals.assign("holiday", "2026-09", 60000);
+      totals.assign(holiday, "2026-09", 60000);
 
-      totals.assign("holiday", "2026-10", -4250);
+      totals.assign(holiday, "2026-10", -4250);
 
-      expect(totals.available("holiday", "2026-10")).toEqual(
-        money(55750, "USD"),
-      );
+      expect(totals.available(holiday, "2026-10")).toEqual(money(55750, "USD"));
       expect(totals.readyToAssign()).toEqual(money(44250, "USD"));
     });
 
     it("counts a Take-back as using a Category, including one stored as a negative Assignment", () => {
       const totals = budget();
-      totals.takeBack("holiday", "2026-10", 4250);
-      totals.assign("gifts", "2026-10", -100);
+      totals.takeBack(holiday, "2026-10", 4250);
+      totals.assign(gifts, "2026-10", -100);
 
-      expect(totals.used("holiday")).toBe(true);
-      expect(totals.used("gifts")).toBe(true);
+      expect(totals.used(holiday)).toBe(true);
+      expect(totals.used(gifts)).toBe(true);
     });
 
     it("does not count a Take-back in a later Month as an Assignment there", () => {
       const totals = budget();
-      totals.takeBack("holiday", "2026-12", 4250);
-      totals.assign("gifts", "2026-12", -100);
+      totals.takeBack(holiday, "2026-12", 4250);
+      totals.assign(gifts, "2026-12", -100);
 
-      expect(totals.assignedAfter("holiday", "2026-10")).toBe(false);
-      expect(totals.assignedAfter("gifts", "2026-10")).toBe(false);
+      expect(totals.assignedAfter(holiday, "2026-10")).toBe(false);
+      expect(totals.assignedAfter(gifts, "2026-10")).toBe(false);
     });
   });
 
@@ -616,20 +625,20 @@ describe("Budget Totals", () => {
       totals.openAccount(100000);
       totals.deleteCategory("holiday");
 
-      totals.assign("holiday", "2026-10", 30000);
-      totals.takeBack("holiday", "2026-11", 500);
+      totals.assign(holiday, "2026-10", 30000);
+      totals.takeBack(holiday, "2026-11", 500);
 
       expect(totals.readyToAssign()).toEqual(money(100000, "USD"));
-      expect(totals.available("holiday", "2026-11")).toEqual(money(0, "USD"));
-      expect(totals.used("holiday")).toBe(false);
-      expect(totals.assignedAfter("holiday", "2026-09")).toBe(false);
+      expect(totals.available(holiday, "2026-11")).toEqual(money(0, "USD"));
+      expect(totals.used(holiday)).toBe(false);
+      expect(totals.assignedAfter(holiday, "2026-09")).toBe(false);
     });
 
     it("doesn't count one written before the delete either", () => {
       const totals = budget();
       totals.openAccount(100000);
-      totals.assign("holiday", "2026-10", 30000);
-      totals.assign("gifts", "2026-10", 2000);
+      totals.assign(holiday, "2026-10", 30000);
+      totals.assign(gifts, "2026-10", 2000);
 
       totals.deleteCategory("holiday");
 
@@ -640,15 +649,15 @@ describe("Budget Totals", () => {
   it("doesn't count a Transaction edited after it was deleted (docs/adr/0006)", () => {
     const totals = budget();
     totals.openAccount(100000);
-    const lunch = totals.record("2026-10-12", -900, "groceries");
+    const lunch = totals.record("2026-10-12", -900, groceriesId);
     const salary = totals.record("2026-10-13", 5000);
 
     totals.delete(lunch);
     totals.delete(salary);
-    totals.edit(lunch, "2026-10-12", -1200, "groceries");
+    totals.edit(lunch, "2026-10-12", -1200, groceriesId);
     totals.edit(salary, "2026-10-13", 7000);
 
     expect(totals.readyToAssign()).toEqual(money(100000, "USD"));
-    expect(totals.available("groceries", "2026-10")).toEqual(money(0, "USD"));
+    expect(totals.available(groceriesId, "2026-10")).toEqual(money(0, "USD"));
   });
 });

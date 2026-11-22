@@ -1,6 +1,7 @@
 /** Budget Totals' public interface: queries and the hooks that wrap them. It has no UI. */
 import { useCallback } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
@@ -30,7 +31,10 @@ export function useReadyToAssign(): Money | undefined {
   return useChangeLogQuery(readyToAssign);
 }
 
-export function useSpending(categoryId: string, of: Month): Money | undefined {
+export function useSpending(
+  categoryId: CategoryId,
+  of: Month,
+): Money | undefined {
   return useChangeLogQuery(
     useCallback(
       (records: readonly ChangeRecord[]) => spending(records, categoryId, of),
@@ -39,7 +43,10 @@ export function useSpending(categoryId: string, of: Month): Money | undefined {
   );
 }
 
-export function useAvailable(categoryId: string, of: Month): Money | undefined {
+export function useAvailable(
+  categoryId: CategoryId,
+  of: Month,
+): Money | undefined {
   return useChangeLogQuery(
     useCallback(
       (records: readonly ChangeRecord[]) => available(records, categoryId, of),

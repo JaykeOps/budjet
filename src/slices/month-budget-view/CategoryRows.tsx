@@ -1,4 +1,5 @@
 import { type ReactNode, useId } from "react";
+import type { CategoryId } from "../../kernel/id";
 import { type Currency, formatMoney, type Money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import type { Category, CategoryGroup } from "../categories";
@@ -16,7 +17,7 @@ export type RowsProps = {
   groups: CategoryGroup[];
   month: Month;
   currency: Currency;
-  onOpenCategory: (categoryId: string) => void;
+  onOpenCategory: (categoryId: CategoryId) => void;
   onAssignGroup: (group: CategoryGroup) => void;
   /** The Category a newcomer starts at, highlighted until anything is assigned. */
   coachedCategoryId?: string;

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { ChangeRecord } from "../../kernel/change-log";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { type Month, month, nextMonth } from "../../kernel/month";
 import type { AccountOpened } from "../accounts/records";
@@ -13,7 +13,9 @@ import type { BudgetCreated } from "../budget-setup/records";
 import type { TransactionRecorded } from "../transactions/records";
 import { available, overspent, readyToAssign } from "./index";
 
-const CATEGORIES = Array.from({ length: 24 }, (_, i) => `category-${i}`);
+const CATEGORIES = Array.from({ length: 24 }, (_, i) =>
+  asId<CategoryId>(`category-${i}`),
+);
 const ACCOUNTS = ["checking", "savings", "cash"].map(asId<AccountId>);
 
 /**

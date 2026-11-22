@@ -1,5 +1,6 @@
 import { type KeyboardEvent, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import type { CategoryId } from "../../kernel/id";
 import {
   type Currency,
   type Money,
@@ -9,9 +10,9 @@ import {
 } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 
-const fieldId = (categoryId: string) => `assigned-${categoryId}`;
+const fieldId = (categoryId: CategoryId) => `assigned-${categoryId}`;
 
-function focusField(categoryId: string) {
+function focusField(categoryId: CategoryId) {
   document.getElementById(fieldId(categoryId))?.focus();
 }
 
@@ -28,14 +29,14 @@ export function useAssignedColumn({
   onError,
 }: {
   /** Every Category in the column, in Budget order. */
-  ids: string[];
+  ids: CategoryId[];
   month: Month;
   currency: Currency;
-  onAssign: (categoryId: string, amount: Money) => boolean;
+  onAssign: (categoryId: CategoryId, amount: Money) => boolean;
   onError: (message: string | undefined) => void;
 }) {
   const [row, setRow] = useState<{
-    id: string;
+    id: CategoryId;
     month: Month;
     draft?: string;
   }>();
@@ -44,7 +45,7 @@ export function useAssignedColumn({
   const toggle = useRef<HTMLButtonElement>(null);
   // A new Month, say from the browser's Back, starts afresh and drops a draft.
   const focused = row?.month === month ? row : undefined;
-  const draftOf = (id: string) =>
+  const draftOf = (id: CategoryId) =>
     focused?.id === id ? focused.draft : undefined;
 
   /** A blank field reads as $0.00, as in the Category sheet. */
@@ -55,12 +56,12 @@ export function useAssignedColumn({
    * Drops the draft before anything else happens, so the blur from moving focus
    * finds nothing left to save.
    */
-  function dropDraft(id: string) {
+  function dropDraft(id: CategoryId) {
     flushSync(() => setRow({ id, month }));
   }
 
   /** Saves what's typed; false when it can't be read, so the row stays. */
-  function save(id: string, assigned: Money): boolean {
+  function save(id: CategoryId, assigned: Money): boolean {
     const draft = draftOf(id);
     if (draft === undefined) return true;
     const amount = read(draft);
@@ -73,7 +74,7 @@ export function useAssignedColumn({
     return amount.minorUnits === assigned.minorUnits || onAssign(id, amount);
   }
 
-  function neighbour(id: string, by: number): string | undefined {
+  function neighbour(id: CategoryId, by: number): CategoryId | undefined {
     return ids[ids.indexOf(id) + by];
   }
 
@@ -84,7 +85,7 @@ export function useAssignedColumn({
     panel,
     toggle,
 
-    field: (id: string, assigned: Money) => ({
+    field: (id: CategoryId, assigned: Money) => ({
       id: fieldId(id),
       value: draftOf(id) ?? typedMoney(assigned),
       onChange: (event: { target: { value: string } }) =>
@@ -117,14 +118,14 @@ export function useAssignedColumn({
       },
     }),
 
-    cover: (id: string) => {
+    cover: (id: CategoryId) => {
       const field = document.getElementById(fieldId(id));
       field?.scrollIntoView({ block: "center" });
       field?.focus();
     },
 
     /** A suggestion replaces what's typed, saves and moves on. */
-    pick: (id: string, amount: Money) => {
+    pick: (id: CategoryId, amount: Money) => {
       dropDraft(id);
       onError(undefined);
       if (!onAssign(id, amount)) {

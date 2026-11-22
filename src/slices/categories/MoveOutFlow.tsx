@@ -1,5 +1,6 @@
 import { useCallback, useId, useState } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
+import { asId, type CategoryId } from "../../kernel/id";
 import { addMoney, formatMoney, type Money } from "../../kernel/money";
 import { type Month, monthName } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
@@ -32,11 +33,11 @@ export function MoveOutFlow({
   onApply,
   onCancel,
 }: {
-  category: { id: string; name: string };
+  category: { id: CategoryId; name: string };
   /** The Month the money moves in. */
   month: Month;
   hide: boolean;
-  onApply: (other: string | undefined) => void;
+  onApply: (other: CategoryId | undefined) => void;
   onCancel: () => void;
 }) {
   const choices = useChangeLogQuery(
@@ -91,7 +92,7 @@ export function MoveOutFlow({
       <button
         type="button"
         data-primary
-        onClick={() => onApply(other || undefined)}
+        onClick={() => onApply(other ? asId<CategoryId>(other) : undefined)}
       >
         {hasMoney
           ? `${moving ? "Move" : "Cover"} ${size}${hide ? " and hide" : ""}`

@@ -1,4 +1,5 @@
 import { type FormEvent, useId, useState } from "react";
+import type { CategoryId } from "../../kernel/id";
 import {
   type Currency,
   formatMoney,
@@ -9,11 +10,17 @@ import {
 import type { Month } from "../../kernel/month";
 import styles from "./CategorySheet.module.css";
 import { groupsOf, useSheetBudget } from "./category-sheet";
-import { moveChange, movePlan, moveStart, READY_TO_ASSIGN } from "./move-money";
+import {
+  moveChange,
+  moveEnd,
+  movePlan,
+  moveStart,
+  READY_TO_ASSIGN,
+} from "./move-money";
 
 export type MoveInput = {
-  fromCategoryId: string;
-  toCategoryId: string;
+  fromCategoryId: CategoryId;
+  toCategoryId: CategoryId;
   amount: Money;
 };
 
@@ -31,7 +38,7 @@ export function MoveMoneyForm({
   month: Month;
   currency: Currency;
   onMove: (input: MoveInput) => void;
-  onAssign: (categoryId: string, amount: Money) => void;
+  onAssign: (categoryId: CategoryId, amount: Money) => void;
   onDone: () => void;
 }) {
   const fromId = useId();
@@ -90,7 +97,7 @@ export function MoveMoneyForm({
           id={fromId}
           value={from}
           onChange={(event) => {
-            setFrom(event.target.value);
+            setFrom(moveEnd(event.target.value));
             setError(undefined);
           }}
         >
@@ -103,7 +110,7 @@ export function MoveMoneyForm({
           id={toId}
           value={to}
           onChange={(event) => {
-            setTo(event.target.value);
+            setTo(moveEnd(event.target.value));
             setError(undefined);
           }}
         >

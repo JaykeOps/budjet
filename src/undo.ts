@@ -6,6 +6,7 @@
  */
 import { useMemo } from "react";
 import type { DeviceChangeLog } from "./kernel/change-log";
+import type { CategoryId } from "./kernel/id";
 import { formatMoney, money } from "./kernel/money";
 import { type Month, monthNameAlone, previousMonth } from "./kernel/month";
 import { useDeviceChangeLog } from "./kernel/use-change-log-query";
@@ -115,7 +116,7 @@ export function deleteRedeclaredBalanceWithUndo(
   };
 }
 
-export type Place = { categoryId: string; month: Month };
+export type Place = { categoryId: CategoryId; month: Month };
 
 /** Notes the Assignment and Take-back at each place, and returns what writes them back. */
 export function rememberMoney(log: DeviceChangeLog, places: Place[]): Undo {
@@ -198,7 +199,7 @@ export function useAssignmentChanges() {
           onUndo: moveMoneyWithUndo(log, input),
         });
       },
-      onCopyLastMonth(month: Month, skipping: Iterable<string>) {
+      onCopyLastMonth(month: Month, skipping: Iterable<CategoryId>) {
         const { copied, undo } = copyLastMonthWithUndo(log, {
           month,
           skipping,

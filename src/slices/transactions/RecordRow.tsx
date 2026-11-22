@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import {
   type Currency,
   formatMoney,
@@ -292,7 +292,9 @@ export function TransactionFields({
         onSelect={(id) => {
           const { categoryId: _, ...rest } = draft;
           onChange(
-            id && id !== READY_TO_ASSIGN ? { ...rest, categoryId: id } : rest,
+            id && id !== READY_TO_ASSIGN
+              ? { ...rest, categoryId: asId<CategoryId>(id) }
+              : rest,
           );
         }}
         onPicked={() => amountField.current?.focus()}

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { copyPreview, walkQueue } from "./assign-walk";
 import { type CategoryAmounts, categoryRow } from "./category-row";
 import type { SheetBudget, SheetCategory } from "./category-sheet";
+
+const rent = asId<CategoryId>("Rent");
 
 const usd = (dollars: number) => money(Math.round(dollars * 100), "USD");
 
@@ -25,7 +28,7 @@ function category(
     spending = 0,
   } = amounts;
   return {
-    id: name,
+    id: asId<CategoryId>(name),
     name,
     groupId: "group",
     groupName: "Group",
@@ -122,7 +125,7 @@ describe("Copy last Month's preview", () => {
     expect(all.readyToAssignAfter).toEqual(usd(720));
     expect(all.warning).toBeUndefined();
 
-    const someUnticked = copyPreview(budget(2000, november), new Set(["Rent"]));
+    const someUnticked = copyPreview(budget(2000, november), new Set([rent]));
     expect(someUnticked.copying).toBe(1);
     expect(someUnticked.readyToAssignAfter).toEqual(usd(1920));
     expect(someUnticked.lines.map(({ ticked }) => ticked)).toEqual([

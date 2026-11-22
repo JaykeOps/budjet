@@ -5,7 +5,7 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "./kernel/change-log";
-import type { AccountId } from "./kernel/id";
+import type { AccountId, CategoryId } from "./kernel/id";
 import { type Money, money } from "./kernel/money";
 import type { Month } from "./kernel/month";
 import { accounts, adjustments, balanceChecks } from "./slices/accounts";
@@ -539,9 +539,9 @@ describe("undoing Assignments", () => {
       groupId: group,
       name: "Dining Out",
     });
-    const assignedIn = (categoryId: string, of = october) =>
+    const assignedIn = (categoryId: CategoryId, of = october) =>
       assignment(phone.records(), categoryId, of);
-    const takenBackIn = (categoryId: string, of = october) =>
+    const takenBackIn = (categoryId: CategoryId, of = october) =>
       takeBack(phone.records(), categoryId, of);
     const ready = () => readyToAssign(phone.records());
     return {

@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import type { CategoryId } from "../../kernel/id";
 import type { Currency, Money } from "../../kernel/money";
 import {
   type Month,
@@ -27,7 +28,11 @@ import { useAssignedColumn } from "./use-assigned-column";
 import { useWide } from "./use-wide";
 import { useVisibleCategoryGroups } from "./visible-categories";
 
-export type AssignInput = { categoryId: string; month: Month; amount: Money };
+export type AssignInput = {
+  categoryId: CategoryId;
+  month: Month;
+  amount: Money;
+};
 export type MoveMoneyInput = MoveInput & { month: Month };
 
 /**
@@ -59,7 +64,7 @@ export function MonthBudget({
   onMonthChange: (month: Month) => void;
   onAssign: (input: AssignInput) => void;
   /** Copies into `month`, except the Categories the user unticked. */
-  onCopyLastMonth: (month: Month, unticked: ReadonlySet<string>) => void;
+  onCopyLastMonth: (month: Month, unticked: ReadonlySet<CategoryId>) => void;
   onMoveMoney: (input: MoveMoneyInput) => void;
   editing: boolean;
   onEditingChange: (editing: boolean) => void;
@@ -106,7 +111,7 @@ export function MonthBudget({
     month,
     currency,
     coachedCategoryId: coached?.id,
-    onOpenCategory: (categoryId: string) =>
+    onOpenCategory: (categoryId: CategoryId) =>
       setSteps({ title: "Categories", ids, start: ids.indexOf(categoryId) }),
     onAssignGroup: ({ name, categories }: CategoryGroup) =>
       setSteps({

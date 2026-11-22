@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import type { Month } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
 import { OpenableSheet } from "../../ui/Sheet";
@@ -14,8 +15,8 @@ export function HiddenMoney({
 }: {
   month: Month;
   onMoveOut: (
-    category: { id: string; name: string },
-    other: string | undefined,
+    category: { id: CategoryId; name: string },
+    other: CategoryId | undefined,
   ) => void;
 }) {
   const lines = useChangeLogQuery(

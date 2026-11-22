@@ -1,4 +1,5 @@
 import { type ChangeRecord, perSnapshot } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import { addMoney, type Money, money, subtractMoney } from "../../kernel/money";
 import { type Month, monthOf } from "../../kernel/month";
 import { adjustments } from "../accounts";
@@ -43,7 +44,7 @@ export function readyToAssign(
  */
 export function spending(
   records: readonly ChangeRecord[],
-  categoryId: string,
+  categoryId: CategoryId,
   of: Month,
 ): Money | undefined {
   const totals = categoryTotals(records);
@@ -60,7 +61,7 @@ export function spending(
  */
 export function available(
   records: readonly ChangeRecord[],
-  categoryId: string,
+  categoryId: CategoryId,
   of: Month,
 ): Money | undefined {
   const totals = categoryTotals(records);
@@ -76,7 +77,7 @@ export function available(
  */
 export function categoryUsed(
   records: readonly ChangeRecord[],
-  categoryId: string,
+  categoryId: CategoryId,
 ): boolean {
   return (
     [...currentAssignments(records).values()].some(
@@ -94,7 +95,7 @@ export function categoryUsed(
 /** Whether a Category has an Assignment other than zero in any Month after `of`. */
 export function assignedAfter(
   records: readonly ChangeRecord[],
-  categoryId: string,
+  categoryId: CategoryId,
   of: Month,
 ): boolean {
   for (const current of currentAssignments(records).values()) {
@@ -112,7 +113,7 @@ export function assignedAfter(
 /** A Category's Assignments other than zero in Months after `of`, oldest first. */
 export function assignmentsAfter(
   records: readonly ChangeRecord[],
-  categoryId: string,
+  categoryId: CategoryId,
   of: Month,
 ): { month: Month; amount: Money }[] {
   const later: { month: Month; amount: Money }[] = [];
@@ -126,7 +127,7 @@ export function assignmentsAfter(
   return later.sort((a, b) => (a.month < b.month ? -1 : 1));
 }
 
-export type OverspentCategory = { categoryId: string; available: Money };
+export type OverspentCategory = { categoryId: CategoryId; available: Money };
 
 /**
  * The Categories whose Available is below zero in a Month, by Category id.
@@ -166,7 +167,7 @@ type CategoryMonths = {
 
 type CategoryTotals = {
   currency: string;
-  categories: Map<string, CategoryMonths>;
+  categories: Map<CategoryId, CategoryMonths>;
 };
 
 /**
@@ -180,11 +181,11 @@ function calculateCategoryTotals(
 ): CategoryTotals | undefined {
   const budget = records.findLast(isBudgetCreated);
   if (!budget) return undefined;
-  const changes = new Map<string, Map<Month, number>>();
-  const spent = new Map<string, Map<Month, number>>();
+  const changes = new Map<CategoryId, Map<Month, number>>();
+  const spent = new Map<CategoryId, Map<Month, number>>();
   const add = (
-    into: Map<string, Map<Month, number>>,
-    categoryId: string,
+    into: Map<CategoryId, Map<Month, number>>,
+    categoryId: CategoryId,
     of: Month,
     minorUnits: number,
   ) => {
@@ -215,7 +216,7 @@ function calculateCategoryTotals(
     add(spent, categoryId, of, -amount.minorUnits);
   }
 
-  const categories = new Map<string, CategoryMonths>();
+  const categories = new Map<CategoryId, CategoryMonths>();
   for (const [categoryId, byMonth] of changes) {
     const months = [...byMonth.keys()].sort();
     let running = 0;

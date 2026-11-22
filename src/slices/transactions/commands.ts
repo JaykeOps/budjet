@@ -1,5 +1,5 @@
 import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
-import type { AccountId } from "../../kernel/id";
+import type { AccountId, CategoryId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import { monthOf } from "../../kernel/month";
 import { accounts } from "../accounts";
@@ -19,7 +19,7 @@ export type TransactionInput = {
   date: string;
   /** Negative for money going out of the Account, positive for money coming in. */
   amount: Money;
-  categoryId?: string;
+  categoryId?: CategoryId;
   payee?: string;
   memo?: string;
 };

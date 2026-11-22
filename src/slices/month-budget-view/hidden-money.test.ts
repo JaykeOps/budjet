@@ -3,6 +3,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
+import { asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -34,7 +35,7 @@ function budget() {
   );
   let position = 0;
   const add = (name: string) => {
-    const id = name.toLowerCase();
+    const id = asId<CategoryId>(name.toLowerCase());
     seedRecord<CategoryCreated["type"], CategoryCreated["payload"]>(
       log,
       id,
@@ -44,14 +45,14 @@ function budget() {
     position += 1;
     return id;
   };
-  const assign = (categoryId: string, month: Month, cents: number) =>
+  const assign = (categoryId: CategoryId, month: Month, cents: number) =>
     seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
       log,
       assignmentSubject(categoryId, month),
       "AssignmentSet",
       { version: 1, categoryId, month, amount: money(cents, "USD") },
     );
-  const hide = (categoryId: string) =>
+  const hide = (categoryId: CategoryId) =>
     seedRecord<CategoryHidden["type"], CategoryHidden["payload"]>(
       log,
       categoryId,

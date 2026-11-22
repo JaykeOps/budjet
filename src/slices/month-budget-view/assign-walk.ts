@@ -1,3 +1,4 @@
+import type { CategoryId } from "../../kernel/id";
 import {
   formatMoney,
   type Money,
@@ -14,7 +15,7 @@ import type { SheetBudget } from "./category-sheet";
 export function walkQueue({
   readyToAssign,
   categories,
-}: SheetBudget): string[] {
+}: SheetBudget): CategoryId[] {
   const overspent = categories.filter(({ row }) => row.state === "overspent");
   const empty = categories.filter(
     ({ row, nothingAssigned }) => nothingAssigned && row.state !== "overspent",
@@ -36,7 +37,7 @@ export function walkQueue({
 }
 
 export type CopyLine = {
-  id: string;
+  id: CategoryId;
   name: string;
   amount: Money;
   ticked: boolean;
@@ -49,7 +50,7 @@ export type CopyLine = {
  */
 export function copyPreview(
   { readyToAssign, categories }: SheetBudget,
-  unticked: ReadonlySet<string>,
+  unticked: ReadonlySet<CategoryId>,
 ) {
   const lines: CopyLine[] = categories
     .filter(

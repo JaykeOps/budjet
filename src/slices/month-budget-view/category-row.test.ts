@@ -3,7 +3,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -21,6 +21,8 @@ import {
   categoryRowIn,
   overspentHint,
 } from "./category-row";
+
+const groceriesId = asId<CategoryId>("groceries");
 
 const checking = asId<AccountId>("checking");
 
@@ -155,25 +157,25 @@ describe("categoryRowIn", () => {
     );
     const amountIn = (month: Month, dollars: number) => ({
       version: 1 as const,
-      categoryId: "groceries",
+      categoryId: groceriesId,
       month,
       amount: usd(dollars),
     });
     seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
       log,
-      assignmentSubject("groceries", "2026-10"),
+      assignmentSubject(groceriesId, "2026-10"),
       "AssignmentSet",
       amountIn("2026-10", 300),
     );
     seedRecord<TakeBackSet["type"], TakeBackSet["payload"]>(
       log,
-      assignmentSubject("groceries", "2026-11"),
+      assignmentSubject(groceriesId, "2026-11"),
       "TakeBackSet",
       amountIn("2026-11", 40),
     );
     seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
       log,
-      assignmentSubject("groceries", "2026-11"),
+      assignmentSubject(groceriesId, "2026-11"),
       "AssignmentSet",
       amountIn("2026-11", 25),
     );
@@ -186,18 +188,18 @@ describe("categoryRowIn", () => {
         accountId: checking,
         date: "2026-11-03",
         amount: usd(-312.5),
-        categoryId: "groceries",
+        categoryId: groceriesId,
       },
     );
     const records = changeLog.readAll();
 
     for (const of of ["2026-10", "2026-11", "2026-12"] as const) {
-      expect(categoryRowIn(records, "groceries", of, "USD").available).toEqual(
-        available(records, "groceries", of),
+      expect(categoryRowIn(records, groceriesId, of, "USD").available).toEqual(
+        available(records, groceriesId, of),
       );
     }
     expect(
-      categoryRowIn(records, "groceries", "2026-11", "USD").available,
+      categoryRowIn(records, groceriesId, "2026-11", "USD").available,
     ).toEqual(usd(-27.5));
   });
 });

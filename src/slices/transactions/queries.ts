@@ -1,5 +1,5 @@
 import type { ChangeRecord } from "../../kernel/change-log";
-import type { AccountId } from "../../kernel/id";
+import type { AccountId, CategoryId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import {
   accounts,
@@ -155,14 +155,17 @@ export function payees(records: readonly ChangeRecord[]): string[] {
 export type KnownPayee = {
   name: string;
   /** The last Category it had, unless that Category is hidden now. */
-  categoryId?: string;
+  categoryId?: CategoryId;
   /** The Account it was last recorded in, unless that Account is closed now. */
   accountId?: AccountId;
 };
 
 /** Every Payee the Budget's Transactions name, in alphabetical order, with what it can fill in. */
 export function knownPayees(records: readonly ChangeRecord[]): KnownPayee[] {
-  const last = new Map<string, { categoryId?: string; accountId: AccountId }>();
+  const last = new Map<
+    string,
+    { categoryId?: CategoryId; accountId: AccountId }
+  >();
   for (const { payee, categoryId, accountId } of currentTransactions(records)) {
     if (!payee) continue;
     last.set(payee, {

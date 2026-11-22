@@ -8,6 +8,7 @@ import {
   latestBySubject,
   perSnapshot,
 } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import { addMoney, type Money, money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 
@@ -22,7 +23,7 @@ export type AssignmentSet = ChangeRecord<
   "AssignmentSet",
   {
     version: 1;
-    categoryId: string;
+    categoryId: CategoryId;
     month: Month;
     amount: Money;
     cleared?: true;
@@ -40,7 +41,7 @@ export function isAssignmentSet(record: ChangeRecord): record is AssignmentSet {
  */
 export type TakeBackSet = ChangeRecord<
   "TakeBackSet",
-  { version: 1; categoryId: string; month: Month; amount: Money }
+  { version: 1; categoryId: CategoryId; month: Month; amount: Money }
 >;
 
 export function isTakeBackSet(record: ChangeRecord): record is TakeBackSet {
@@ -48,13 +49,16 @@ export function isTakeBackSet(record: ChangeRecord): record is TakeBackSet {
 }
 
 /** The subject id of a Category's Assignment or Take-back in a Month. */
-export function assignmentSubject(categoryId: string, month: Month): string {
+export function assignmentSubject(
+  categoryId: CategoryId,
+  month: Month,
+): string {
   return `${categoryId}/${month}`;
 }
 
 /** A Category's money in a Month: each is undefined until it has been set. */
 export type CurrentAssignment = {
-  categoryId: string;
+  categoryId: CategoryId;
   month: Month;
   assigned: Money | undefined;
   takenBack: Money | undefined;
@@ -76,7 +80,7 @@ export const currentAssignments = perSnapshot(
     const current = new Map<string, CurrentAssignment>();
     const entry = (
       subject: string,
-      { categoryId, month }: { categoryId: string; month: Month },
+      { categoryId, month }: { categoryId: CategoryId; month: Month },
     ) => {
       let found = current.get(subject);
       if (!found) {

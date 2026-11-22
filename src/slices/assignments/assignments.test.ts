@@ -4,6 +4,7 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "../../kernel/change-log";
+import { asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -17,6 +18,16 @@ import {
 } from "./commands";
 import { assignment, takeBack } from "./index";
 import { type AssignmentSet, assignmentSubject } from "./records";
+
+const diningOutId = asId<CategoryId>("dining-out");
+const groceriesId = asId<CategoryId>("groceries");
+const phoneId = asId<CategoryId>("phone");
+const powerId = asId<CategoryId>("power");
+const rentId = asId<CategoryId>("rent");
+
+const diningOut = diningOutId;
+const groceries = groceriesId;
+const power = powerId;
 
 const october = month(2026, 10);
 const november = month(2026, 11);
@@ -40,42 +51,40 @@ function budgetIn(
 describe("Assignments", () => {
   it("has no Assignment for a Category until one is set", () => {
     const { changeLog } = budgetIn("USD");
-    expect(assignment(changeLog.readAll(), "rent", october)).toBeUndefined();
+    expect(assignment(changeLog.readAll(), rentId, october)).toBeUndefined();
   });
 
   it("sets a Category's Assignment for one Month only", () => {
     const { changeLog, log } = budgetIn("USD");
 
     setAssignment(log, {
-      categoryId: "rent",
+      categoryId: rentId,
       month: october,
       amount: money(120000, "USD"),
     });
 
-    expect(assignment(changeLog.readAll(), "rent", october)).toEqual(
+    expect(assignment(changeLog.readAll(), rentId, october)).toEqual(
       money(120000, "USD"),
     );
-    expect(assignment(changeLog.readAll(), "rent", november)).toBeUndefined();
-    expect(
-      assignment(changeLog.readAll(), "groceries", october),
-    ).toBeUndefined();
+    expect(assignment(changeLog.readAll(), rentId, november)).toBeUndefined();
+    expect(assignment(changeLog.readAll(), groceries, october)).toBeUndefined();
   });
 
   it("replaces the Assignment when it is set again", () => {
     const { changeLog, log } = budgetIn("USD");
-    const rent = { categoryId: "rent", month: october };
+    const rent = { categoryId: rentId, month: october };
 
     setAssignment(log, { ...rent, amount: money(120000, "USD") });
     setAssignment(log, { ...rent, amount: money(115000, "USD") });
 
-    expect(assignment(changeLog.readAll(), "rent", october)).toEqual(
+    expect(assignment(changeLog.readAll(), rentId, october)).toEqual(
       money(115000, "USD"),
     );
   });
 
   it("keeps the most recent Assignment, even from a device whose clock runs behind", () => {
     const laptop = budgetIn("USD", "laptop", () => 5000);
-    const rent = { categoryId: "rent", month: october };
+    const rent = { categoryId: rentId, month: october };
     setAssignment(laptop.log, { ...rent, amount: money(100, "USD") });
     // The phone's clock is behind, but it has seen the laptop's records.
     const phoneLog = createInMemoryChangeLog();
@@ -90,7 +99,7 @@ describe("Assignments", () => {
     ]) {
       const merged = createInMemoryChangeLog();
       for (const records of order) merged.append(records);
-      expect(assignment(merged.readAll(), "rent", october)).toEqual(
+      expect(assignment(merged.readAll(), rentId, october)).toEqual(
         money(200, "USD"),
       );
     }
@@ -101,24 +110,24 @@ describe("Assignments", () => {
 
     expect(() =>
       setAssignment(log, {
-        categoryId: "rent",
+        categoryId: rentId,
         month: october,
         amount: money(100, "EUR"),
       }),
     ).toThrow(/in USD, the Budget's currency/);
-    expect(assignment(changeLog.readAll(), "rent", october)).toBeUndefined();
+    expect(assignment(changeLog.readAll(), rentId, october)).toBeUndefined();
   });
 
   describe("copy last Month", () => {
     it("fills each Category that has no Assignment this Month with last Month's amount", () => {
       const { changeLog, log } = budgetIn("USD");
       setAssignment(log, {
-        categoryId: "rent",
+        categoryId: rentId,
         month: october,
         amount: money(120000, "USD"),
       });
       setAssignment(log, {
-        categoryId: "groceries",
+        categoryId: groceries,
         month: october,
         amount: money(35050, "USD"),
       });
@@ -126,18 +135,18 @@ describe("Assignments", () => {
       copyLastMonth(log, { month: november });
 
       const records = changeLog.readAll();
-      expect(assignment(records, "rent", november)).toEqual(
+      expect(assignment(records, rentId, november)).toEqual(
         money(120000, "USD"),
       );
-      expect(assignment(records, "groceries", november)).toEqual(
+      expect(assignment(records, groceries, november)).toEqual(
         money(35050, "USD"),
       );
-      expect(assignment(records, "power", november)).toBeUndefined();
+      expect(assignment(records, power, november)).toBeUndefined();
     });
 
     it("never overwrites an Assignment already set this Month, even one of zero", () => {
       const { changeLog, log } = budgetIn("USD");
-      for (const categoryId of ["rent", "power"]) {
+      for (const categoryId of ["rent", "power"].map(asId<CategoryId>)) {
         setAssignment(log, {
           categoryId,
           month: october,
@@ -145,12 +154,12 @@ describe("Assignments", () => {
         });
       }
       setAssignment(log, {
-        categoryId: "rent",
+        categoryId: rentId,
         month: november,
         amount: money(9000, "USD"),
       });
       setAssignment(log, {
-        categoryId: "power",
+        categoryId: power,
         month: november,
         amount: money(0, "USD"),
       });
@@ -158,13 +167,13 @@ describe("Assignments", () => {
       copyLastMonth(log, { month: november });
 
       const records = changeLog.readAll();
-      expect(assignment(records, "rent", november)).toEqual(money(9000, "USD"));
-      expect(assignment(records, "power", november)).toEqual(money(0, "USD"));
+      expect(assignment(records, rentId, november)).toEqual(money(9000, "USD"));
+      expect(assignment(records, power, november)).toEqual(money(0, "USD"));
     });
 
     it("leaves out the Categories it is told to skip, such as hidden ones", () => {
       const { changeLog, log } = budgetIn("USD");
-      for (const categoryId of ["rent", "phone"]) {
+      for (const categoryId of ["rent", "phone"].map(asId<CategoryId>)) {
         setAssignment(log, {
           categoryId,
           month: october,
@@ -172,39 +181,42 @@ describe("Assignments", () => {
         });
       }
 
-      copyLastMonth(log, { month: november, skipping: ["phone"] });
+      copyLastMonth(log, {
+        month: november,
+        skipping: [phoneId],
+      });
 
       const records = changeLog.readAll();
-      expect(assignment(records, "rent", november)).toEqual(
+      expect(assignment(records, rentId, november)).toEqual(
         money(10000, "USD"),
       );
-      expect(assignment(records, "phone", november)).toBeUndefined();
+      expect(assignment(records, phoneId, november)).toBeUndefined();
     });
 
     it("sets nothing for a Category whose Assignment last Month was zero", () => {
       const { changeLog, log } = budgetIn("USD");
       setAssignment(log, {
-        categoryId: "rent",
+        categoryId: rentId,
         month: october,
         amount: money(0, "USD"),
       });
 
       copyLastMonth(log, { month: november });
 
-      expect(assignment(changeLog.readAll(), "rent", november)).toBeUndefined();
+      expect(assignment(changeLog.readAll(), rentId, november)).toBeUndefined();
     });
 
     it("copies only from the Month just before", () => {
       const { changeLog, log } = budgetIn("USD");
       setAssignment(log, {
-        categoryId: "rent",
+        categoryId: rentId,
         month: month(2026, 9),
         amount: money(10000, "USD"),
       });
 
       copyLastMonth(log, { month: november });
 
-      expect(assignment(changeLog.readAll(), "rent", november)).toBeUndefined();
+      expect(assignment(changeLog.readAll(), rentId, november)).toBeUndefined();
     });
   });
 
@@ -212,31 +224,31 @@ describe("Assignments", () => {
     it("lowers one Category's Assignment and raises another's by the same amount in the same Month", () => {
       const { changeLog, log } = budgetIn("USD");
       setAssignment(log, {
-        categoryId: "dining-out",
+        categoryId: diningOut,
         month: october,
         amount: money(20000, "USD"),
       });
       setAssignment(log, {
-        categoryId: "groceries",
+        categoryId: groceries,
         month: october,
         amount: money(30000, "USD"),
       });
 
       moveMoney(log, {
-        fromCategoryId: "dining-out",
-        toCategoryId: "groceries",
+        fromCategoryId: diningOut,
+        toCategoryId: groceries,
         month: october,
         amount: money(5000, "USD"),
       });
 
       const records = changeLog.readAll();
-      expect(assignment(records, "dining-out", october)).toEqual(
+      expect(assignment(records, diningOut, october)).toEqual(
         money(15000, "USD"),
       );
-      expect(assignment(records, "groceries", october)).toEqual(
+      expect(assignment(records, groceries, october)).toEqual(
         money(35000, "USD"),
       );
-      expect(assignment(records, "groceries", november)).toBeUndefined();
+      expect(assignment(records, groceries, november)).toBeUndefined();
     });
 
     it.each([
@@ -267,8 +279,8 @@ describe("Assignments", () => {
 
         expect(() =>
           moveMoney(log, {
-            fromCategoryId: "groceries",
-            toCategoryId,
+            fromCategoryId: groceries,
+            toCategoryId: asId<CategoryId>(toCategoryId),
             month: october,
             amount,
           }),
@@ -279,13 +291,13 @@ describe("Assignments", () => {
   });
 
   describe("Take-backs", () => {
-    const rent = { categoryId: "rent", month: october };
+    const rent = { categoryId: rentId, month: october };
     const dollars = (amount: number) => money(amount * 100, "USD");
 
     function moveFromRent(log: DeviceChangeLog, amount: number) {
       moveMoney(log, {
-        fromCategoryId: "rent",
-        toCategoryId: "groceries",
+        fromCategoryId: rentId,
+        toCategoryId: groceries,
         month: october,
         amount: dollars(amount),
       });
@@ -307,8 +319,8 @@ describe("Assignments", () => {
       moveFromRent(log, 100);
 
       const records = changeLog.readAll();
-      expect(assignment(records, "rent", october)).toEqual(dollars(0));
-      expect(takeBack(records, "rent", october)).toBeUndefined();
+      expect(assignment(records, rentId, october)).toEqual(dollars(0));
+      expect(takeBack(records, rentId, october)).toBeUndefined();
     });
 
     it("takes back what moving money needs beyond the Assignment, which stops at zero", () => {
@@ -318,10 +330,10 @@ describe("Assignments", () => {
       moveFromRent(log, 50);
 
       const records = changeLog.readAll();
-      expect(assignment(records, "rent", october)).toEqual(dollars(0));
-      expect(takeBack(records, "rent", october)).toEqual(dollars(20));
-      expect(assignment(records, "groceries", october)).toEqual(dollars(50));
-      expect(takeBack(records, "rent", november)).toBeUndefined();
+      expect(assignment(records, rentId, october)).toEqual(dollars(0));
+      expect(takeBack(records, rentId, october)).toEqual(dollars(20));
+      expect(assignment(records, groceries, october)).toEqual(dollars(50));
+      expect(takeBack(records, rentId, november)).toBeUndefined();
     });
 
     it("turns an Assignment typed below zero into zero plus a Take-back", () => {
@@ -330,8 +342,8 @@ describe("Assignments", () => {
       setAssignment(log, { ...rent, amount: dollars(-40) });
 
       const records = changeLog.readAll();
-      expect(assignment(records, "rent", october)).toEqual(dollars(0));
-      expect(takeBack(records, "rent", october)).toEqual(dollars(40));
+      expect(assignment(records, rentId, october)).toEqual(dollars(0));
+      expect(takeBack(records, rentId, october)).toEqual(dollars(40));
     });
 
     it("keeps one total per Category per Month, growing with each Take-back", () => {
@@ -341,7 +353,7 @@ describe("Assignments", () => {
       setAssignment(log, { ...rent, amount: dollars(-5) });
       moveFromRent(log, 10);
 
-      expect(takeBack(changeLog.readAll(), "rent", october)).toEqual(
+      expect(takeBack(changeLog.readAll(), rentId, october)).toEqual(
         dollars(35),
       );
     });
@@ -352,15 +364,15 @@ describe("Assignments", () => {
 
       setAssignment(log, { ...rent, amount: dollars(70) });
       moveMoney(log, {
-        fromCategoryId: "groceries",
-        toCategoryId: "rent",
+        fromCategoryId: groceries,
+        toCategoryId: rentId,
         month: october,
         amount: dollars(5),
       });
 
       const records = changeLog.readAll();
-      expect(assignment(records, "rent", october)).toEqual(dollars(75));
-      expect(takeBack(records, "rent", october)).toEqual(dollars(20));
+      expect(assignment(records, rentId, october)).toEqual(dollars(75));
+      expect(takeBack(records, rentId, october)).toEqual(dollars(20));
     });
 
     it("keeps the most recent Take-back, whichever device's records arrive first", () => {
@@ -381,7 +393,7 @@ describe("Assignments", () => {
       ]) {
         const merged = createInMemoryChangeLog();
         for (const records of order) merged.append(records);
-        expect(takeBack(merged.readAll(), "rent", october)).toEqual(
+        expect(takeBack(merged.readAll(), rentId, october)).toEqual(
           dollars(30),
         );
       }
@@ -401,8 +413,8 @@ describe("Assignments", () => {
 
       const records = changeLog.readAll();
       expect(readyToAssign(records)).toEqual(before);
-      expect(available(records, "rent", october)).toEqual(dollars(557.5));
-      expect(available(records, "groceries", october)).toEqual(dollars(52.5));
+      expect(available(records, rentId, october)).toEqual(dollars(557.5));
+      expect(available(records, groceries, october)).toEqual(dollars(52.5));
     });
 
     it("keeps the later of two Take-backs made without seeing each other", () => {
@@ -421,7 +433,7 @@ describe("Assignments", () => {
       ]) {
         const merged = createInMemoryChangeLog();
         for (const records of order) merged.append(records);
-        expect(takeBack(merged.readAll(), "rent", october)).toEqual(
+        expect(takeBack(merged.readAll(), rentId, october)).toEqual(
           dollars(20),
         );
       }
@@ -433,8 +445,8 @@ describe("Assignments", () => {
         storeNegativeAssignment(log, 50);
 
         const records = changeLog.readAll();
-        expect(assignment(records, "rent", october)).toEqual(dollars(0));
-        expect(takeBack(records, "rent", october)).toEqual(dollars(50));
+        expect(assignment(records, rentId, october)).toEqual(dollars(0));
+        expect(takeBack(records, rentId, october)).toEqual(dollars(50));
       });
 
       it("keeps its Take-back when a new Assignment replaces it", () => {
@@ -444,8 +456,8 @@ describe("Assignments", () => {
         setAssignment(log, { ...rent, amount: dollars(70) });
 
         const records = changeLog.readAll();
-        expect(assignment(records, "rent", october)).toEqual(dollars(70));
-        expect(takeBack(records, "rent", october)).toEqual(dollars(50));
+        expect(assignment(records, rentId, october)).toEqual(dollars(70));
+        expect(takeBack(records, rentId, october)).toEqual(dollars(50));
       });
 
       it("adds to its Take-back when more money leaves", () => {
@@ -455,8 +467,8 @@ describe("Assignments", () => {
         moveFromRent(log, 20);
 
         const records = changeLog.readAll();
-        expect(assignment(records, "rent", october)).toEqual(dollars(0));
-        expect(takeBack(records, "rent", october)).toEqual(dollars(70));
+        expect(assignment(records, rentId, october)).toEqual(dollars(0));
+        expect(takeBack(records, rentId, october)).toEqual(dollars(70));
       });
 
       it("adds to a Take-back recorded for the same Month on another device", () => {
@@ -464,7 +476,7 @@ describe("Assignments", () => {
         moveFromRent(log, 30);
         storeNegativeAssignment(log, 50);
 
-        expect(takeBack(changeLog.readAll(), "rent", october)).toEqual(
+        expect(takeBack(changeLog.readAll(), rentId, october)).toEqual(
           dollars(80),
         );
       });
@@ -476,8 +488,8 @@ describe("Assignments", () => {
         copyLastMonth(log, { month: november });
 
         const records = changeLog.readAll();
-        expect(assignment(records, "rent", november)).toBeUndefined();
-        expect(takeBack(records, "rent", november)).toBeUndefined();
+        expect(assignment(records, rentId, november)).toBeUndefined();
+        expect(takeBack(records, rentId, november)).toBeUndefined();
       });
     });
 
@@ -496,7 +508,7 @@ describe("Assignments", () => {
   });
 
   describe("restoring", () => {
-    const rent = { categoryId: "rent", month: october };
+    const rent = { categoryId: rentId, month: october };
 
     it("writes back an Assignment and a Take-back, and zero for unset ones", () => {
       const { changeLog, log } = budgetIn("USD");
@@ -509,10 +521,10 @@ describe("Assignments", () => {
         takenBack: undefined,
       });
 
-      expect(assignment(changeLog.readAll(), "rent", october)).toEqual(
+      expect(assignment(changeLog.readAll(), rentId, october)).toEqual(
         money(5000, "USD"),
       );
-      expect(takeBack(changeLog.readAll(), "rent", october)).toEqual(
+      expect(takeBack(changeLog.readAll(), rentId, october)).toEqual(
         money(0, "USD"),
       );
     });
@@ -535,7 +547,7 @@ describe("Assignments", () => {
       const { changeLog, log } = budgetIn("USD");
       seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
         log,
-        assignmentSubject("rent", october),
+        assignmentSubject(rentId, october),
         "AssignmentSet",
         { version: 1, ...rent, amount: money(-2000, "USD") },
       );
@@ -546,10 +558,10 @@ describe("Assignments", () => {
         takenBack: money(500, "USD"),
       });
 
-      expect(takeBack(changeLog.readAll(), "rent", october)).toEqual(
+      expect(takeBack(changeLog.readAll(), rentId, october)).toEqual(
         money(500, "USD"),
       );
-      expect(assignment(changeLog.readAll(), "rent", october)).toEqual(
+      expect(assignment(changeLog.readAll(), rentId, october)).toEqual(
         money(0, "USD"),
       );
     });

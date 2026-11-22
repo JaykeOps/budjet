@@ -7,6 +7,7 @@
  * ties (from two devices adding at once) fall back to the thing's id.
  */
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 
 export type CategoryGroupCreated = ChangeRecord<
   "CategoryGroupCreated",
@@ -26,28 +27,43 @@ export type CategoryGroupPlaced = ChangeRecord<
 
 export type CategoryCreated = ChangeRecord<
   "CategoryCreated",
-  { version: 1; groupId: string; name: string; position: number }
+  { version: 1; groupId: string; name: string; position: number },
+  CategoryId
 >;
 
 export type CategoryRenamed = ChangeRecord<
   "CategoryRenamed",
-  { version: 1; name: string }
+  { version: 1; name: string },
+  CategoryId
 >;
 
 /** A Category's new Category Group and its place among that group's Categories. */
 export type CategoryPlaced = ChangeRecord<
   "CategoryPlaced",
-  { version: 1; groupId: string; position: number }
+  { version: 1; groupId: string; position: number },
+  CategoryId
 >;
 
 /** A Category leaves the Month Budget view and the Category pickers; its history stays. */
-export type CategoryHidden = ChangeRecord<"CategoryHidden", { version: 1 }>;
+export type CategoryHidden = ChangeRecord<
+  "CategoryHidden",
+  { version: 1 },
+  CategoryId
+>;
 
 /** A hidden Category comes back. */
-export type CategoryUnhidden = ChangeRecord<"CategoryUnhidden", { version: 1 }>;
+export type CategoryUnhidden = ChangeRecord<
+  "CategoryUnhidden",
+  { version: 1 },
+  CategoryId
+>;
 
 /** A Category that was never used is gone for good. */
-export type CategoryDeleted = ChangeRecord<"CategoryDeleted", { version: 1 }>;
+export type CategoryDeleted = ChangeRecord<
+  "CategoryDeleted",
+  { version: 1 },
+  CategoryId
+>;
 
 /** An empty Category Group is gone for good. */
 export type CategoryGroupDeleted = ChangeRecord<

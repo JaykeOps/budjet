@@ -3,7 +3,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import type { AccountOpened } from "../accounts/records";
@@ -29,6 +29,14 @@ import {
   withDirection,
   withPayee,
 } from "./record-flow";
+
+const diningId = asId<CategoryId>("dining");
+const groceriesId = asId<CategoryId>("groceries");
+const rentId = asId<CategoryId>("rent");
+
+const dining = diningId;
+const groceries = groceriesId;
+const rent = rentId;
 
 const checking = asId<AccountId>("checking");
 const savings = asId<AccountId>("savings");
@@ -92,18 +100,22 @@ describe("knownPayees", () => {
     recordTransaction(log, {
       ...spend,
       accountId: checking,
-      categoryId: "groceries",
+      categoryId: groceries,
       payee: "Corner Bistro",
     });
     recordTransaction(log, {
       ...spend,
       accountId: savings,
-      categoryId: "dining",
+      categoryId: dining,
       payee: "Corner Bistro",
     });
 
     expect(knownPayees(records())).toEqual([
-      { name: "Corner Bistro", categoryId: "dining", accountId: savings },
+      {
+        name: "Corner Bistro",
+        categoryId: diningId,
+        accountId: savings,
+      },
     ]);
   });
 
@@ -112,7 +124,7 @@ describe("knownPayees", () => {
     recordTransaction(log, {
       ...spend,
       accountId: checking,
-      categoryId: "groceries",
+      categoryId: groceries,
       payee: "Corner Bistro",
     });
     recordTransaction(log, {
@@ -130,7 +142,7 @@ describe("knownPayees", () => {
     recordTransaction(log, {
       ...spend,
       accountId: savings,
-      categoryId: "dining",
+      categoryId: dining,
       payee: "Corner Bistro",
     });
     seedRecord(log, "dining", "CategoryHidden", { version: 1 });
@@ -142,25 +154,29 @@ describe("knownPayees", () => {
 
 describe("withPayee", () => {
   const known = [
-    { name: "Corner Bistro", categoryId: "dining", accountId: savings },
+    {
+      name: "Corner Bistro",
+      categoryId: diningId,
+      accountId: savings,
+    },
   ];
 
   it("fills in a known Payee's Category and Account when no Category is chosen", () => {
     expect(withPayee(draft, "Corner Bistro", known)).toEqual({
       ...draft,
       payee: "Corner Bistro",
-      categoryId: "dining",
+      categoryId: diningId,
       accountId: savings,
     });
   });
 
   it("keeps a Category that's chosen, and still fills in the Account", () => {
     expect(
-      withPayee({ ...draft, categoryId: "groceries" }, "Corner Bistro", known),
+      withPayee({ ...draft, categoryId: groceries }, "Corner Bistro", known),
     ).toEqual({
       ...draft,
       payee: "Corner Bistro",
-      categoryId: "groceries",
+      categoryId: groceriesId,
       accountId: savings,
     });
   });
@@ -227,7 +243,7 @@ describe("draftAmount", () => {
 
 describe("withDirection", () => {
   it("clears the Category when the direction changes, as money in starts at Ready to Assign", () => {
-    expect(withDirection({ ...draft, categoryId: "groceries" }, "in")).toEqual({
+    expect(withDirection({ ...draft, categoryId: groceries }, "in")).toEqual({
       ...draft,
       direction: "in",
     });
@@ -235,7 +251,7 @@ describe("withDirection", () => {
 
   it("keeps the Category when the direction stays", () => {
     expect(
-      withDirection({ ...draft, categoryId: "groceries" }, "out").categoryId,
+      withDirection({ ...draft, categoryId: groceries }, "out").categoryId,
     ).toBe("groceries");
   });
 });
@@ -249,7 +265,7 @@ describe("categoryChoices", () => {
       "AssignmentSet",
       {
         version: 1,
-        categoryId: "groceries",
+        categoryId: groceries,
         month: "2026-10",
         amount: money(5000, "USD"),
       },
@@ -257,7 +273,7 @@ describe("categoryChoices", () => {
     recordTransaction(log, {
       ...spend,
       accountId: checking,
-      categoryId: "groceries",
+      categoryId: groceries,
     });
     seedRecord(log, "dining", "CategoryHidden", { version: 1 });
 
@@ -294,7 +310,7 @@ describe("categoryChoices while editing a Transaction", () => {
     accountId: checking,
     date: "2026-10-12",
     amount: money(-1850, "USD"),
-    categoryId: "groceries",
+    categoryId: groceriesId,
   };
   const availableIn = (
     choices: ReturnType<typeof categoryChoices>,
@@ -366,14 +382,14 @@ describe("draftOf", () => {
         accountId: checking,
         date: "2026-10-12",
         amount: money(-1850, "USD"),
-        categoryId: "groceries",
+        categoryId: groceries,
         payee: "Corner Bistro",
         memo: "With Sam",
       }),
     ).toEqual({
       direction: "out",
       typed: "18.50",
-      categoryId: "groceries",
+      categoryId: groceriesId,
       payee: "Corner Bistro",
       memo: "With Sam",
       date: "2026-10-12",
@@ -410,7 +426,7 @@ describe("the row on desktop", () => {
   const draft: Draft = {
     direction: "out",
     typed: "18.50",
-    categoryId: "groceries",
+    categoryId: groceries,
     payee: "Corner Shop",
     date: "2026-10-03",
     accountId: savings,
@@ -450,7 +466,11 @@ describe("the row on desktop", () => {
         id: "everyday",
         name: "Everyday",
         categories: [
-          { id: "groceries", name: "Groceries", available: money(2000, "USD") },
+          {
+            id: groceriesId,
+            name: "Groceries",
+            available: money(2000, "USD"),
+          },
         ],
       },
     ],
@@ -480,7 +500,7 @@ describe("draftChanged", () => {
   const started: Draft = {
     direction: "out",
     typed: "20.00",
-    categoryId: "groceries",
+    categoryId: groceries,
     payee: "Rewe",
     date: "2026-10-15",
     accountId: checking,
@@ -496,7 +516,7 @@ describe("draftChanged", () => {
       { typed: "21" },
       { typed: "" },
       { direction: "in" },
-      { categoryId: "rent" },
+      { categoryId: rent },
       { categoryId: undefined },
       { payee: "Aldi" },
       { date: "2026-10-16" },

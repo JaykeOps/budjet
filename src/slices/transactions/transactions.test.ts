@@ -4,7 +4,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import type {
@@ -25,6 +25,9 @@ import {
 } from "./commands";
 import { accountTransactions, payees, transactionList } from "./index";
 import type { TransactionDeleted, TransactionEdited } from "./records";
+
+const groceriesId = asId<CategoryId>("groceries");
+const rent = asId<CategoryId>("rent");
 
 const checking = asId<AccountId>("checking");
 const old = asId<AccountId>("old");
@@ -96,11 +99,7 @@ describe("Transactions", () => {
       { accountId: savings },
       /No Account savings/,
     ],
-    [
-      "a Category that doesn't exist",
-      { categoryId: "rent" },
-      /No Category rent/,
-    ],
+    ["a Category that doesn't exist", { categoryId: rent }, /No Category rent/],
     [
       "an amount in another currency",
       { amount: money(-100, "EUR") },
@@ -116,7 +115,7 @@ describe("Transactions", () => {
         accountId: checking,
         date: "2026-10-12",
         amount: money(-4550, "USD"),
-        categoryId: "groceries",
+        categoryId: groceriesId,
         ...change,
       }),
     ).toThrow(error);
@@ -130,7 +129,7 @@ describe("Transactions", () => {
       accountId: checking,
       date: "2026-10-12",
       amount: money(-4550, "USD"),
-      categoryId: "groceries",
+      categoryId: groceriesId,
       payee: "Corner Shop",
       memo: "Milk and bread",
     });
@@ -144,13 +143,13 @@ describe("Transactions", () => {
       accountId: checking,
       date: "2026-10-12",
       amount: money(1000, "USD"),
-      categoryId: "groceries",
+      categoryId: groceriesId,
     });
     const older = recordTransaction(log, {
       accountId: checking,
       date: "2026-09-30",
       amount: money(-200, "USD"),
-      categoryId: "groceries",
+      categoryId: groceriesId,
     });
 
     expect(transactions()).toEqual([
@@ -166,14 +165,14 @@ describe("Transactions", () => {
         accountId: checking,
         date: "2026-10-12",
         amount: money(1000, "USD"),
-        categoryId: "groceries",
+        categoryId: groceriesId,
       },
       {
         id: groceries,
         accountId: checking,
         date: "2026-10-12",
         amount: money(-4550, "USD"),
-        categoryId: "groceries",
+        categoryId: groceriesId,
         payee: "Corner Shop",
         memo: "Milk and bread",
       },
@@ -182,7 +181,7 @@ describe("Transactions", () => {
         accountId: checking,
         date: "2026-09-30",
         amount: money(-200, "USD"),
-        categoryId: "groceries",
+        categoryId: groceriesId,
       },
     ]);
   });
@@ -193,7 +192,7 @@ describe("Transactions", () => {
       accountId: checking,
       date: "2026-10-12",
       amount: money(-4550, "USD"),
-      categoryId: "groceries",
+      categoryId: groceriesId,
       payee: "Corner Shop",
       memo: "Milk",
     });
@@ -227,7 +226,7 @@ describe("Transactions", () => {
       accountId: checking,
       date: "2026-10-12",
       amount: money(-4550, "USD"),
-      categoryId: "groceries",
+      categoryId: groceriesId,
     });
 
     deleteTransaction(log, deleted);
@@ -241,7 +240,7 @@ describe("Transactions", () => {
         accountId: checking,
         date: "2026-10-12",
         amount: money(-100, "USD"),
-        categoryId: "groceries",
+        categoryId: groceriesId,
       }),
     ).toThrow(`No Transaction ${deleted}`);
   });
@@ -252,7 +251,7 @@ describe("Transactions", () => {
       accountId: checking,
       date: "2026-10-12",
       amount: money(-4550, "USD"),
-      categoryId: "groceries",
+      categoryId: groceriesId,
     });
 
     expect(() =>
@@ -268,7 +267,7 @@ describe("Transactions", () => {
         accountId: checking,
         date: "2026-10-12",
         amount: money(-4550, "USD"),
-        categoryId: "groceries",
+        categoryId: groceriesId,
       },
     ]);
   });
@@ -286,7 +285,7 @@ describe("Transactions", () => {
           accountId: checking,
           date: "2026-10-12",
           amount: money(-1200, "USD"),
-          categoryId: "groceries",
+          categoryId: groceriesId,
           payee: `Edited on ${deviceId}`,
         },
       };
@@ -333,7 +332,7 @@ describe("Transactions", () => {
               accountId: checking,
               date: "2026-10-12",
               amount: money(-900, "USD"),
-              categoryId: "groceries",
+              categoryId: groceriesId,
             },
           },
         ]);
@@ -362,7 +361,7 @@ describe("Transactions", () => {
         accountId,
         date: "2026-10-12",
         amount: money(cents, "USD"),
-        categoryId: "groceries",
+        categoryId: groceriesId,
       });
     const refund = record(old, 1000);
     const spent = record(old, -1000);
@@ -380,7 +379,7 @@ describe("Transactions", () => {
         accountId: old,
         date: "2026-10-12",
         amount: money(2000, "USD"),
-        categoryId: "groceries",
+        categoryId: groceriesId,
       }),
     ).toThrow("Old checking is closed");
     expect(() =>
@@ -388,7 +387,7 @@ describe("Transactions", () => {
         accountId: checking,
         date: "2026-10-12",
         amount: money(-1000, "USD"),
-        categoryId: "groceries",
+        categoryId: groceriesId,
       }),
     ).toThrow("Old checking is closed");
     expect(() =>
@@ -396,7 +395,7 @@ describe("Transactions", () => {
         accountId: old,
         date: "2026-10-12",
         amount: money(-500, "USD"),
-        categoryId: "groceries",
+        categoryId: groceriesId,
       }),
     ).toThrow("Old checking is closed");
     expect(() => deleteTransaction(log, spent)).toThrow(
@@ -465,7 +464,7 @@ describe("Transactions", () => {
       accountId: checking,
       date: "2026-10-12",
       amount: money(-4550, "USD"),
-      categoryId: "groceries",
+      categoryId: groceriesId,
     });
     transfer("from-savings", savings, checking, "2026-10-20", 5000);
     transfer("deleted", checking, savings, "2026-10-21", 100);
@@ -491,7 +490,7 @@ describe("Transactions", () => {
         accountId: checking,
         date: "2026-10-12",
         amount: money(-4550, "USD"),
-        categoryId: "groceries",
+        categoryId: groceriesId,
       },
       {
         kind: "transfer",
@@ -511,7 +510,7 @@ describe("Transactions", () => {
       accountId: checking,
       date: "2100-01-15",
       amount: money(-4550, "USD"),
-      categoryId: "groceries",
+      categoryId: groceriesId,
     });
     // A clock ahead of the records already written, which the Change Log keeps in order.
     const redeclared = seedRecord<
