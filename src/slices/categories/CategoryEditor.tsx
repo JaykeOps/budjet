@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
-import type { CategoryId } from "../../kernel/id";
+import type { CategoryGroupId, CategoryId } from "../../kernel/id";
 import { formatMoney } from "../../kernel/money";
 import { currentMonth, type Month } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
@@ -23,17 +23,20 @@ type Named<Id extends string = string> = { id: Id; name: string };
 
 /** What the app shell does for each change. Any of them may refuse by throwing. */
 export type CategoryChanges = Moves & {
-  addCategory: (groupId: string, name: string) => void;
+  addCategory: (groupId: CategoryGroupId, name: string) => void;
   addGroup: (name: string) => void;
   renameCategory: (categoryId: CategoryId, name: string) => void;
-  renameGroup: (groupId: string, name: string) => void;
+  renameGroup: (groupId: CategoryGroupId, name: string) => void;
   /** `other` takes its money or covers it; without one, Ready to Assign does. */
   hide: (category: Named<CategoryId>, other?: CategoryId) => void;
   unhide: (category: Named<CategoryId>) => void;
   deleteCategory: (category: Named<CategoryId>) => void;
-  deleteGroup: (group: Named) => void;
-  moveThemAndDelete: (group: Named, toGroupId: string) => void;
-  setLeftOut: (group: Named, leftOut: boolean) => void;
+  deleteGroup: (group: Named<CategoryGroupId>) => void;
+  moveThemAndDelete: (
+    group: Named<CategoryGroupId>,
+    toGroupId: CategoryGroupId,
+  ) => void;
+  setLeftOut: (group: Named<CategoryGroupId>, leftOut: boolean) => void;
   moveOut: (
     category: Named<CategoryId>,
     month: Month,
@@ -555,7 +558,7 @@ function MoveThemAndDelete({
 }: {
   group: CategoryGroup;
   others: CategoryGroup[];
-  onMove: (toGroupId: string) => void;
+  onMove: (toGroupId: CategoryGroupId) => void;
 }) {
   const [picked, setPicked] = useState<string>();
   const pickerId = useId();

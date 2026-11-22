@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { asId, type CategoryId } from "../../kernel/id";
+import { asId, type CategoryGroupId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { assignPanel } from "./assign-panel";
 import { type CategoryAmounts, categoryRow } from "./category-row";
 import type { SheetCategory } from "./category-sheet";
+
+const group = asId<CategoryGroupId>("group");
 
 const holidayId = asId<CategoryId>("holiday");
 
@@ -25,7 +27,7 @@ function category(
   return {
     id: holiday,
     name: "Holiday",
-    groupId: "group",
+    groupId: group,
     groupName: "Group",
     lastMonth: usd(lastMonth),
     nothingAssigned: false,

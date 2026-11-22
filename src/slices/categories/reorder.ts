@@ -1,10 +1,10 @@
 /** Where things can go when reordering. Pure, so nothing here writes. */
 
-import type { CategoryId } from "../../kernel/id";
+import type { CategoryGroupId, CategoryId } from "../../kernel/id";
 import type { CategoryGroup } from "./queries";
 
 /** Where a Category can be: which Category Group, and its place among the others. */
-export type CategoryPlace = { groupId: string; toIndex: number };
+export type CategoryPlace = { groupId: CategoryGroupId; toIndex: number };
 
 /** Where a Category is now. */
 export function categoryAt(
@@ -44,7 +44,7 @@ export function categoryStep(
 /** Where one step up or down takes a Category Group. */
 export function groupStep(
   groups: readonly CategoryGroup[],
-  groupId: string,
+  groupId: CategoryGroupId,
   by: -1 | 1,
 ): number | undefined {
   const toIndex = groups.findIndex(({ id }) => id === groupId) + by;
@@ -65,7 +65,7 @@ export function categoryPlace(
 /** E.g. "2 of 3 Groups". */
 export function groupPlace(
   groups: readonly CategoryGroup[],
-  groupId: string,
+  groupId: CategoryGroupId,
 ): string {
   const index = groups.findIndex(({ id }) => id === groupId);
   return `${index + 1} of ${groups.length} Groups`;
@@ -95,7 +95,7 @@ export function withCategoryAt(
 /** The list with a Category Group somewhere else. */
 export function withGroupAt(
   groups: readonly CategoryGroup[],
-  groupId: string,
+  groupId: CategoryGroupId,
   toIndex: number,
 ): CategoryGroup[] {
   const moved = groups.find(({ id }) => id === groupId);

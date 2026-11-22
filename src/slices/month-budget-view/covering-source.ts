@@ -1,9 +1,9 @@
-import type { CategoryId } from "../../kernel/id";
+import type { CategoryGroupId, CategoryId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 
 export type CoverCandidate = {
   id: CategoryId;
-  groupId: string;
+  groupId: CategoryGroupId;
   assigned: Money;
   available: Money;
 };
@@ -21,7 +21,7 @@ export type CoverCandidate = {
  */
 export function coveringSource(
   candidates: readonly CoverCandidate[],
-  target: { id: CategoryId; groupId: string },
+  target: { id: CategoryId; groupId: CategoryGroupId },
   amount: Money,
 ): string | undefined {
   const others = candidates

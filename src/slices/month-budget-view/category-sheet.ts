@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
-import type { CategoryId } from "../../kernel/id";
+import type { CategoryGroupId, CategoryId } from "../../kernel/id";
 import {
   addMoney,
   type Currency,
@@ -20,7 +20,7 @@ import { visibleCategoryGroups } from "./visible-categories";
 export type SheetCategory = {
   id: CategoryId;
   name: string;
-  groupId: string;
+  groupId: CategoryGroupId;
   groupName: string;
   row: CategoryRow;
   /** Its Assignment in the Month before. */

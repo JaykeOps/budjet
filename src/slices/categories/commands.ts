@@ -1,5 +1,5 @@
 import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
-import { type CategoryId, newId } from "../../kernel/id";
+import { type CategoryGroupId, type CategoryId, newId } from "../../kernel/id";
 import { formatMoney } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { assignedAfter, available, categoryUsed } from "../budget-totals";
@@ -34,8 +34,8 @@ export function addStarterSet(log: DeviceChangeLog): void {
 export function createCategoryGroup(
   log: DeviceChangeLog,
   { name }: { name: string },
-): string {
-  const id = crypto.randomUUID();
+): CategoryGroupId {
+  const id = newId<CategoryGroupId>();
   write(log, id, "CategoryGroupCreated")
     .ensure((records) => categoryGroups(records).length)
     .commit((position) => ({ version: 1, name: validName(name), position }));
@@ -45,7 +45,7 @@ export function createCategoryGroup(
 /** Adds a Category at the end of its Category Group and returns its id. */
 export function createCategory(
   log: DeviceChangeLog,
-  { groupId, name }: { groupId: string; name: string },
+  { groupId, name }: { groupId: CategoryGroupId; name: string },
 ): CategoryId {
   const id = newId<CategoryId>();
   write(log, id, "CategoryCreated")
@@ -61,7 +61,7 @@ export function createCategory(
 
 export function renameCategoryGroup(
   log: DeviceChangeLog,
-  groupId: string,
+  groupId: CategoryGroupId,
   { name }: { name: string },
 ): void {
   write(log, groupId, "CategoryGroupRenamed")
@@ -82,7 +82,7 @@ export function renameCategory(
 /** Leaves a Category Group out of Spent this Month, or counts it again. */
 export function setCategoryGroupSpentThisMonth(
   log: DeviceChangeLog,
-  groupId: string,
+  groupId: CategoryGroupId,
   { leftOut }: { leftOut: boolean },
 ): void {
   write(log, groupId, "CategoryGroupSpentThisMonthSet")
@@ -93,7 +93,7 @@ export function setCategoryGroupSpentThisMonth(
 /** Puts a Category Group at `toIndex` among the Category Groups. */
 export function moveCategoryGroup(
   log: DeviceChangeLog,
-  groupId: string,
+  groupId: CategoryGroupId,
   { toIndex }: { toIndex: number },
 ): void {
   log
@@ -121,7 +121,7 @@ export function moveCategoryGroup(
 export function moveCategory(
   log: DeviceChangeLog,
   categoryId: CategoryId,
-  { groupId, toIndex }: { groupId: string; toIndex: number },
+  { groupId, toIndex }: { groupId: CategoryGroupId; toIndex: number },
 ): void {
   log
     .writeMany<CategoryPlaced>()
@@ -227,7 +227,7 @@ export function deleteCategory(
 /** Deletes a Category Group with no Categories in it, hidden ones included. */
 export function deleteCategoryGroup(
   log: DeviceChangeLog,
-  groupId: string,
+  groupId: CategoryGroupId,
 ): void {
   write(log, groupId, "CategoryGroupDeleted")
     .ensure((records) => {
@@ -269,7 +269,7 @@ function findCategory(
   throw new Error("There is no such Category");
 }
 
-function findGroup(records: readonly ChangeRecord[], groupId: string) {
+function findGroup(records: readonly ChangeRecord[], groupId: CategoryGroupId) {
   const group = categoryGroups(records).find(({ id }) => id === groupId);
   if (!group) throw new Error("There is no such Category Group");
   return group;

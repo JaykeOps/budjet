@@ -4,7 +4,12 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId, type CategoryId } from "../../kernel/id";
+import {
+  type AccountId,
+  asId,
+  type CategoryGroupId,
+  type CategoryId,
+} from "../../kernel/id";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -33,6 +38,10 @@ import {
 } from "./commands";
 import { type CategoryGroup, categoryGroups } from "./index";
 import { moveOutChoices } from "./move-out";
+
+const nowhereId = asId<CategoryGroupId>("nowhere");
+
+const nowhere = nowhereId;
 
 const nothingId = asId<CategoryId>("nothing");
 
@@ -88,7 +97,10 @@ describe("Categories", () => {
   it("only creates a Category inside an existing Category Group", () => {
     const { log } = setUp();
     expect(() =>
-      createCategory(log, { groupId: "nowhere", name: "Games" }),
+      createCategory(log, {
+        groupId: nowhereId,
+        name: "Games",
+      }),
     ).toThrow(/no such Category Group/);
   });
 
@@ -183,7 +195,10 @@ describe("Categories", () => {
     const rent = bills.categories[0];
 
     expect(() =>
-      moveCategory(log, rent.id, { groupId: "nowhere", toIndex: 0 }),
+      moveCategory(log, rent.id, {
+        groupId: nowhereId,
+        toIndex: 0,
+      }),
     ).toThrow(/no such Category Group/);
     expect(() =>
       moveCategory(log, rent.id, { groupId: savings.id, toIndex: 2 }),
@@ -264,7 +279,7 @@ describe("Leaving a Category Group out of Spent this Month", () => {
     const { log } = setUp();
 
     expect(() =>
-      setCategoryGroupSpentThisMonth(log, "nowhere", { leftOut: true }),
+      setCategoryGroupSpentThisMonth(log, nowhere, { leftOut: true }),
     ).toThrow(/no such Category Group/);
   });
 

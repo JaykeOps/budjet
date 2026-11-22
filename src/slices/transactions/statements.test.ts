@@ -5,7 +5,12 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId, type CategoryId } from "../../kernel/id";
+import {
+  type AccountId,
+  asId,
+  type CategoryGroupId,
+  type CategoryId,
+} from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import { accountBalance, accountsTotal } from "../accounts";
@@ -22,6 +27,8 @@ import type {
 import type { TransferMade } from "../transfers/records";
 import { deleteTransaction, recordTransaction } from "./commands";
 import { statements } from "./index";
+
+const needs = asId<CategoryGroupId>("needs");
 
 const groceries = asId<CategoryId>("groceries");
 
@@ -97,7 +104,12 @@ function budget() {
     log,
     "groceries",
     "CategoryCreated",
-    { version: 1, name: "Groceries", groupId: "needs", position: 0 },
+    {
+      version: 1,
+      name: "Groceries",
+      groupId: needs,
+      position: 0,
+    },
   );
   const record = (accountId: AccountId, date: string, cents: number) =>
     recordTransaction(log, {

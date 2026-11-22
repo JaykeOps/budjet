@@ -3,7 +3,12 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId, type CategoryId } from "../../kernel/id";
+import {
+  type AccountId,
+  asId,
+  type CategoryGroupId,
+  type CategoryId,
+} from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import type { AccountOpened } from "../accounts/records";
@@ -29,6 +34,8 @@ import {
   withDirection,
   withPayee,
 } from "./record-flow";
+
+const everyday = asId<CategoryGroupId>("everyday");
 
 const diningId = asId<CategoryId>("dining");
 const groceriesId = asId<CategoryId>("groceries");
@@ -75,7 +82,12 @@ function budget() {
       log,
       id,
       "CategoryCreated",
-      { version: 1, name: id, groupId: "everyday", position },
+      {
+        version: 1,
+        name: id,
+        groupId: everyday,
+        position,
+      },
     );
   }
   return { log, records: () => changeLog.readAll() };

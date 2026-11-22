@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asId, type CategoryId } from "../../kernel/id";
+import { asId, type CategoryGroupId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { type CategoryAmounts, categoryRow } from "./category-row";
 import {
@@ -10,6 +10,8 @@ import {
   type SheetCategory,
   suggestions,
 } from "./category-sheet";
+
+const group = asId<CategoryGroupId>("group");
 
 const usd = (dollars: number) => money(Math.round(dollars * 100), "USD");
 
@@ -27,7 +29,7 @@ function category(
   return {
     id: asId<CategoryId>(name.toLowerCase()),
     name,
-    groupId: "group",
+    groupId: group,
     groupName: "Group",
     lastMonth: usd(lastMonth),
     nothingAssigned: false,
