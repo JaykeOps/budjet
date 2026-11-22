@@ -3,9 +3,6 @@
  * domain state (docs/adr/0004, docs/adr/0005).
  */
 
-/** A hybrid logical clock reading: wall-clock milliseconds, then a counter for ties. */
-export type Timestamp = { wallTime: number; counter: number };
-
 export type ChangeRecord<Type extends string = string, Payload = unknown> = {
   id: string;
   /** The id of the thing this record changes. */
@@ -18,18 +15,6 @@ export type ChangeRecord<Type extends string = string, Payload = unknown> = {
   payload: Payload;
 };
 
-/** Why a change isn't saved yet: the folder's access lapsed, the folder is gone, or the write failed some other way. */
-export type UnsavedReason = "access-lapsed" | "folder-gone" | "write-failed";
-
-/**
- * Whether every change has reached where this Change Log keeps them. The same
- * object comes back until the state changes.
- */
-export type SaveState =
-  | { status: "saved" }
-  | { status: "saving" }
-  | { status: "unsaved"; reason: UnsavedReason };
-
 export type ChangeLog = {
   /** Records a change. It shows at once, and `saveState` follows its write. */
   append(records: readonly ChangeRecord[]): void;
@@ -41,118 +26,6 @@ export type ChangeLog = {
   saveState(): SaveState;
   subscribeToSaveState(listener: () => void): () => void;
 };
-
-export const SAVED: SaveState = { status: "saved" };
-export const SAVING: SaveState = { status: "saving" };
-
-/** Holds a Change Log's save state and tells subscribers when it changes. */
-export function createSaveStateStore() {
-  let state = SAVED;
-  const listeners = new Set<() => void>();
-  return {
-    get: () => state,
-    set(next: SaveState) {
-      if (JSON.stringify(next) === JSON.stringify(state)) return;
-      state = next;
-      for (const listener of listeners) listener();
-    },
-    subscribe(listener: () => void) {
-      const entry = () => listener();
-      listeners.add(entry);
-      return () => {
-        listeners.delete(entry);
-      };
-    },
-  };
-}
-
-/** What `merge` should add: each id once, leaving out ids already held. */
-export function recordsToMerge(
-  held: readonly ChangeRecord[],
-  arriving: readonly ChangeRecord[],
-): ChangeRecord[] {
-  const seen = new Set(held.map(({ id }) => id));
-  return arriving.filter(({ id }) => {
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
-}
-
-/** Orders records oldest first: by timestamp, then device id, so every device agrees. */
-export function compareRecords(a: ChangeRecord, b: ChangeRecord): number {
-  return (
-    a.timestamp.wallTime - b.timestamp.wallTime ||
-    a.timestamp.counter - b.timestamp.counter ||
-    compareStrings(a.deviceId, b.deviceId) ||
-    compareStrings(a.id, b.id)
-  );
-}
-
-/**
- * The most recent record for each thing, keyed by its id: when two records
- * change the same thing, the later one wins. Expects records oldest first, as
- * `readAll` returns them.
- */
-export function latestBySubject<Record extends ChangeRecord>(
-  records: readonly Record[],
-): Map<string, Record> {
-  const latest = new Map<string, Record>();
-  for (const record of records) latest.set(record.subjectId, record);
-  return latest;
-}
-
-/**
- * Every subject with a delete record. A deleted thing stays deleted whatever else
- * is written about it, before or after (docs/adr/0006), so Replays leave out these
- * subjects' other records.
- */
-export function deletedSubjects(
-  records: readonly ChangeRecord[],
-  isDelete: (record: ChangeRecord) => boolean,
-): Set<string> {
-  const deleted = new Set<string>();
-  for (const record of records) {
-    if (isDelete(record)) deleted.add(record.subjectId);
-  }
-  return deleted;
-}
-
-function compareStrings(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
-export function createInMemoryChangeLog(): ChangeLog & {
-  /** Swaps every record for these, as a change of Budget does. */
-  replaceAll(records: readonly ChangeRecord[]): void;
-} {
-  let records: readonly ChangeRecord[] = [];
-  const listeners = new Set<() => void>();
-  const replaceAll = (next: readonly ChangeRecord[]) => {
-    records = [...next].sort(compareRecords);
-    for (const listener of listeners) listener();
-  };
-  const append = (added: readonly ChangeRecord[]) =>
-    replaceAll([...records, ...added]);
-  return {
-    append,
-    replaceAll,
-    merge(arriving) {
-      const added = recordsToMerge(records, arriving);
-      if (added.length > 0) append(added);
-    },
-    readAll: () => records,
-    subscribe(listener) {
-      // Wrapped so the same function can subscribe twice and unsubscribe once.
-      const entry = () => listener();
-      listeners.add(entry);
-      return () => listeners.delete(entry);
-    },
-    // Nothing to wait for: a change is as saved as it will ever be.
-    saveState: () => SAVED,
-    subscribeToSaveState: () => () => {},
-  };
-}
 
 export type ChangeLogWriter = {
   readonly changeLog: ChangeLog;
@@ -211,6 +84,9 @@ export function createChangeLogWriter(
   };
 }
 
+/** A hybrid logical clock reading: wall-clock milliseconds, then a counter for ties. */
+export type Timestamp = { wallTime: number; counter: number };
+
 /**
  * The hybrid logical clock step: a new record is stamped after every record
  * this device has seen, even when another device's clock runs ahead of ours.
@@ -223,6 +99,62 @@ function nextTimestamp(
     return { wallTime, counter: 0 };
   }
   return { wallTime: newestSeen.wallTime, counter: newestSeen.counter + 1 };
+}
+
+/** Orders records oldest first: by timestamp, then device id, so every device agrees. */
+export function compareRecords(a: ChangeRecord, b: ChangeRecord): number {
+  return (
+    a.timestamp.wallTime - b.timestamp.wallTime ||
+    a.timestamp.counter - b.timestamp.counter ||
+    compareStrings(a.deviceId, b.deviceId) ||
+    compareStrings(a.id, b.id)
+  );
+}
+
+function compareStrings(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** What `merge` should add: each id once, leaving out ids already held. */
+export function recordsToMerge(
+  held: readonly ChangeRecord[],
+  arriving: readonly ChangeRecord[],
+): ChangeRecord[] {
+  const seen = new Set(held.map(({ id }) => id));
+  return arriving.filter(({ id }) => {
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+/**
+ * The most recent record for each thing, keyed by its id: when two records
+ * change the same thing, the later one wins. Expects records oldest first, as
+ * `readAll` returns them.
+ */
+export function latestBySubject<Record extends ChangeRecord>(
+  records: readonly Record[],
+): Map<string, Record> {
+  const latest = new Map<string, Record>();
+  for (const record of records) latest.set(record.subjectId, record);
+  return latest;
+}
+
+/**
+ * Every subject with a delete record. A deleted thing stays deleted whatever else
+ * is written about it, before or after (docs/adr/0006), so Replays leave out these
+ * subjects' other records.
+ */
+export function deletedSubjects(
+  records: readonly ChangeRecord[],
+  isDelete: (record: ChangeRecord) => boolean,
+): Set<string> {
+  const deleted = new Set<string>();
+  for (const record of records) {
+    if (isDelete(record)) deleted.add(record.subjectId);
+  }
+  return deleted;
 }
 
 /**
@@ -239,5 +171,73 @@ export function perSnapshot<Result>(
     const result = replay(records);
     results.set(records, result);
     return result;
+  };
+}
+
+/**
+ * Whether every change has reached where this Change Log keeps them. The same
+ * object comes back until the state changes.
+ */
+export type SaveState =
+  | { status: "saved" }
+  | { status: "saving" }
+  | { status: "unsaved"; reason: UnsavedReason };
+
+/** Why a change isn't saved yet: the folder's access lapsed, the folder is gone, or the write failed some other way. */
+export type UnsavedReason = "access-lapsed" | "folder-gone" | "write-failed";
+
+export const SAVED: SaveState = { status: "saved" };
+export const SAVING: SaveState = { status: "saving" };
+
+/** Holds a Change Log's save state and tells subscribers when it changes. */
+export function createSaveStateStore() {
+  let state = SAVED;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => state,
+    set(next: SaveState) {
+      if (JSON.stringify(next) === JSON.stringify(state)) return;
+      state = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe(listener: () => void) {
+      const entry = () => listener();
+      listeners.add(entry);
+      return () => {
+        listeners.delete(entry);
+      };
+    },
+  };
+}
+
+export function createInMemoryChangeLog(): ChangeLog & {
+  /** Swaps every record for these, as a change of Budget does. */
+  replaceAll(records: readonly ChangeRecord[]): void;
+} {
+  let records: readonly ChangeRecord[] = [];
+  const listeners = new Set<() => void>();
+  const replaceAll = (next: readonly ChangeRecord[]) => {
+    records = [...next].sort(compareRecords);
+    for (const listener of listeners) listener();
+  };
+  const append = (added: readonly ChangeRecord[]) =>
+    replaceAll([...records, ...added]);
+  return {
+    append,
+    replaceAll,
+    merge(arriving) {
+      const added = recordsToMerge(records, arriving);
+      if (added.length > 0) append(added);
+    },
+    readAll: () => records,
+    subscribe(listener) {
+      // Wrapped so the same function can subscribe twice and unsubscribe once.
+      const entry = () => listener();
+      listeners.add(entry);
+      return () => listeners.delete(entry);
+    },
+    // Nothing to wait for: a change is as saved as it will ever be.
+    saveState: () => SAVED,
+    subscribeToSaveState: () => () => {},
   };
 }
