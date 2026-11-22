@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type ChangeLog,
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
@@ -29,18 +29,18 @@ import type { BalanceRedeclared, RedeclaredBalanceDeleted } from "./records";
 
 function budgetIn(currency: string) {
   const changeLog = createInMemoryChangeLog();
-  const writer = createChangeLogWriter(changeLog, "this-device");
-  writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  const log = createDeviceChangeLog(changeLog, "this-device");
+  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
     "budget",
     "BudgetCreated",
     { version: 1, currency },
   );
-  return { changeLog, writer };
+  return { changeLog, log };
 }
 
 /** A second device writing to the same Change Log, with its clock reading `at`. */
 function deviceAt(changeLog: ChangeLog, deviceId: string, at: Date) {
-  return createChangeLogWriter(changeLog, deviceId, {
+  return createDeviceChangeLog(changeLog, deviceId, {
     now: () => at.getTime(),
   });
 }
@@ -64,9 +64,9 @@ function redeclareOn(
 
 describe("Accounts", () => {
   it("lists an opened Account, open, with its Opening Balance as its balance", () => {
-    const { changeLog, writer } = budgetIn("USD");
+    const { changeLog, log } = budgetIn("USD");
 
-    const id = openAccount(writer, {
+    const id = openAccount(log, {
       name: "Everyday checking",
       kind: "checking",
       openingBalance: money(125050, "USD"),
@@ -87,20 +87,20 @@ describe("Accounts", () => {
   });
 
   it("totals the balances of every Account, savings and cash included", () => {
-    const { changeLog, writer } = budgetIn("SEK");
+    const { changeLog, log } = budgetIn("SEK");
     expect(accountsTotal(changeLog.readAll())).toEqual(money(0, "SEK"));
 
-    openAccount(writer, {
+    openAccount(log, {
       name: "Checking",
       kind: "checking",
       openingBalance: money(100000, "SEK"),
     });
-    openAccount(writer, {
+    openAccount(log, {
       name: "Rainy day",
       kind: "savings",
       openingBalance: money(250000, "SEK"),
     });
-    openAccount(writer, {
+    openAccount(log, {
       name: "Wallet",
       kind: "cash",
       openingBalance: money(-5050, "SEK"),
@@ -115,19 +115,19 @@ describe("Accounts", () => {
   });
 
   it("counts money going out of and coming in to an Account in its balance", () => {
-    const { changeLog, writer } = budgetIn("USD");
-    const checking = openAccount(writer, {
+    const { changeLog, log } = budgetIn("USD");
+    const checking = openAccount(log, {
       name: "Checking",
       kind: "checking",
       openingBalance: money(100000, "USD"),
     });
-    const savings = openAccount(writer, {
+    const savings = openAccount(log, {
       name: "Savings",
       kind: "savings",
       openingBalance: money(50000, "USD"),
     });
     const recordTransaction = (accountId: string, amount: number) =>
-      writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      log.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
         crypto.randomUUID(),
         "TransactionRecorded",
         {
@@ -153,13 +153,13 @@ describe("Accounts", () => {
   });
 
   it("counts a Transaction as last edited, in whichever Account it now belongs to, and not at all once deleted", () => {
-    const { changeLog, writer } = budgetIn("USD");
-    const checking = openAccount(writer, {
+    const { changeLog, log } = budgetIn("USD");
+    const checking = openAccount(log, {
       name: "Checking",
       kind: "checking",
       openingBalance: money(100000, "USD"),
     });
-    const savings = openAccount(writer, {
+    const savings = openAccount(log, {
       name: "Savings",
       kind: "savings",
       openingBalance: money(50000, "USD"),
@@ -171,23 +171,23 @@ describe("Accounts", () => {
       amount: money(-4550, "USD"),
       categoryId: "groceries",
     };
-    writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+    log.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
       "moved",
       "TransactionRecorded",
       transaction,
     );
-    writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+    log.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
       "deleted",
       "TransactionRecorded",
       transaction,
     );
 
-    writer.write<TransactionEdited["type"], TransactionEdited["payload"]>(
+    log.write<TransactionEdited["type"], TransactionEdited["payload"]>(
       "moved",
       "TransactionEdited",
       { ...transaction, accountId: savings, amount: money(-1000, "USD") },
     );
-    writer.write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
+    log.write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
       "deleted",
       "TransactionDeleted",
       { version: 1 },
@@ -202,27 +202,27 @@ describe("Accounts", () => {
   });
 
   it("re-declares a balance higher or lower, so the balance becomes the declared one", () => {
-    const { changeLog, writer } = budgetIn("USD");
-    const checking = openAccount(writer, {
+    const { changeLog, log } = budgetIn("USD");
+    const checking = openAccount(log, {
       name: "Checking",
       kind: "checking",
       openingBalance: money(100000, "USD"),
     });
 
-    redeclareBalance(writer, checking, { balance: money(112500, "USD") });
+    redeclareBalance(log, checking, { balance: money(112500, "USD") });
     expect(accountBalance(changeLog.readAll(), checking)).toEqual(
       money(112500, "USD"),
     );
 
-    redeclareBalance(writer, checking, { balance: money(90000, "USD") });
+    redeclareBalance(log, checking, { balance: money(90000, "USD") });
     expect(accountBalance(changeLog.readAll(), checking)).toEqual(
       money(90000, "USD"),
     );
   });
 
   it("keeps re-declaring the current balance as a Balance check, not an Adjustment", () => {
-    const { changeLog, writer } = budgetIn("USD");
-    const checking = openAccount(writer, {
+    const { changeLog, log } = budgetIn("USD");
+    const checking = openAccount(log, {
       name: "Checking",
       kind: "checking",
       openingBalance: money(100000, "USD"),
@@ -253,15 +253,15 @@ describe("Accounts", () => {
   });
 
   it("measures a Balance check against the balance just before it, once a late record arrives from another device", () => {
-    const { changeLog, writer } = budgetIn("USD");
-    const checking = openAccount(writer, {
+    const { changeLog, log } = budgetIn("USD");
+    const checking = openAccount(log, {
       name: "Checking",
       kind: "checking",
       openingBalance: money(100000, "USD"),
     });
     // Both devices saw $1,000. This one checks it on Oct 20; the other spent
     // $10 on Oct 19 but its record only arrives afterwards.
-    const other = createChangeLogWriter(createInMemoryChangeLog(), "other", {
+    const other = createDeviceChangeLog(createInMemoryChangeLog(), "other", {
       now: () => new Date(2100, 9, 19, 12).getTime(),
     });
     const spent = other.write<
@@ -303,8 +303,8 @@ describe("Accounts", () => {
 
   describe("last checked", () => {
     function checkingAccount() {
-      const { changeLog, writer } = budgetIn("USD");
-      const checking = openAccount(writer, {
+      const { changeLog, log } = budgetIn("USD");
+      const checking = openAccount(log, {
         name: "Checking",
         kind: "checking",
         openingBalance: money(100000, "USD"),
@@ -364,13 +364,13 @@ describe("Accounts", () => {
     });
 
     it("belongs to the one Account", () => {
-      const { changeLog, writer } = budgetIn("USD");
-      const first = openAccount(writer, {
+      const { changeLog, log } = budgetIn("USD");
+      const first = openAccount(log, {
         name: "First",
         kind: "checking",
         openingBalance: money(0, "USD"),
       });
-      const second = openAccount(writer, {
+      const second = openAccount(log, {
         name: "Second",
         kind: "savings",
         openingBalance: money(0, "USD"),
@@ -442,8 +442,8 @@ describe("Accounts", () => {
 
   describe("deleting a re-declared balance", () => {
     function checkingAccount() {
-      const { changeLog, writer } = budgetIn("USD");
-      const checking = openAccount(writer, {
+      const { changeLog, log } = budgetIn("USD");
+      const checking = openAccount(log, {
         name: "Checking",
         kind: "checking",
         openingBalance: money(100000, "USD"),
@@ -462,7 +462,7 @@ describe("Accounts", () => {
       const openingRecord = () =>
         changeLog.readAll().find(({ type }) => type === "AccountOpened")?.id ??
         "";
-      return { changeLog, writer, checking, account, redeclare, openingRecord };
+      return { changeLog, log, checking, account, redeclare, openingRecord };
     }
 
     /** A deletion written on a device whose clock reads `at`. */
@@ -479,44 +479,44 @@ describe("Accounts", () => {
     }
 
     it("takes an Adjustment back out of the Account", () => {
-      const { changeLog, writer, account, redeclare } = checkingAccount();
+      const { changeLog, log, account, redeclare } = checkingAccount();
       const redeclared = redeclare(18, 90000);
 
-      deleteRedeclaredBalance(writer, redeclared.id);
+      deleteRedeclaredBalance(log, redeclared.id);
 
       expect(adjustments(changeLog.readAll())).toEqual([]);
       expect(account()?.balance).toEqual(money(100000, "USD"));
     });
 
     it("takes back a re-declaration by the id redeclaring returned", () => {
-      const { changeLog, writer, checking, account } = checkingAccount();
+      const { changeLog, log, checking, account } = checkingAccount();
 
-      const id = redeclareBalance(writer, checking, {
+      const id = redeclareBalance(log, checking, {
         balance: money(90000, "USD"),
       });
-      deleteRedeclaredBalance(writer, id);
+      deleteRedeclaredBalance(log, id);
 
       expect(adjustments(changeLog.readAll())).toEqual([]);
       expect(account()?.balance).toEqual(money(100000, "USD"));
     });
 
     it("removes a Balance check, moving nothing", () => {
-      const { changeLog, writer, account, redeclare } = checkingAccount();
+      const { changeLog, log, account, redeclare } = checkingAccount();
       const check = redeclare(18, 100000);
 
-      deleteRedeclaredBalance(writer, check.id);
+      deleteRedeclaredBalance(log, check.id);
 
       expect(balanceChecks(changeLog.readAll())).toEqual([]);
       expect(account()?.balance).toEqual(money(100000, "USD"));
     });
 
     it("measures later Adjustments again from the balance just before them", () => {
-      const { changeLog, writer, checking, account, redeclare } =
+      const { changeLog, log, checking, account, redeclare } =
         checkingAccount();
       const first = redeclare(18, 90000);
       const second = redeclare(20, 95000);
 
-      deleteRedeclaredBalance(writer, first.id);
+      deleteRedeclaredBalance(log, first.id);
 
       expect(adjustments(changeLog.readAll())).toEqual([
         {
@@ -531,11 +531,11 @@ describe("Accounts", () => {
     });
 
     it("turns a later Balance check into an Adjustment when the balance it matched is deleted", () => {
-      const { changeLog, writer, checking, redeclare } = checkingAccount();
+      const { changeLog, log, checking, redeclare } = checkingAccount();
       const first = redeclare(18, 90000);
       const check = redeclare(20, 90000);
 
-      deleteRedeclaredBalance(writer, first.id);
+      deleteRedeclaredBalance(log, first.id);
 
       expect(balanceChecks(changeLog.readAll())).toEqual([]);
       expect(adjustments(changeLog.readAll())).toEqual([
@@ -550,14 +550,14 @@ describe("Accounts", () => {
     });
 
     it("sets last checked back to the re-declaration before it, or to none", () => {
-      const { writer, account, redeclare } = checkingAccount();
+      const { log, account, redeclare } = checkingAccount();
       const first = redeclare(18, 100000);
       const second = redeclare(20, 90000);
 
-      deleteRedeclaredBalance(writer, second.id);
+      deleteRedeclaredBalance(log, second.id);
       expect(account()?.lastChecked).toBe("2100-10-18");
 
-      deleteRedeclaredBalance(writer, first.id);
+      deleteRedeclaredBalance(log, first.id);
       expect(account()?.lastChecked).toBeUndefined();
     });
 
@@ -616,10 +616,10 @@ describe("Accounts", () => {
     });
 
     it("can't delete an Opening Balance", () => {
-      const { writer, checking, account, openingRecord } = checkingAccount();
+      const { log, checking, account, openingRecord } = checkingAccount();
 
       for (const id of [openingRecord(), checking]) {
-        expect(() => deleteRedeclaredBalance(writer, id)).toThrow(RangeError);
+        expect(() => deleteRedeclaredBalance(log, id)).toThrow(RangeError);
       }
       expect(account()?.balance).toEqual(money(100000, "USD"));
     });
@@ -633,22 +633,22 @@ describe("Accounts", () => {
     });
 
     it("can't delete the same re-declaration twice", () => {
-      const { writer, redeclare } = checkingAccount();
+      const { log, redeclare } = checkingAccount();
       const redeclared = redeclare(18, 90000);
 
-      deleteRedeclaredBalance(writer, redeclared.id);
+      deleteRedeclaredBalance(log, redeclared.id);
 
-      expect(() => deleteRedeclaredBalance(writer, redeclared.id)).toThrow(
+      expect(() => deleteRedeclaredBalance(log, redeclared.id)).toThrow(
         RangeError,
       );
     });
 
     it("can't delete one in a closed Account, so its balance stays zero", () => {
-      const { writer, checking, account, redeclare } = checkingAccount();
+      const { log, checking, account, redeclare } = checkingAccount();
       const redeclared = redeclare(18, 0);
-      closeAccount(writer, checking);
+      closeAccount(log, checking);
 
-      expect(() => deleteRedeclaredBalance(writer, redeclared.id)).toThrow(
+      expect(() => deleteRedeclaredBalance(log, redeclared.id)).toThrow(
         "Checking is closed",
       );
       expect(account()?.balance).toEqual(money(0, "USD"));
@@ -656,45 +656,43 @@ describe("Accounts", () => {
   });
 
   it("renames an Account, the latest name winning", () => {
-    const { changeLog, writer } = budgetIn("USD");
-    const id = openAccount(writer, {
+    const { changeLog, log } = budgetIn("USD");
+    const id = openAccount(log, {
       name: "Checking",
       kind: "checking",
       openingBalance: money(0, "USD"),
     });
 
-    renameAccount(writer, id, { name: "  Bills account " });
+    renameAccount(log, id, { name: "  Bills account " });
     expect(accounts(changeLog.readAll()).map(({ name }) => name)).toEqual([
       "Bills account",
     ]);
-    renameAccount(writer, id, { name: "Everyday" });
+    renameAccount(log, id, { name: "Everyday" });
     expect(accounts(changeLog.readAll()).map(({ name }) => name)).toEqual([
       "Everyday",
     ]);
 
-    expect(() => renameAccount(writer, id, { name: " " })).toThrow(
-      /needs a name/,
-    );
-    expect(() => renameAccount(writer, "missing", { name: "X" })).toThrow(
+    expect(() => renameAccount(log, id, { name: " " })).toThrow(/needs a name/);
+    expect(() => renameAccount(log, "missing", { name: "X" })).toThrow(
       /No Account missing/,
     );
   });
 
   it("closes an Account only once its balance is zero, pointing to Transfers", () => {
-    const { changeLog, writer } = budgetIn("USD");
-    const id = openAccount(writer, {
+    const { changeLog, log } = budgetIn("USD");
+    const id = openAccount(log, {
       name: "Old savings",
       kind: "savings",
       openingBalance: money(5000, "USD"),
     });
 
-    expect(() => closeAccount(writer, id)).toThrow(
+    expect(() => closeAccount(log, id)).toThrow(
       /Transfer the \$50\.00 in Old savings to another Account first/,
     );
     expect(accounts(changeLog.readAll())[0].closed).toBe(false);
 
-    redeclareBalance(writer, id, { balance: money(0, "USD") });
-    closeAccount(writer, id);
+    redeclareBalance(log, id, { balance: money(0, "USD") });
+    closeAccount(log, id);
 
     expect(accounts(changeLog.readAll())).toEqual([
       {
@@ -706,17 +704,17 @@ describe("Accounts", () => {
         lastChecked: expect.any(String),
       },
     ]);
-    expect(() => closeAccount(writer, id)).toThrow(/Old savings is closed/);
+    expect(() => closeAccount(log, id)).toThrow(/Old savings is closed/);
     expect(() =>
-      redeclareBalance(writer, id, { balance: money(100, "USD") }),
+      redeclareBalance(log, id, { balance: money(100, "USD") }),
     ).toThrow(/Old savings is closed/);
   });
 
   it("needs a name for the Account", () => {
-    const { changeLog, writer } = budgetIn("USD");
+    const { changeLog, log } = budgetIn("USD");
 
     expect(() =>
-      openAccount(writer, {
+      openAccount(log, {
         name: "   ",
         kind: "checking",
         openingBalance: money(0, "USD"),
@@ -726,10 +724,10 @@ describe("Accounts", () => {
   });
 
   it("keeps the Opening Balance in the Budget's currency", () => {
-    const { changeLog, writer } = budgetIn("USD");
+    const { changeLog, log } = budgetIn("USD");
 
     expect(() =>
-      openAccount(writer, {
+      openAccount(log, {
         name: "Euro account",
         kind: "checking",
         openingBalance: money(1000, "EUR"),
@@ -740,10 +738,10 @@ describe("Accounts", () => {
 
   it("opens Accounts only once a Budget exists", () => {
     const changeLog = createInMemoryChangeLog();
-    const writer = createChangeLogWriter(changeLog, "this-device");
+    const log = createDeviceChangeLog(changeLog, "this-device");
 
     expect(() =>
-      openAccount(writer, {
+      openAccount(log, {
         name: "Checking",
         kind: "checking",
         openingBalance: money(0, "USD"),

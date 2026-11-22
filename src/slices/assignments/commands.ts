@@ -1,4 +1,4 @@
-import type { ChangeLogWriter } from "../../kernel/change-log";
+import type { DeviceChangeLog } from "../../kernel/change-log";
 import { addMoney, type Money, money, subtractMoney } from "../../kernel/money";
 import { type Month, previousMonth } from "../../kernel/month";
 import { isBudgetCreated } from "../budget-setup/records";
@@ -24,11 +24,11 @@ export type AssignmentInput = {
  * amount below zero sets it to zero and takes the rest back.
  */
 export function setAssignment(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   input: AssignmentInput,
 ): void {
-  checkInBudgetCurrency(writer, input.amount);
-  write(writer, input);
+  checkInBudgetCurrency(log, input.amount);
+  write(log, input);
 }
 
 /**
@@ -39,10 +39,10 @@ export function setAssignment(
  * doesn't know which those are) are left out. Says how many it copied.
  */
 export function copyLastMonth(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   { month, skipping = [] }: { month: Month; skipping?: Iterable<string> },
 ): number {
-  const current = currentAssignments(writer.changeLog.readAll());
+  const current = currentAssignments(log.readAll());
   const lastMonth = previousMonth(month);
   const skipped = new Set(skipping);
   let copied = 0;
@@ -50,7 +50,7 @@ export function copyLastMonth(
     if (of !== lastMonth || !assigned?.minorUnits) continue;
     if (skipped.has(categoryId)) continue;
     if (current.get(assignmentSubject(categoryId, month))?.assigned) continue;
-    setAssignment(writer, { categoryId, month, amount: assigned });
+    setAssignment(log, { categoryId, month, amount: assigned });
     copied++;
   }
   return copied;
@@ -69,7 +69,7 @@ export type MoveMoneyInput = {
  * lowered Assignment can't cover is taken back from what it carried forward.
  */
 export function moveMoney(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   { fromCategoryId, toCategoryId, month, amount }: MoveMoneyInput,
 ): void {
   if (fromCategoryId === toCategoryId) {
@@ -78,14 +78,14 @@ export function moveMoney(
   if (amount.minorUnits <= 0) {
     throw new RangeError("Move an amount more than zero");
   }
-  checkInBudgetCurrency(writer, amount);
-  const records = writer.changeLog.readAll();
+  checkInBudgetCurrency(log, amount);
+  const records = log.readAll();
   const assigned = (categoryId: string) =>
     assignment(records, categoryId, month) ?? money(0, amount.currency);
   const from = subtractMoney(assigned(fromCategoryId), amount);
   const to = addMoney(assigned(toCategoryId), amount);
-  write(writer, { categoryId: fromCategoryId, month, amount: from });
-  write(writer, { categoryId: toCategoryId, month, amount: to });
+  write(log, { categoryId: fromCategoryId, month, amount: from });
+  write(log, { categoryId: toCategoryId, month, amount: to });
 }
 
 /**
@@ -94,21 +94,21 @@ export function moveMoney(
  * didn't change.
  */
 export function restoreAssignment(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   { categoryId, month, assigned, takenBack }: CurrentAssignment,
 ): void {
-  const budget = writer.changeLog.readAll().findLast(isBudgetCreated);
+  const budget = log.readAll().findLast(isBudgetCreated);
   if (!budget) throw new Error("Create a Budget first");
   const { currency } = budget.payload;
   const subject = assignmentSubject(categoryId, month);
-  const stored = writer.changeLog
+  const stored = log
     .readAll()
     .filter(isAssignmentSet)
     .findLast((record) => record.subjectId === subject)?.payload;
   // Compared as stored: one below zero has to be replaced to stop counting.
   const storedNow = stored?.cleared ? undefined : stored?.amount.minorUnits;
   if (storedNow !== assigned?.minorUnits) {
-    writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+    log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
       subject,
       "AssignmentSet",
       {
@@ -120,9 +120,9 @@ export function restoreAssignment(
       },
     );
   }
-  const now = currentAssignments(writer.changeLog.readAll()).get(subject);
+  const now = currentAssignments(log.readAll()).get(subject);
   if ((now?.takenBack?.minorUnits ?? 0) !== (takenBack?.minorUnits ?? 0)) {
-    writer.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+    log.write<TakeBackSet["type"], TakeBackSet["payload"]>(
       subject,
       "TakeBackSet",
       {
@@ -135,8 +135,8 @@ export function restoreAssignment(
   }
 }
 
-function checkInBudgetCurrency(writer: ChangeLogWriter, amount: Money): void {
-  const budget = writer.changeLog.readAll().findLast(isBudgetCreated);
+function checkInBudgetCurrency(log: DeviceChangeLog, amount: Money): void {
+  const budget = log.readAll().findLast(isBudgetCreated);
   if (!budget) throw new Error("Create a Budget first");
   const { currency } = budget.payload;
   if (amount.currency !== currency) {
@@ -152,10 +152,10 @@ function checkInBudgetCurrency(writer: ChangeLogWriter, amount: Money): void {
  * changes, so an Assignment on one device can't undo a Take-back on another.
  */
 function write(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   { categoryId, month, amount }: AssignmentInput,
 ): void {
-  const records = writer.changeLog.readAll();
+  const records = log.readAll();
   const subject = assignmentSubject(categoryId, month);
   const beyond = Math.max(0, -amount.minorUnits);
   const replaced = records
@@ -164,7 +164,7 @@ function write(
   // A stored negative Assignment holds a Take-back only until it's replaced.
   if (beyond > 0 || (replaced && replaced.minorUnits < 0)) {
     const earlier = currentAssignments(records).get(subject)?.takenBack;
-    writer.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+    log.write<TakeBackSet["type"], TakeBackSet["payload"]>(
       subject,
       "TakeBackSet",
       {
@@ -175,7 +175,7 @@ function write(
       },
     );
   }
-  writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+  log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
     subject,
     "AssignmentSet",
     {

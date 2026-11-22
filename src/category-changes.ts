@@ -4,10 +4,10 @@
  * `undo.ts`. The commands stay as they are, so the steps are composed here.
  */
 import { useMemo } from "react";
-import type { ChangeLogWriter } from "./kernel/change-log";
+import type { DeviceChangeLog } from "./kernel/change-log";
 import { formatMoney, money, subtractMoney } from "./kernel/money";
 import { currentMonth, type Month } from "./kernel/month";
-import { useChangeLogWriter } from "./kernel/use-change-log-query";
+import { useDeviceChangeLog } from "./kernel/use-change-log-query";
 import { assignment } from "./slices/assignments";
 import { moveMoney, setAssignment } from "./slices/assignments/commands";
 import { assignmentsAfter, available } from "./slices/budget-totals";
@@ -34,67 +34,67 @@ import {
 import { useToast } from "./ui/Toast";
 import { type Place, rememberMoney, type Undo } from "./undo";
 
-function groupsNow(writer: ChangeLogWriter) {
-  return categoryGroups(writer.changeLog.readAll());
+function groupsNow(log: DeviceChangeLog) {
+  return categoryGroups(log.readAll());
 }
 
-function groupNow(writer: ChangeLogWriter, groupId: string) {
-  const groups = groupsNow(writer);
+function groupNow(log: DeviceChangeLog, groupId: string) {
+  const groups = groupsNow(log);
   const index = groups.findIndex(({ id }) => id === groupId);
   if (index < 0) throw new RangeError(`No Category Group ${groupId}`);
   return { group: groups[index], index };
 }
 
-function categoryNow(writer: ChangeLogWriter, categoryId: string) {
-  for (const group of groupsNow(writer)) {
+function categoryNow(log: DeviceChangeLog, categoryId: string) {
+  for (const group of groupsNow(log)) {
     const index = group.categories.findIndex(({ id }) => id === categoryId);
     if (index >= 0) return { category: group.categories[index], group, index };
   }
   throw new RangeError(`No Category ${categoryId}`);
 }
 
-function hide(writer: ChangeLogWriter, categoryId: string): void {
-  hideCategory(writer, categoryId, { currentMonth: currentMonth() });
+function hide(log: DeviceChangeLog, categoryId: string): void {
+  hideCategory(log, categoryId, { currentMonth: currentMonth() });
 }
 
 /** Undoing deletes it. */
 export function createCategoryWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   input: { groupId: string; name: string },
 ): Undo {
-  const id = createCategory(writer, input);
-  return () => deleteCategory(writer, id);
+  const id = createCategory(log, input);
+  return () => deleteCategory(log, id);
 }
 
 /** Undoing deletes it. */
 export function createCategoryGroupWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   input: { name: string },
 ): Undo {
-  const id = createCategoryGroup(writer, input);
-  return () => deleteCategoryGroup(writer, id);
+  const id = createCategoryGroup(log, input);
+  return () => deleteCategoryGroup(log, id);
 }
 
 /** Undoing writes the previous name as a new record. */
 export function renameCategoryWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   categoryId: string,
   input: { name: string },
 ): Undo {
-  const { name } = categoryNow(writer, categoryId).category;
-  renameCategory(writer, categoryId, input);
-  return () => renameCategory(writer, categoryId, { name });
+  const { name } = categoryNow(log, categoryId).category;
+  renameCategory(log, categoryId, input);
+  return () => renameCategory(log, categoryId, { name });
 }
 
 /** Undoing writes the previous name as a new record. */
 export function renameCategoryGroupWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   groupId: string,
   input: { name: string },
 ): Undo {
-  const { name } = groupNow(writer, groupId).group;
-  renameCategoryGroup(writer, groupId, input);
-  return () => renameCategoryGroup(writer, groupId, { name });
+  const { name } = groupNow(log, groupId).group;
+  renameCategoryGroup(log, groupId, input);
+  return () => renameCategoryGroup(log, groupId, { name });
 }
 
 /**
@@ -103,16 +103,16 @@ export function renameCategoryGroupWithUndo(
  * Take-back applies through the commands.
  */
 function moveOut(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   categoryId: string,
   { month, other }: { month: Month; other?: string },
 ): void {
-  const records = writer.changeLog.readAll();
+  const records = log.readAll();
   const left = available(records, categoryId, month);
   if (!left?.minorUnits) return;
   if (other) {
     const amount = money(Math.abs(left.minorUnits), left.currency);
-    moveMoney(writer, {
+    moveMoney(log, {
       fromCategoryId: left.minorUnits > 0 ? categoryId : other,
       toCategoryId: left.minorUnits > 0 ? other : categoryId,
       month,
@@ -122,7 +122,7 @@ function moveOut(
   }
   const assigned =
     assignment(records, categoryId, month) ?? money(0, left.currency);
-  setAssignment(writer, {
+  setAssignment(log, {
     categoryId,
     month,
     amount: subtractMoney(assigned, left),
@@ -143,12 +143,12 @@ function moneyPlaces(
 
 /** Undoing writes back the Assignments and Take-backs it changed. */
 export function moveOutWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   categoryId: string,
   where: { month: Month; other?: string },
 ): Undo {
-  const restore = rememberMoney(writer, moneyPlaces(categoryId, where));
-  moveOut(writer, categoryId, where);
+  const restore = rememberMoney(log, moneyPlaces(categoryId, where));
+  moveOut(log, categoryId, where);
   return restore;
 }
 
@@ -160,77 +160,77 @@ export function moveOutWithUndo(
  * Budget flags it. Undoing writes the reverse of each step.
  */
 export function hideCategoryWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   categoryId: string,
   { month = currentMonth(), other }: { month?: Month; other?: string } = {},
 ): Undo {
-  categoryNow(writer, categoryId);
-  const later = assignmentsAfter(writer.changeLog.readAll(), categoryId, month);
-  const restore = rememberMoney(writer, [
+  categoryNow(log, categoryId);
+  const later = assignmentsAfter(log.readAll(), categoryId, month);
+  const restore = rememberMoney(log, [
     ...moneyPlaces(categoryId, { month, other }),
     ...later.map((place) => ({ categoryId, month: place.month })),
   ]);
-  moveOut(writer, categoryId, { month, other });
+  moveOut(log, categoryId, { month, other });
   for (const { month: laterMonth, amount } of later) {
-    setAssignment(writer, {
+    setAssignment(log, {
       categoryId,
       month: laterMonth,
       amount: money(0, amount.currency),
     });
   }
-  hideCategory(writer, categoryId, { currentMonth: month });
+  hideCategory(log, categoryId, { currentMonth: month });
   return () => {
     // First, so an Undo ruled out by another device's delete writes nothing.
-    unhideCategory(writer, categoryId);
+    unhideCategory(log, categoryId);
     restore();
   };
 }
 
 export function unhideCategoryWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   categoryId: string,
 ): Undo {
-  unhideCategory(writer, categoryId);
-  return () => restoreHidden(writer, categoryId);
+  unhideCategory(log, categoryId);
+  return () => restoreHidden(log, categoryId);
 }
 
 /** Undoing writes a new Category, with a fresh id, in the same place. */
 export function deleteCategoryWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   categoryId: string,
 ): Undo {
-  const { category, group, index } = categoryNow(writer, categoryId);
-  deleteCategory(writer, categoryId);
+  const { category, group, index } = categoryNow(log, categoryId);
+  deleteCategory(log, categoryId);
   return () => {
-    const id = createCategory(writer, {
+    const id = createCategory(log, {
       groupId: group.id,
       name: category.name,
     });
-    moveCategory(writer, id, { groupId: group.id, toIndex: index });
-    if (category.hidden) hide(writer, id);
+    moveCategory(log, id, { groupId: group.id, toIndex: index });
+    if (category.hidden) hide(log, id);
   };
 }
 
 /** A fresh Category Group with the same name, setting and place. */
 function restoreGroup(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   { name, leftOut, index }: { name: string; leftOut: boolean; index: number },
 ): string {
-  const id = createCategoryGroup(writer, { name });
-  if (leftOut) setCategoryGroupSpentThisMonth(writer, id, { leftOut });
-  moveCategoryGroup(writer, id, { toIndex: index });
+  const id = createCategoryGroup(log, { name });
+  if (leftOut) setCategoryGroupSpentThisMonth(log, id, { leftOut });
+  moveCategoryGroup(log, id, { toIndex: index });
   return id;
 }
 
 /** Undoing writes a new Category Group, with a fresh id, in the same place. */
 export function deleteCategoryGroupWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   groupId: string,
 ): Undo {
-  const { group, index } = groupNow(writer, groupId);
-  deleteCategoryGroup(writer, groupId);
+  const { group, index } = groupNow(log, groupId);
+  deleteCategoryGroup(log, groupId);
   return () => {
-    restoreGroup(writer, {
+    restoreGroup(log, {
       name: group.name,
       leftOut: group.leftOutOfSpentThisMonth,
       index,
@@ -244,149 +244,149 @@ export function deleteCategoryGroupWithUndo(
  * in the same place, and moves them back in their order.
  */
 export function moveThemAndDeleteWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   groupId: string,
   toGroupId: string,
 ): Undo {
-  const { group, index } = groupNow(writer, groupId);
-  let toIndex = groupNow(writer, toGroupId).group.categories.length;
+  const { group, index } = groupNow(log, groupId);
+  let toIndex = groupNow(log, toGroupId).group.categories.length;
   for (const { id } of group.categories) {
-    moveCategory(writer, id, { groupId: toGroupId, toIndex });
+    moveCategory(log, id, { groupId: toGroupId, toIndex });
     toIndex += 1;
   }
-  deleteCategoryGroup(writer, groupId);
+  deleteCategoryGroup(log, groupId);
   return () => {
     // Checked first, so an Undo that can't finish writes nothing.
-    for (const { id } of group.categories) categoryNow(writer, id);
-    const restored = restoreGroup(writer, {
+    for (const { id } of group.categories) categoryNow(log, id);
+    const restored = restoreGroup(log, {
       name: group.name,
       leftOut: group.leftOutOfSpentThisMonth,
       index,
     });
     group.categories.forEach(({ id }, position) => {
-      moveCategory(writer, id, { groupId: restored, toIndex: position });
+      moveCategory(log, id, { groupId: restored, toIndex: position });
     });
   };
 }
 
 /** Undoing puts it back where it was, as new records. */
 export function moveCategoryWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   categoryId: string,
   to: { groupId: string; toIndex: number },
 ): Undo {
-  const { group, index } = categoryNow(writer, categoryId);
-  moveCategory(writer, categoryId, to);
+  const { group, index } = categoryNow(log, categoryId);
+  moveCategory(log, categoryId, to);
   return () =>
-    moveCategory(writer, categoryId, { groupId: group.id, toIndex: index });
+    moveCategory(log, categoryId, { groupId: group.id, toIndex: index });
 }
 
 /** Undoing puts it back where it was, as new records. */
 export function moveCategoryGroupWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   groupId: string,
   to: { toIndex: number },
 ): Undo {
-  const { index } = groupNow(writer, groupId);
-  moveCategoryGroup(writer, groupId, to);
-  return () => moveCategoryGroup(writer, groupId, { toIndex: index });
+  const { index } = groupNow(log, groupId);
+  moveCategoryGroup(log, groupId, to);
+  return () => moveCategoryGroup(log, groupId, { toIndex: index });
 }
 
 /** Undoing writes the previous setting as a new record. */
 export function setSpentThisMonthWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   groupId: string,
   { leftOut }: { leftOut: boolean },
 ): Undo {
-  const { group } = groupNow(writer, groupId);
+  const { group } = groupNow(log, groupId);
   const previous = group.leftOutOfSpentThisMonth;
-  setCategoryGroupSpentThisMonth(writer, groupId, { leftOut });
+  setCategoryGroupSpentThisMonth(log, groupId, { leftOut });
   return () =>
-    setCategoryGroupSpentThisMonth(writer, groupId, { leftOut: previous });
+    setCategoryGroupSpentThisMonth(log, groupId, { leftOut: previous });
 }
 
 /** Edit mode's changes, each with its toast and Undo. */
 export function useCategoryChanges(): CategoryChanges {
-  const writer = useChangeLogWriter();
+  const log = useDeviceChangeLog();
   const toast = useToast();
   return useMemo(
     () => ({
       addCategory(groupId, name) {
         toast({
           text: `Added ${name}`,
-          onUndo: createCategoryWithUndo(writer, { groupId, name }),
+          onUndo: createCategoryWithUndo(log, { groupId, name }),
         });
       },
       addGroup(name) {
         toast({
           text: `Added ${name}`,
-          onUndo: createCategoryGroupWithUndo(writer, { name }),
+          onUndo: createCategoryGroupWithUndo(log, { name }),
         });
       },
       renameCategory(categoryId, name) {
         toast({
           text: `Renamed to ${name}`,
-          onUndo: renameCategoryWithUndo(writer, categoryId, { name }),
+          onUndo: renameCategoryWithUndo(log, categoryId, { name }),
         });
       },
       renameGroup(groupId, name) {
         toast({
           text: `Renamed to ${name}`,
-          onUndo: renameCategoryGroupWithUndo(writer, groupId, { name }),
+          onUndo: renameCategoryGroupWithUndo(log, groupId, { name }),
         });
       },
       hide({ id, name }, other) {
         toast({
           text: `Hid ${name}`,
-          onUndo: hideCategoryWithUndo(writer, id, { other }),
+          onUndo: hideCategoryWithUndo(log, id, { other }),
         });
       },
       moveOut({ id, name }, month, other) {
-        const left = available(writer.changeLog.readAll(), id, month);
+        const left = available(log.readAll(), id, month);
         toast({
           text:
             left && left.minorUnits > 0
               ? `Moved ${formatMoney(left)} out of ${name}`
               : `Covered ${name}`,
-          onUndo: moveOutWithUndo(writer, id, { month, other }),
+          onUndo: moveOutWithUndo(log, id, { month, other }),
         });
       },
       unhide({ id, name }) {
         toast({
           text: `${name} is back`,
-          onUndo: unhideCategoryWithUndo(writer, id),
+          onUndo: unhideCategoryWithUndo(log, id),
         });
       },
       deleteCategory({ id, name }) {
         toast({
           text: `Deleted ${name}`,
-          onUndo: deleteCategoryWithUndo(writer, id),
+          onUndo: deleteCategoryWithUndo(log, id),
         });
       },
       deleteGroup({ id, name }) {
         toast({
           text: `Deleted ${name}`,
-          onUndo: deleteCategoryGroupWithUndo(writer, id),
+          onUndo: deleteCategoryGroupWithUndo(log, id),
         });
       },
       moveThemAndDelete({ id, name }, toGroupId) {
         toast({
           text: `Deleted ${name}`,
-          onUndo: moveThemAndDeleteWithUndo(writer, id, toGroupId),
+          onUndo: moveThemAndDeleteWithUndo(log, id, toGroupId),
         });
       },
       // Saying where it landed doubles as what a screen reader announces.
       moveCategory({ id, name }, to) {
-        const onUndo = moveCategoryWithUndo(writer, id, to);
+        const onUndo = moveCategoryWithUndo(log, id, to);
         toast({
-          text: `${name}, ${categoryPlace(groupsNow(writer), id)}`,
+          text: `${name}, ${categoryPlace(groupsNow(log), id)}`,
           onUndo,
         });
       },
       moveGroup({ id, name }, toIndex) {
-        const onUndo = moveCategoryGroupWithUndo(writer, id, { toIndex });
+        const onUndo = moveCategoryGroupWithUndo(log, id, { toIndex });
         toast({
-          text: `${name}, ${groupPlace(groupsNow(writer), id)}`,
+          text: `${name}, ${groupPlace(groupsNow(log), id)}`,
           onUndo,
         });
       },
@@ -395,10 +395,10 @@ export function useCategoryChanges(): CategoryChanges {
           text: leftOut
             ? `${name} left out of Spent this Month`
             : `${name} counts toward Spent this Month`,
-          onUndo: setSpentThisMonthWithUndo(writer, id, { leftOut }),
+          onUndo: setSpentThisMonthWithUndo(log, id, { leftOut }),
         });
       },
     }),
-    [writer, toast],
+    [log, toast],
   );
 }

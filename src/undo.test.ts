@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  type ChangeLogWriter,
   type ChangeRecord,
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
+  type DeviceChangeLog,
 } from "./kernel/change-log";
 import { type Money, money } from "./kernel/money";
 import type { Month } from "./kernel/month";
@@ -58,7 +58,7 @@ function twoDevices() {
     const changeLog = createInMemoryChangeLog();
     return {
       changeLog,
-      writer: createChangeLogWriter(changeLog, deviceId, { now }),
+      log: createDeviceChangeLog(changeLog, deviceId, { now }),
       records: () => changeLog.readAll(),
     };
   };
@@ -69,19 +69,19 @@ function twoDevices() {
     phone.changeLog.merge(laptop.records());
   };
 
-  createBudget(phone.writer, { currency: "USD" });
-  const checking = openAccount(phone.writer, {
+  createBudget(phone.log, { currency: "USD" });
+  const checking = openAccount(phone.log, {
     name: "Checking",
     kind: "checking",
     openingBalance: usd(100000),
   });
-  const savings = openAccount(phone.writer, {
+  const savings = openAccount(phone.log, {
     name: "Savings",
     kind: "savings",
     openingBalance: usd(50000),
   });
-  const group = createCategoryGroup(phone.writer, { name: "Everyday" });
-  const groceries = createCategory(phone.writer, {
+  const group = createCategoryGroup(phone.log, { name: "Everyday" });
+  const groceries = createCategory(phone.log, {
     groupId: group,
     name: "Groceries",
   });
@@ -89,8 +89,8 @@ function twoDevices() {
 
   const balance = (records: readonly ChangeRecord[], id = checking) =>
     accounts(records).find((account) => account.id === id)?.balance;
-  const lunch = (writer: ChangeLogWriter) =>
-    recordTransaction(writer, {
+  const lunch = (log: DeviceChangeLog) =>
+    recordTransaction(log, {
       accountId: checking,
       date: "2026-10-12",
       amount: usd(-1200),
@@ -119,15 +119,15 @@ const listed = (records: readonly ChangeRecord[], accountId: string) =>
 describe("undoing a Transaction's delete", () => {
   it("writes a new Transaction with a fresh id, the same content and the same place in the list", () => {
     const { phone, checking, groceries, balance, lunch } = twoDevices();
-    const before = recordTransaction(phone.writer, {
+    const before = recordTransaction(phone.log, {
       accountId: checking,
       date: "2026-10-12",
       amount: usd(-100),
       categoryId: groceries,
       payee: "Before",
     });
-    const deleted = lunch(phone.writer);
-    const after = recordTransaction(phone.writer, {
+    const deleted = lunch(phone.log);
+    const after = recordTransaction(phone.log, {
       accountId: checking,
       date: "2026-10-12",
       amount: usd(-300),
@@ -135,7 +135,7 @@ describe("undoing a Transaction's delete", () => {
       payee: "After",
     });
 
-    const undo = deleteTransactionWithUndo(phone.writer, deleted);
+    const undo = deleteTransactionWithUndo(phone.log, deleted);
     expect(listed(phone.records(), checking)).toEqual([after, before]);
     undo();
 
@@ -159,19 +159,19 @@ describe("undoing a Transaction's delete", () => {
 
   it("keeps its place when that Transaction is deleted and undone again, or edited", () => {
     const { phone, checking, groceries, lunch } = twoDevices();
-    const first = lunch(phone.writer);
-    const later = recordTransaction(phone.writer, {
+    const first = lunch(phone.log);
+    const later = recordTransaction(phone.log, {
       accountId: checking,
       date: "2026-10-12",
       amount: usd(-300),
       categoryId: groceries,
     });
 
-    deleteTransactionWithUndo(phone.writer, first)();
+    deleteTransactionWithUndo(phone.log, first)();
     const restored = listed(phone.records(), checking)[1] ?? "";
-    deleteTransactionWithUndo(phone.writer, restored)();
+    deleteTransactionWithUndo(phone.log, restored)();
     const again = listed(phone.records(), checking)[1] ?? "";
-    editTransaction(phone.writer, again, {
+    editTransaction(phone.log, again, {
       accountId: checking,
       date: "2026-10-12",
       amount: usd(-1300),
@@ -184,12 +184,12 @@ describe("undoing a Transaction's delete", () => {
 
   it("leaves an Adjustment made since as it was, because the money goes and comes back after it", () => {
     const { phone, checking, balance, lunch } = twoDevices();
-    const deleted = lunch(phone.writer);
-    redeclareBalance(phone.writer, checking, { balance: usd(90000) });
+    const deleted = lunch(phone.log);
+    redeclareBalance(phone.log, checking, { balance: usd(90000) });
     const adjusted = () => adjustments(phone.records()).map((a) => a.amount);
     expect(adjusted()).toEqual([usd(90000 - 98800)]);
 
-    deleteTransactionWithUndo(phone.writer, deleted)();
+    deleteTransactionWithUndo(phone.log, deleted)();
 
     expect(adjusted()).toEqual([usd(90000 - 98800)]);
     expect(balance(phone.records())).toEqual(usd(90000));
@@ -200,10 +200,10 @@ describe("undoing a Transaction's edit", () => {
   it("writes the previous values as a new record, under the same id", () => {
     const { phone, checking, savings, groceries, balance, lunch } =
       twoDevices();
-    const id = lunch(phone.writer);
+    const id = lunch(phone.log);
     const logged = phone.records().length;
 
-    const undo = editTransactionWithUndo(phone.writer, id, {
+    const undo = editTransactionWithUndo(phone.log, id, {
       accountId: savings,
       date: "2026-10-13",
       amount: usd(3000),
@@ -233,7 +233,7 @@ describe("undoing a Transfer's delete and edit", () => {
   it("brings a deleted Transfer back with a fresh id, the same details and the same place", () => {
     const { phone, checking, savings, balance } = twoDevices();
     const move = (minorUnits: number, memo?: string) =>
-      makeTransfer(phone.writer, {
+      makeTransfer(phone.log, {
         fromAccountId: checking,
         toAccountId: savings,
         date: "2026-10-12",
@@ -243,7 +243,7 @@ describe("undoing a Transfer's delete and edit", () => {
     const deleted = move(2000, "Rainy day");
     const later = move(100);
 
-    deleteTransferWithUndo(phone.writer, deleted)();
+    deleteTransferWithUndo(phone.log, deleted)();
 
     const records = phone.records();
     const [newest, restored] = listed(records, checking);
@@ -261,14 +261,14 @@ describe("undoing a Transfer's delete and edit", () => {
 
   it("writes a Transfer's previous details back after an edit", () => {
     const { phone, checking, savings, balance } = twoDevices();
-    const id = makeTransfer(phone.writer, {
+    const id = makeTransfer(phone.log, {
       fromAccountId: checking,
       toAccountId: savings,
       date: "2026-10-12",
       amount: usd(2000),
     });
 
-    editTransferWithUndo(phone.writer, id, {
+    editTransferWithUndo(phone.log, id, {
       fromAccountId: savings,
       toAccountId: checking,
       date: "2026-10-13",
@@ -288,14 +288,14 @@ describe("undoing a Transfer's delete and edit", () => {
 describe("undoing a re-declared balance's delete", () => {
   it("measures it again from where it was, not against what happened since", () => {
     const { phone, checking, balance, lunch } = twoDevices();
-    const redeclared = redeclareBalance(phone.writer, checking, {
+    const redeclared = redeclareBalance(phone.log, checking, {
       balance: usd(90000),
     });
     const date = adjustments(phone.records())[0]?.date;
-    lunch(phone.writer);
+    lunch(phone.log);
     expect(balance(phone.records())).toEqual(usd(88800));
 
-    const undo = deleteRedeclaredBalanceWithUndo(phone.writer, redeclared);
+    const undo = deleteRedeclaredBalanceWithUndo(phone.log, redeclared);
     expect(balance(phone.records())).toEqual(usd(98800));
     undo();
 
@@ -311,14 +311,14 @@ describe("undoing a re-declared balance's delete", () => {
 
   it("turns a later Balance check back from the Adjustment its delete made it", () => {
     const { phone, checking } = twoDevices();
-    const first = redeclareBalance(phone.writer, checking, {
+    const first = redeclareBalance(phone.log, checking, {
       balance: usd(90000),
     });
-    const check = redeclareBalance(phone.writer, checking, {
+    const check = redeclareBalance(phone.log, checking, {
       balance: usd(90000),
     });
 
-    const undo = deleteRedeclaredBalanceWithUndo(phone.writer, first);
+    const undo = deleteRedeclaredBalanceWithUndo(phone.log, first);
     expect(balanceChecks(phone.records())).toEqual([]);
     undo();
 
@@ -328,14 +328,14 @@ describe("undoing a re-declared balance's delete", () => {
 
   it("restores its place again after a second delete and Undo", () => {
     const { phone, checking, balance, lunch } = twoDevices();
-    const redeclared = redeclareBalance(phone.writer, checking, {
+    const redeclared = redeclareBalance(phone.log, checking, {
       balance: usd(90000),
     });
-    lunch(phone.writer);
+    lunch(phone.log);
 
-    deleteRedeclaredBalanceWithUndo(phone.writer, redeclared)();
+    deleteRedeclaredBalanceWithUndo(phone.log, redeclared)();
     const restored = adjustments(phone.records())[0]?.id ?? "";
-    deleteRedeclaredBalanceWithUndo(phone.writer, restored)();
+    deleteRedeclaredBalanceWithUndo(phone.log, restored)();
 
     expect(balance(phone.records())).toEqual(usd(88800));
     expect(adjustments(phone.records())[0]?.id).not.toBe(restored);
@@ -346,13 +346,13 @@ describe("Undo's records merging from two devices", () => {
   it("counts a Transaction once when one device undoes its delete and the other edited it", () => {
     const { phone, laptop, sync, checking, groceries, balance, lunch } =
       twoDevices();
-    const id = lunch(phone.writer);
+    const id = lunch(phone.log);
     sync();
 
-    const undo = deleteTransactionWithUndo(phone.writer, id);
+    const undo = deleteTransactionWithUndo(phone.log, id);
     undo();
     // Written after the delete, by a device that hadn't seen it.
-    editTransaction(laptop.writer, id, {
+    editTransaction(laptop.log, id, {
       accountId: checking,
       date: "2026-10-12",
       amount: usd(-9900),
@@ -373,11 +373,11 @@ describe("Undo's records merging from two devices", () => {
   it("keeps a Transaction deleted when another device undoes an edit to it", () => {
     const { phone, laptop, sync, checking, groceries, balance, lunch } =
       twoDevices();
-    const id = lunch(phone.writer);
+    const id = lunch(phone.log);
     sync();
 
-    deleteTransactionWithUndo(laptop.writer, id);
-    const undo = editTransactionWithUndo(phone.writer, id, {
+    deleteTransactionWithUndo(laptop.log, id);
+    const undo = editTransactionWithUndo(phone.log, id, {
       accountId: checking,
       date: "2026-10-12",
       amount: usd(-500),
@@ -394,7 +394,7 @@ describe("Undo's records merging from two devices", () => {
 
   it("lets a later edit on another device beat an undone edit, and an undone edit beat an earlier one", () => {
     const { phone, laptop, sync, checking, groceries, lunch } = twoDevices();
-    const id = lunch(phone.writer);
+    const id = lunch(phone.log);
     sync();
     const edit = (payee: string) => ({
       accountId: checking,
@@ -405,22 +405,22 @@ describe("Undo's records merging from two devices", () => {
     });
     const payee = () => currentTransactions(phone.records())[0]?.payee;
 
-    const undo = editTransactionWithUndo(phone.writer, id, edit("Phone"));
-    editTransaction(laptop.writer, id, edit("Laptop, earlier"));
+    const undo = editTransactionWithUndo(phone.log, id, edit("Phone"));
+    editTransaction(laptop.log, id, edit("Laptop, earlier"));
     undo();
     sync();
     expect(payee()).toBe("Corner Bistro");
 
-    const undoAgain = editTransactionWithUndo(phone.writer, id, edit("Phone"));
+    const undoAgain = editTransactionWithUndo(phone.log, id, edit("Phone"));
     undoAgain();
-    editTransaction(laptop.writer, id, edit("Laptop, later"));
+    editTransaction(laptop.log, id, edit("Laptop, later"));
     sync();
     expect(payee()).toBe("Laptop, later");
   });
 
   it("counts a Transfer once when one device undoes its delete and the other edited it", () => {
     const { phone, laptop, sync, checking, savings, balance } = twoDevices();
-    const id = makeTransfer(phone.writer, {
+    const id = makeTransfer(phone.log, {
       fromAccountId: checking,
       toAccountId: savings,
       date: "2026-10-12",
@@ -428,8 +428,8 @@ describe("Undo's records merging from two devices", () => {
     });
     sync();
 
-    deleteTransferWithUndo(phone.writer, id)();
-    editTransfer(laptop.writer, id, {
+    deleteTransferWithUndo(phone.log, id)();
+    editTransfer(laptop.log, id, {
       fromAccountId: checking,
       toAccountId: savings,
       date: "2026-10-12",
@@ -446,13 +446,13 @@ describe("Undo's records merging from two devices", () => {
 
   it("agrees on a restored re-declaration's place across devices, with what the other device did since", () => {
     const { phone, laptop, sync, checking, balance, lunch } = twoDevices();
-    const redeclared = redeclareBalance(phone.writer, checking, {
+    const redeclared = redeclareBalance(phone.log, checking, {
       balance: usd(90000),
     });
     sync();
 
-    lunch(laptop.writer);
-    deleteRedeclaredBalanceWithUndo(phone.writer, redeclared)();
+    lunch(laptop.log);
+    deleteRedeclaredBalanceWithUndo(phone.log, redeclared)();
     sync();
 
     for (const { records } of [phone, laptop]) {
@@ -466,13 +466,13 @@ describe("Undo's records merging from two devices", () => {
 
   it("keeps the money right when both devices undo the same re-declaration's delete", () => {
     const { phone, laptop, sync, checking, balance } = twoDevices();
-    const redeclared = redeclareBalance(phone.writer, checking, {
+    const redeclared = redeclareBalance(phone.log, checking, {
       balance: usd(90000),
     });
     sync();
 
-    deleteRedeclaredBalanceWithUndo(phone.writer, redeclared)();
-    deleteRedeclaredBalanceWithUndo(laptop.writer, redeclared)();
+    deleteRedeclaredBalanceWithUndo(phone.log, redeclared)();
+    deleteRedeclaredBalanceWithUndo(laptop.log, redeclared)();
     sync();
 
     for (const { records } of [phone, laptop]) {
@@ -484,11 +484,11 @@ describe("Undo's records merging from two devices", () => {
 
   it("leaves two Transactions, each visible and deletable, when both devices undo the same delete", () => {
     const { phone, laptop, sync, balance, lunch } = twoDevices();
-    const id = lunch(phone.writer);
+    const id = lunch(phone.log);
     sync();
 
-    deleteTransactionWithUndo(phone.writer, id)();
-    deleteTransactionWithUndo(laptop.writer, id)();
+    deleteTransactionWithUndo(phone.log, id)();
+    deleteTransactionWithUndo(laptop.log, id)();
     sync();
 
     expect(currentTransactions(phone.records())).toHaveLength(2);
@@ -497,29 +497,29 @@ describe("Undo's records merging from two devices", () => {
 
   it("refuses an Undo once another device's change has ruled it out", () => {
     const { phone, laptop, sync, checking, groceries, lunch } = twoDevices();
-    const id = lunch(phone.writer);
-    const emptied = openAccount(phone.writer, {
+    const id = lunch(phone.log);
+    const emptied = openAccount(phone.log, {
       name: "Old",
       kind: "cash",
       openingBalance: usd(0),
     });
-    const inOld = recordTransaction(phone.writer, {
+    const inOld = recordTransaction(phone.log, {
       accountId: emptied,
       date: "2026-10-12",
       amount: usd(100),
     });
     sync();
 
-    const undoEdit = editTransactionWithUndo(phone.writer, id, {
+    const undoEdit = editTransactionWithUndo(phone.log, id, {
       accountId: checking,
       date: "2026-10-12",
       amount: usd(-500),
       categoryId: groceries,
     });
-    deleteTransactionWithUndo(laptop.writer, id);
-    const undoDelete = deleteTransactionWithUndo(phone.writer, inOld);
+    deleteTransactionWithUndo(laptop.log, id);
+    const undoDelete = deleteTransactionWithUndo(phone.log, inOld);
     sync();
-    closeAccount(laptop.writer, emptied);
+    closeAccount(laptop.log, emptied);
     sync();
 
     expect(undoEdit).toThrow(RangeError);
@@ -533,8 +533,8 @@ describe("undoing Assignments", () => {
 
   function aBudget() {
     const { phone, group, groceries } = twoDevices();
-    const { writer } = phone;
-    const dining = createCategory(writer, {
+    const { log } = phone;
+    const dining = createCategory(log, {
       groupId: group,
       name: "Dining Out",
     });
@@ -544,7 +544,7 @@ describe("undoing Assignments", () => {
       takeBack(phone.records(), categoryId, of);
     const ready = () => readyToAssign(phone.records());
     return {
-      writer,
+      log,
       groceries,
       dining,
       assignedIn,
@@ -554,15 +554,15 @@ describe("undoing Assignments", () => {
   }
 
   it("writes the previous Assignment back", () => {
-    const { writer, groceries, assignedIn, ready } = aBudget();
-    setAssignment(writer, {
+    const { log, groceries, assignedIn, ready } = aBudget();
+    setAssignment(log, {
       categoryId: groceries,
       month: october,
       amount: usd(10000),
     });
     const before = ready();
 
-    const undo = setAssignmentWithUndo(writer, {
+    const undo = setAssignmentWithUndo(log, {
       categoryId: groceries,
       month: october,
       amount: usd(25000),
@@ -575,15 +575,15 @@ describe("undoing Assignments", () => {
   });
 
   it("restores the Take-back a typed negative added", () => {
-    const { writer, groceries, assignedIn, takenBackIn, ready } = aBudget();
-    setAssignment(writer, {
+    const { log, groceries, assignedIn, takenBackIn, ready } = aBudget();
+    setAssignment(log, {
       categoryId: groceries,
       month: october,
       amount: usd(10000),
     });
     const before = ready();
 
-    const undo = setAssignmentWithUndo(writer, {
+    const undo = setAssignmentWithUndo(log, {
       categoryId: groceries,
       month: october,
       amount: usd(-500),
@@ -597,16 +597,16 @@ describe("undoing Assignments", () => {
   });
 
   it("puts both ends of a move back, Take-back included", () => {
-    const { writer, groceries, dining, assignedIn, takenBackIn, ready } =
+    const { log, groceries, dining, assignedIn, takenBackIn, ready } =
       aBudget();
-    setAssignment(writer, {
+    setAssignment(log, {
       categoryId: groceries,
       month: october,
       amount: usd(1000),
     });
     const before = ready();
 
-    const undo = moveMoneyWithUndo(writer, {
+    const undo = moveMoneyWithUndo(log, {
       fromCategoryId: groceries,
       toCategoryId: dining,
       month: october,
@@ -622,24 +622,24 @@ describe("undoing Assignments", () => {
   });
 
   it("empties what a copy filled, so the same copy can run again", () => {
-    const { writer, groceries, dining, assignedIn } = aBudget();
-    setAssignment(writer, {
+    const { log, groceries, dining, assignedIn } = aBudget();
+    setAssignment(log, {
       categoryId: groceries,
       month: october,
       amount: usd(1000),
     });
-    setAssignment(writer, {
+    setAssignment(log, {
       categoryId: dining,
       month: october,
       amount: usd(2000),
     });
-    setAssignment(writer, {
+    setAssignment(log, {
       categoryId: dining,
       month: november,
       amount: usd(300),
     });
 
-    const { copied, undo } = copyLastMonthWithUndo(writer, {
+    const { copied, undo } = copyLastMonthWithUndo(log, {
       month: november,
     });
     expect(copied).toBe(1);
@@ -649,24 +649,24 @@ describe("undoing Assignments", () => {
     expect(assignedIn(groceries, november)).toBeUndefined();
     expect(assignedIn(dining, november)).toEqual(usd(300));
 
-    copyLastMonth(writer, { month: november });
+    copyLastMonth(log, { month: november });
     expect(assignedIn(groceries, november)).toEqual(usd(1000));
   });
 
   it("goes back to an Assignment set to zero, which a copy leaves alone", () => {
-    const { writer, groceries, assignedIn } = aBudget();
-    setAssignment(writer, {
+    const { log, groceries, assignedIn } = aBudget();
+    setAssignment(log, {
       categoryId: groceries,
       month: october,
       amount: usd(1000),
     });
-    setAssignment(writer, {
+    setAssignment(log, {
       categoryId: groceries,
       month: november,
       amount: usd(0),
     });
 
-    setAssignmentWithUndo(writer, {
+    setAssignmentWithUndo(log, {
       categoryId: groceries,
       month: november,
       amount: usd(70),
@@ -676,9 +676,9 @@ describe("undoing Assignments", () => {
   });
 
   it("leaves nothing assigned behind after undoing a first Assignment to zero", () => {
-    const { writer, groceries, assignedIn } = aBudget();
+    const { log, groceries, assignedIn } = aBudget();
 
-    setAssignmentWithUndo(writer, {
+    setAssignmentWithUndo(log, {
       categoryId: groceries,
       month: october,
       amount: usd(0),

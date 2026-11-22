@@ -4,9 +4,9 @@ import {
   addStarterSetWithUndo,
 } from "./first-categories";
 import {
-  type ChangeLogWriter,
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
+  type DeviceChangeLog,
 } from "./kernel/change-log";
 import { money } from "./kernel/money";
 import { openAccount } from "./slices/accounts/commands";
@@ -14,22 +14,22 @@ import { setAssignment } from "./slices/assignments/commands";
 import { createBudget } from "./slices/budget-setup/commands";
 import { categoryGroups } from "./slices/categories";
 
-let writer: ChangeLogWriter;
+let log: DeviceChangeLog;
 
 const outline = () =>
-  categoryGroups(writer.changeLog.readAll()).map(({ name, categories }) => [
+  categoryGroups(log.readAll()).map(({ name, categories }) => [
     name,
     categories.map((category) => category.name),
   ]);
 
 beforeEach(() => {
-  writer = createChangeLogWriter(createInMemoryChangeLog(), "this-device");
-  createBudget(writer, { currency: "USD" });
+  log = createDeviceChangeLog(createInMemoryChangeLog(), "this-device");
+  createBudget(log, { currency: "USD" });
 });
 
 describe("adding the first Category", () => {
   it("adds it in a new Category Group, and Undo takes both away", () => {
-    const undo = addFirstCategoryWithUndo(writer, {
+    const undo = addFirstCategoryWithUndo(log, {
       name: " Rent ",
       groupName: " Bills ",
     });
@@ -43,16 +43,14 @@ describe("adding the first Category", () => {
     ["Rent", " "],
     [" ", "Bills"],
   ])("writes nothing when a name is blank (%j, %j)", (name, groupName) => {
-    expect(() =>
-      addFirstCategoryWithUndo(writer, { name, groupName }),
-    ).toThrow();
+    expect(() => addFirstCategoryWithUndo(log, { name, groupName })).toThrow();
     expect(outline()).toEqual([]);
   });
 });
 
 describe("the starter set", () => {
   it("is added, and Undo takes every Group and Category away", () => {
-    const undo = addStarterSetWithUndo(writer);
+    const undo = addStarterSetWithUndo(log);
     expect(outline().map(([name]) => name)).toEqual([
       "Bills",
       "Everyday",
@@ -64,14 +62,14 @@ describe("the starter set", () => {
   });
 
   it("can't be undone once a Category is used, and the attempt writes nothing", () => {
-    const undo = addStarterSetWithUndo(writer);
-    openAccount(writer, {
+    const undo = addStarterSetWithUndo(log);
+    openAccount(log, {
       name: "Checking",
       kind: "checking",
       openingBalance: money(100_000, "USD"),
     });
-    const rent = categoryGroups(writer.changeLog.readAll())[0].categories[0];
-    setAssignment(writer, {
+    const rent = categoryGroups(log.readAll())[0].categories[0];
+    setAssignment(log, {
       categoryId: rent.id,
       month: "2026-10",
       amount: money(5000, "USD"),

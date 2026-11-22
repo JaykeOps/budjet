@@ -8,7 +8,7 @@ import { chooseFolder, hasFolderPicker } from "./first-run/browser";
 import { GettingYourBudget } from "./first-run/FirstRun";
 import { type ChosenFolder, createFolderChooser } from "./folder-chooser";
 import { browserFolder, returningFolder } from "./kernel/browser-folder";
-import { createChangeLogWriter, type UnsavedReason } from "./kernel/change-log";
+import { createDeviceChangeLog, type UnsavedReason } from "./kernel/change-log";
 import {
   type FullReadProgress,
   openDataFolderChangeLog,
@@ -69,14 +69,14 @@ const [
       },
   openIndexedDbDeviceId(),
 ]);
-const writer = createChangeLogWriter(changeLog, deviceId);
+const log = createDeviceChangeLog(changeLog, deviceId);
 let checksScheduled = false;
 
 function showApp({ folderChosen = false } = {}) {
   reactRoot.render(
     <StrictMode>
       <App
-        writer={writer}
+        log={log}
         keepInFolder={keepInFolder}
         folderChosen={folderChosen}
         folderConnection={folderConnection}

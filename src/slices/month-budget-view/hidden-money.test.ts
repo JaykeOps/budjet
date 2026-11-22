@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
@@ -18,16 +18,13 @@ const october: Month = "2026-10";
 
 /** A Budget in USD with one Category Group, seeded with the records other slices publish. */
 function budget() {
-  const writer = createChangeLogWriter(
-    createInMemoryChangeLog(),
-    "this-device",
-  );
-  writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  const log = createDeviceChangeLog(createInMemoryChangeLog(), "this-device");
+  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
   );
-  writer.write<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+  log.write<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
     "everyday",
     "CategoryGroupCreated",
     { version: 1, name: "Everyday", position: 0 },
@@ -35,7 +32,7 @@ function budget() {
   let position = 0;
   const add = (name: string) => {
     const id = name.toLowerCase();
-    writer.write<CategoryCreated["type"], CategoryCreated["payload"]>(
+    log.write<CategoryCreated["type"], CategoryCreated["payload"]>(
       id,
       "CategoryCreated",
       { version: 1, groupId: "everyday", name, position },
@@ -44,19 +41,18 @@ function budget() {
     return id;
   };
   const assign = (categoryId: string, month: Month, cents: number) =>
-    writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+    log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
       assignmentSubject(categoryId, month),
       "AssignmentSet",
       { version: 1, categoryId, month, amount: money(cents, "USD") },
     );
   const hide = (categoryId: string) =>
-    writer.write<CategoryHidden["type"], CategoryHidden["payload"]>(
+    log.write<CategoryHidden["type"], CategoryHidden["payload"]>(
       categoryId,
       "CategoryHidden",
       { version: 1 },
     );
-  const lines = (of: Month = october) =>
-    hiddenWithMoney(writer.changeLog.readAll(), of);
+  const lines = (of: Month = october) => hiddenWithMoney(log.readAll(), of);
   return { add, assign, hide, lines };
 }
 

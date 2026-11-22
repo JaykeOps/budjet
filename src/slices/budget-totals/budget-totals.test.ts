@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
@@ -30,15 +30,15 @@ import {
 /** A Budget in USD, seeded with the records other slices publish. */
 function budget() {
   const changeLog = createInMemoryChangeLog();
-  const writer = createChangeLogWriter(changeLog, "this-device");
-  writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  const log = createDeviceChangeLog(changeLog, "this-device");
+  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
   );
   return {
     openAccount(openingBalance: number, id: string = crypto.randomUUID()) {
-      writer.write<AccountOpened["type"], AccountOpened["payload"]>(
+      log.write<AccountOpened["type"], AccountOpened["payload"]>(
         id,
         "AccountOpened",
         {
@@ -50,7 +50,7 @@ function budget() {
       );
     },
     assign(categoryId: string, assigned: Month, amount: number) {
-      writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+      log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
         assignmentSubject(categoryId, assigned),
         "AssignmentSet",
         {
@@ -62,7 +62,7 @@ function budget() {
       );
     },
     takeBack(categoryId: string, of: Month, amount: number) {
-      writer.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+      log.write<TakeBackSet["type"], TakeBackSet["payload"]>(
         assignmentSubject(categoryId, of),
         "TakeBackSet",
         {
@@ -76,7 +76,7 @@ function budget() {
     /** Records a Transaction: a negative amount goes out, a positive one comes in. */
     record(date: string, amount: number, categoryId?: string): string {
       const id = crypto.randomUUID();
-      writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      log.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
         id,
         "TransactionRecorded",
         {
@@ -91,7 +91,7 @@ function budget() {
     },
     /** Edits a Transaction to say this instead. */
     edit(id: string, date: string, amount: number, categoryId?: string) {
-      writer.write<TransactionEdited["type"], TransactionEdited["payload"]>(
+      log.write<TransactionEdited["type"], TransactionEdited["payload"]>(
         id,
         "TransactionEdited",
         {
@@ -104,14 +104,14 @@ function budget() {
       );
     },
     delete(id: string) {
-      writer.write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
+      log.write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
         id,
         "TransactionDeleted",
         { version: 1 },
       );
     },
     deleteCategory(id: string) {
-      writer.write<CategoryDeleted["type"], CategoryDeleted["payload"]>(
+      log.write<CategoryDeleted["type"], CategoryDeleted["payload"]>(
         id,
         "CategoryDeleted",
         { version: 1 },
@@ -119,7 +119,7 @@ function budget() {
     },
     /** Re-declares the real balance of the Account Transactions go to. */
     redeclare(balance: number) {
-      writer.write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+      log.write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
         "checking",
         "BalanceRedeclared",
         { version: 1, balance: money(balance, "USD") },

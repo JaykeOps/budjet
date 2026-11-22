@@ -1,4 +1,4 @@
-import type { ChangeLogWriter } from "../../kernel/change-log";
+import type { DeviceChangeLog } from "../../kernel/change-log";
 import { formatMoney } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { assignedAfter, available, categoryUsed } from "../budget-totals";
@@ -12,27 +12,27 @@ export const starterSet = [
 ] as const;
 
 /** Gives a new Budget its starter Category Groups and Categories. */
-export function addStarterSet(writer: ChangeLogWriter): void {
-  if (categoryGroups(writer.changeLog.readAll()).length > 0) {
+export function addStarterSet(log: DeviceChangeLog): void {
+  if (categoryGroups(log.readAll()).length > 0) {
     throw new Error("The Budget already has Category Groups");
   }
   for (const [groupName, categoryNames, { leftOut }] of starterSet) {
-    const groupId = createCategoryGroup(writer, { name: groupName });
-    if (leftOut) setCategoryGroupSpentThisMonth(writer, groupId, { leftOut });
+    const groupId = createCategoryGroup(log, { name: groupName });
+    if (leftOut) setCategoryGroupSpentThisMonth(log, groupId, { leftOut });
     for (const name of categoryNames) {
-      createCategory(writer, { groupId, name });
+      createCategory(log, { groupId, name });
     }
   }
 }
 
 /** Adds a Category Group after the others and returns its id. */
 export function createCategoryGroup(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   { name }: { name: string },
 ): string {
   const id = crypto.randomUUID();
-  const groups = categoryGroups(writer.changeLog.readAll());
-  write(writer, id, "CategoryGroupCreated", {
+  const groups = categoryGroups(log.readAll());
+  write(log, id, "CategoryGroupCreated", {
     version: 1,
     name: validName(name),
     position: groups.length,
@@ -42,12 +42,12 @@ export function createCategoryGroup(
 
 /** Adds a Category at the end of its Category Group and returns its id. */
 export function createCategory(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   { groupId, name }: { groupId: string; name: string },
 ): string {
   const id = crypto.randomUUID();
-  const group = findGroup(writer, groupId);
-  write(writer, id, "CategoryCreated", {
+  const group = findGroup(log, groupId);
+  write(log, id, "CategoryCreated", {
     version: 1,
     groupId,
     name: validName(name),
@@ -57,24 +57,24 @@ export function createCategory(
 }
 
 export function renameCategoryGroup(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   groupId: string,
   { name }: { name: string },
 ): void {
-  findGroup(writer, groupId);
-  write(writer, groupId, "CategoryGroupRenamed", {
+  findGroup(log, groupId);
+  write(log, groupId, "CategoryGroupRenamed", {
     version: 1,
     name: validName(name),
   });
 }
 
 export function renameCategory(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   categoryId: string,
   { name }: { name: string },
 ): void {
-  findCategory(writer, categoryId);
-  write(writer, categoryId, "CategoryRenamed", {
+  findCategory(log, categoryId);
+  write(log, categoryId, "CategoryRenamed", {
     version: 1,
     name: validName(name),
   });
@@ -82,12 +82,12 @@ export function renameCategory(
 
 /** Leaves a Category Group out of Spent this Month, or counts it again. */
 export function setCategoryGroupSpentThisMonth(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   groupId: string,
   { leftOut }: { leftOut: boolean },
 ): void {
-  findGroup(writer, groupId);
-  write(writer, groupId, "CategoryGroupSpentThisMonthSet", {
+  findGroup(log, groupId);
+  write(log, groupId, "CategoryGroupSpentThisMonthSet", {
     version: 1,
     leftOut,
   });
@@ -95,16 +95,16 @@ export function setCategoryGroupSpentThisMonth(
 
 /** Puts a Category Group at `toIndex` among the Category Groups. */
 export function moveCategoryGroup(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   groupId: string,
   { toIndex }: { toIndex: number },
 ): void {
-  findGroup(writer, groupId);
-  const others = categoryGroups(writer.changeLog.readAll())
+  findGroup(log, groupId);
+  const others = categoryGroups(log.readAll())
     .map(({ id }) => id)
     .filter((id) => id !== groupId);
   for (const [position, id] of placeAt(others, groupId, toIndex)) {
-    write(writer, id, "CategoryGroupPlaced", { version: 1, position });
+    write(log, id, "CategoryGroupPlaced", { version: 1, position });
   }
 }
 
@@ -113,16 +113,16 @@ export function moveCategoryGroup(
  * its own Category Group (a reorder) or another one (a move).
  */
 export function moveCategory(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   categoryId: string,
   { groupId, toIndex }: { groupId: string; toIndex: number },
 ): void {
-  findCategory(writer, categoryId);
-  const others = findGroup(writer, groupId)
+  findCategory(log, categoryId);
+  const others = findGroup(log, groupId)
     .categories.map(({ id }) => id)
     .filter((id) => id !== categoryId);
   for (const [position, id] of placeAt(others, categoryId, toIndex)) {
-    write(writer, id, "CategoryPlaced", { version: 1, groupId, position });
+    write(log, id, "CategoryPlaced", { version: 1, groupId, position });
   }
 }
 
@@ -133,12 +133,12 @@ export function moveCategory(
  * hiding never makes money vanish.
  */
 export function hideCategory(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   categoryId: string,
   { currentMonth }: { currentMonth: Month },
 ): void {
-  const { category } = findCategory(writer, categoryId);
-  const records = writer.changeLog.readAll();
+  const { category } = findCategory(log, categoryId);
+  const records = log.readAll();
   const left = available(records, categoryId, currentMonth);
   if (left && left.minorUnits !== 0) {
     throw new Error(
@@ -150,28 +150,22 @@ export function hideCategory(
       `${category.name} has Assignments in later Months. Set them to zero first.`,
     );
   }
-  write(writer, categoryId, "CategoryHidden", { version: 1 });
+  write(log, categoryId, "CategoryHidden", { version: 1 });
 }
 
 /** Brings a hidden Category back. */
-export function unhideCategory(
-  writer: ChangeLogWriter,
-  categoryId: string,
-): void {
-  findCategory(writer, categoryId);
-  write(writer, categoryId, "CategoryUnhidden", { version: 1 });
+export function unhideCategory(log: DeviceChangeLog, categoryId: string): void {
+  findCategory(log, categoryId);
+  write(log, categoryId, "CategoryUnhidden", { version: 1 });
 }
 
 /**
  * Hides a Category again whatever it holds, for an Undo of unhiding it: it was
  * hidden like that a moment ago, and the Budget flags one holding money.
  */
-export function restoreHidden(
-  writer: ChangeLogWriter,
-  categoryId: string,
-): void {
-  findCategory(writer, categoryId);
-  write(writer, categoryId, "CategoryHidden", { version: 1 });
+export function restoreHidden(log: DeviceChangeLog, categoryId: string): void {
+  findCategory(log, categoryId);
+  write(log, categoryId, "CategoryHidden", { version: 1 });
 }
 
 /**
@@ -191,29 +185,26 @@ export class CategoryInUseError extends Error {
 }
 
 /** Deletes a Category that was never used. A used one can only be hidden. */
-export function deleteCategory(
-  writer: ChangeLogWriter,
-  categoryId: string,
-): void {
-  const { category } = findCategory(writer, categoryId);
-  if (categoryUsed(writer.changeLog.readAll(), categoryId)) {
+export function deleteCategory(log: DeviceChangeLog, categoryId: string): void {
+  const { category } = findCategory(log, categoryId);
+  if (categoryUsed(log.readAll(), categoryId)) {
     throw new CategoryInUseError(categoryId, category.name);
   }
-  write(writer, categoryId, "CategoryDeleted", { version: 1 });
+  write(log, categoryId, "CategoryDeleted", { version: 1 });
 }
 
 /** Deletes a Category Group with no Categories in it, hidden ones included. */
 export function deleteCategoryGroup(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   groupId: string,
 ): void {
-  const group = findGroup(writer, groupId);
+  const group = findGroup(log, groupId);
   if (group.categories.length > 0) {
     throw new Error(
       `${group.name} still has Categories. Move or delete them first.`,
     );
   }
-  write(writer, groupId, "CategoryGroupDeleted", { version: 1 });
+  write(log, groupId, "CategoryGroupDeleted", { version: 1 });
 }
 
 /**
@@ -233,18 +224,16 @@ function placeAt(
     .map((id, position) => [position, id]);
 }
 
-function findCategory(writer: ChangeLogWriter, categoryId: string) {
-  for (const group of categoryGroups(writer.changeLog.readAll())) {
+function findCategory(log: DeviceChangeLog, categoryId: string) {
+  for (const group of categoryGroups(log.readAll())) {
     const category = group.categories.find(({ id }) => id === categoryId);
     if (category) return { group, category };
   }
   throw new Error("There is no such Category");
 }
 
-function findGroup(writer: ChangeLogWriter, groupId: string) {
-  const group = categoryGroups(writer.changeLog.readAll()).find(
-    ({ id }) => id === groupId,
-  );
+function findGroup(log: DeviceChangeLog, groupId: string) {
+  const group = categoryGroups(log.readAll()).find(({ id }) => id === groupId);
   if (!group) throw new Error("There is no such Category Group");
   return group;
 }
@@ -256,10 +245,10 @@ function validName(name: string): string {
 }
 
 function write<Record extends CategoriesRecord>(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   subjectId: string,
   type: Record["type"],
   payload: Record["payload"],
 ): void {
-  writer.write(subjectId, type, payload);
+  log.write(subjectId, type, payload);
 }
