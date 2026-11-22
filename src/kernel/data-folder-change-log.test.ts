@@ -10,6 +10,7 @@ import {
   type DataFolderChangeLog,
   openDataFolderChangeLog,
 } from "./data-folder-change-log";
+import { asId, type BudgetId } from "./id";
 import { createInMemoryFolder, type InMemoryFolder } from "./in-memory-folder";
 import { rememberedFolderHandle } from "./indexed-db-change-log";
 
@@ -31,10 +32,11 @@ function aBrowser(folder: InMemoryFolder = createInMemoryFolder()) {
   };
 }
 
+/** The Budget Setup slice's, for a kernel that can't import it: by type name, so it trusts the subject. */
 function budgetIds(records: readonly ChangeRecord[]) {
   return records
     .filter(({ type }) => type === "BudgetCreated")
-    .map(({ subjectId }) => subjectId);
+    .map(({ subjectId }) => asId<BudgetId>(subjectId));
 }
 
 function saveStates(changeLog: ChangeLog): SaveState[] {
