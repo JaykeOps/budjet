@@ -6,7 +6,7 @@
  */
 import { useMemo } from "react";
 import type { DeviceChangeLog } from "./kernel/change-log";
-import type { CategoryId, TransactionId } from "./kernel/id";
+import type { CategoryId, TransactionId, TransferId } from "./kernel/id";
 import { formatMoney, money } from "./kernel/money";
 import { type Month, monthNameAlone, previousMonth } from "./kernel/month";
 import { useDeviceChangeLog } from "./kernel/use-change-log-query";
@@ -59,7 +59,7 @@ function transactionNow(
   return now;
 }
 
-function transferNow(log: DeviceChangeLog, id: string): TransferInput {
+function transferNow(log: DeviceChangeLog, id: TransferId): TransferInput {
   const now = currentTransfers(log.readAll()).get(id);
   if (!now) throw new RangeError(`No Transfer ${id}`);
   return now;
@@ -91,7 +91,7 @@ export function deleteTransactionWithUndo(
 /** Undoing writes the previous details as a new record. */
 export function editTransferWithUndo(
   log: DeviceChangeLog,
-  id: string,
+  id: TransferId,
   input: TransferInput,
 ): Undo {
   const previous = transferNow(log, id);
@@ -100,7 +100,10 @@ export function editTransferWithUndo(
 }
 
 /** Undoing writes a new Transfer, with a fresh id, in the same place. */
-export function deleteTransferWithUndo(log: DeviceChangeLog, id: string): Undo {
+export function deleteTransferWithUndo(
+  log: DeviceChangeLog,
+  id: TransferId,
+): Undo {
   const deleted = transferNow(log, id);
   deleteTransfer(log, id);
   return () => {
@@ -236,13 +239,13 @@ export function useHistoryChanges() {
           onUndo: deleteTransactionWithUndo(log, id),
         });
       },
-      onEditTransfer(id: string, input: TransferInput) {
+      onEditTransfer(id: TransferId, input: TransferInput) {
         toast({
           text: "Changes saved",
           onUndo: editTransferWithUndo(log, id, input),
         });
       },
-      onDeleteTransfer(id: string) {
+      onDeleteTransfer(id: TransferId) {
         toast({
           text: "Transfer deleted",
           onUndo: deleteTransferWithUndo(log, id),

@@ -1,5 +1,5 @@
 import { type ReactNode, useId, useState } from "react";
-import type { AccountId, TransactionId } from "../../kernel/id";
+import type { AccountId, TransactionId, TransferId } from "../../kernel/id";
 import type { Currency } from "../../kernel/money";
 import { EmptyState } from "../../ui/EmptyState";
 import type { MenuAction } from "../../ui/Menu";
@@ -22,8 +22,8 @@ type HistoryActions = {
   onDelete: (id: TransactionId) => void;
   /** `what` names it for a toast: "Adjustment" or "Balance check". */
   onDeleteRedeclaredBalance: (recordId: string, what: string) => void;
-  onEditTransfer: (id: string, input: TransferInput) => void;
-  onDeleteTransfer: (id: string) => void;
+  onEditTransfer: (id: TransferId, input: TransferInput) => void;
+  onDeleteTransfer: (id: TransferId) => void;
 };
 
 /**

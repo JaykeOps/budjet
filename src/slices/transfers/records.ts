@@ -8,7 +8,7 @@ import {
   latestBySubject,
   perSnapshot,
 } from "../../kernel/change-log";
-import type { AccountId } from "../../kernel/id";
+import type { AccountId, TransferId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 
 /** What a Transfer says: money moved from one Account to another on a calendar date. */
@@ -34,18 +34,24 @@ export type TransferMade = ChangeRecord<
      * The deleted Transfer that Undo brought back as this new one, whose place
      * in a list it takes. Its money counts from now, as any record's does.
      */
-    restores?: string;
-  } & TransferDetails
+    restores?: TransferId;
+  } & TransferDetails,
+  TransferId
 >;
 
 /** A Transfer's details replaced as a whole. Its subject is the Transfer's id. */
 export type TransferEdited = ChangeRecord<
   "TransferEdited",
-  { version: 1 } & TransferDetails
+  { version: 1 } & TransferDetails,
+  TransferId
 >;
 
 /** A Transfer taken out of the Budget. Its subject is the Transfer's id. */
-export type TransferDeleted = ChangeRecord<"TransferDeleted", { version: 1 }>;
+export type TransferDeleted = ChangeRecord<
+  "TransferDeleted",
+  { version: 1 },
+  TransferId
+>;
 
 export function isTransferMade(record: ChangeRecord): record is TransferMade {
   return record.type === "TransferMade";
@@ -71,7 +77,9 @@ export function isTransferDeleted(
  * oldest first, as `readAll` returns them.
  */
 export const currentTransfers = perSnapshot(
-  (records: readonly ChangeRecord[]): ReadonlyMap<string, TransferDetails> => {
+  (
+    records: readonly ChangeRecord[],
+  ): ReadonlyMap<TransferId, TransferDetails> => {
     const deleted = deletedSubjects(records, isTransferDeleted);
     const latest = latestBySubject(
       records.filter(
@@ -79,7 +87,7 @@ export const currentTransfers = perSnapshot(
           isTransferMade(record) || isTransferEdited(record),
       ),
     );
-    const transfers = new Map<string, TransferDetails>();
+    const transfers = new Map<TransferId, TransferDetails>();
     for (const [id, { payload }] of latest) {
       if (deleted.has(id)) continue;
       const { fromAccountId, toAccountId, date, amount, memo } = payload;

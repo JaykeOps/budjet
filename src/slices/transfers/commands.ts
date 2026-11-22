@@ -1,5 +1,5 @@
 import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
-import type { AccountId } from "../../kernel/id";
+import { type AccountId, newId, type TransferId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import { monthOf } from "../../kernel/month";
 import { accounts } from "../accounts";
@@ -26,8 +26,8 @@ export type TransferInput = {
 export function makeTransfer(
   log: DeviceChangeLog,
   input: TransferInput,
-): string {
-  const id = crypto.randomUUID();
+): TransferId {
+  const id = newId<TransferId>();
   log
     .write<TransferMade["type"], TransferMade["payload"]>(id, "TransferMade")
     .ensure((records) => validTransfer(records, input))
@@ -38,7 +38,7 @@ export function makeTransfer(
 /** Replaces a Transfer's details. The same rules apply as when making one. */
 export function editTransfer(
   log: DeviceChangeLog,
-  id: string,
+  id: TransferId,
   input: TransferInput,
 ): void {
   log
@@ -54,7 +54,7 @@ export function editTransfer(
 }
 
 /** Takes a Transfer out of the Budget, unless it touches a closed Account. */
-export function deleteTransfer(log: DeviceChangeLog, id: string): void {
+export function deleteTransfer(log: DeviceChangeLog, id: TransferId): void {
   log
     .write<TransferDeleted["type"], TransferDeleted["payload"]>(
       id,
@@ -71,10 +71,10 @@ export function deleteTransfer(log: DeviceChangeLog, id: string): void {
  */
 export function restoreTransfer(
   log: DeviceChangeLog,
-  restores: string,
+  restores: TransferId,
   input: TransferInput,
-): string {
-  const id = crypto.randomUUID();
+): TransferId {
+  const id = newId<TransferId>();
   log
     .write<TransferMade["type"], TransferMade["payload"]>(id, "TransferMade")
     .ensure((records) => validTransfer(records, input))
@@ -86,7 +86,10 @@ export function restoreTransfer(
  * Checks the Transfer is in the Budget and both its Accounts are open: a
  * closed Account's history stays as it is.
  */
-function requireTransfer(records: readonly ChangeRecord[], id: string): void {
+function requireTransfer(
+  records: readonly ChangeRecord[],
+  id: TransferId,
+): void {
   const transfer = currentTransfers(records).get(id);
   if (!transfer) throw new RangeError(`No Transfer ${id}`);
   requireOpen(records, [transfer.fromAccountId, transfer.toAccountId]);
