@@ -3,6 +3,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
+import { type AccountId, asId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -27,6 +28,8 @@ import {
   readyToAssign,
   spending,
 } from "./index";
+
+const checking = asId<AccountId>("checking");
 
 /** A Budget in USD, seeded with the records other slices publish. */
 function budget() {
@@ -87,7 +90,7 @@ function budget() {
         "TransactionRecorded",
         {
           version: 1,
-          accountId: "checking",
+          accountId: checking,
           date,
           amount: money(amount, "USD"),
           ...(categoryId && { categoryId }),
@@ -103,7 +106,7 @@ function budget() {
         "TransactionEdited",
         {
           version: 1,
-          accountId: "checking",
+          accountId: checking,
           date,
           amount: money(amount, "USD"),
           ...(categoryId && { categoryId }),

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { type AccountId, asId } from "../../kernel/id";
 import {
   type Currency,
   formatMoney,
@@ -64,7 +65,7 @@ export function RecordRow({
   onClose,
 }: {
   currency: Currency;
-  defaultAccountId?: string;
+  defaultAccountId?: AccountId;
   /** Starts it as a Transfer, with what's known so far. */
   transfer?: TransferDraft;
   /** Changing it moves focus back to the row's first field. */
@@ -119,6 +120,7 @@ export function RecordRow({
     const amount = draftAmount(draft, currency);
     if (!amount) return amountField.current?.focus();
     const { accountId, date, categoryId, payee } = draft;
+    if (!accountId) return;
     const input = { accountId, date, amount, categoryId, payee };
     if (attempt(() => onRecord(input))) {
       setDraft(nextDraft(draft));
@@ -349,7 +351,10 @@ export function TransactionFields({
         <select
           value={draft.accountId}
           onChange={(event) =>
-            onChange({ ...draft, accountId: event.target.value })
+            onChange({
+              ...draft,
+              accountId: asId<AccountId>(event.target.value),
+            })
           }
         >
           {open.map(({ id, name, balance }) => (

@@ -100,9 +100,15 @@ function TransferForm({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!amount || !to) return;
+    if (!amount || !from || !to) return;
     try {
-      onSubmit({ ...editing, fromAccountId, toAccountId, date, amount });
+      onSubmit({
+        ...editing,
+        fromAccountId: from.id,
+        toAccountId: to.id,
+        date,
+        amount,
+      });
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
     }

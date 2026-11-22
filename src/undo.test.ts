@@ -5,6 +5,7 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "./kernel/change-log";
+import type { AccountId } from "./kernel/id";
 import { type Money, money } from "./kernel/money";
 import type { Month } from "./kernel/month";
 import { accounts, adjustments, balanceChecks } from "./slices/accounts";
@@ -111,7 +112,7 @@ function twoDevices() {
   };
 }
 
-const listed = (records: readonly ChangeRecord[], accountId: string) =>
+const listed = (records: readonly ChangeRecord[], accountId: AccountId) =>
   transactionList(records, accountId)
     .filter(({ kind }) => kind !== "opening-balance")
     .map((entry) => entry.id);

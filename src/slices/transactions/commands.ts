@@ -1,4 +1,5 @@
 import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
+import type { AccountId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import { monthOf } from "../../kernel/month";
 import { accounts } from "../accounts";
@@ -13,7 +14,7 @@ import {
 } from "./records";
 
 export type TransactionInput = {
-  accountId: string;
+  accountId: AccountId;
   /** A calendar date, "YYYY-MM-DD". */
   date: string;
   /** Negative for money going out of the Account, positive for money coming in. */
@@ -107,7 +108,10 @@ function checkChangeable(records: readonly ChangeRecord[], id: string): void {
   checkOpen(records, transaction.accountId);
 }
 
-function checkOpen(records: readonly ChangeRecord[], accountId: string): void {
+function checkOpen(
+  records: readonly ChangeRecord[],
+  accountId: AccountId,
+): void {
   const account = accounts(records).find(({ id }) => id === accountId);
   if (!account) throw new RangeError(`No Account ${accountId}`);
   if (account.closed) throw new RangeError(`${account.name} is closed`);

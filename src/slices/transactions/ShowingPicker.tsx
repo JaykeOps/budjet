@@ -1,4 +1,5 @@
 import { type FormEvent, useId, useState } from "react";
+import type { AccountId } from "../../kernel/id";
 import { type Month, monthName } from "../../kernel/month";
 import { Sheet } from "../../ui/Sheet";
 import { useAccounts } from "../accounts";
@@ -6,7 +7,7 @@ import styles from "./History.module.css";
 import { useStatements } from "./hooks";
 
 /** What Activity narrows to. With neither, everything. */
-export type Showing = { accountId?: string; month?: Month };
+export type Showing = { accountId?: AccountId; month?: Month };
 
 /**
  * One button, saying what's showing, that opens a choice of Accounts, including

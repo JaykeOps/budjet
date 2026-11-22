@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type AccountId, asId } from "../../kernel/id";
 import {
   type Currency,
   formatMoney,
@@ -62,7 +63,7 @@ export function RecordTransactionSheet({
   onClose,
 }: {
   currency: Currency;
-  defaultAccountId?: string;
+  defaultAccountId?: AccountId;
   editing?: Transaction;
   onRecord: (input: TransactionInput) => void;
   onDelete?: () => void;
@@ -417,10 +418,10 @@ function ReviewStep({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!canRecord) return;
+    if (!canRecord || !account) return;
     try {
       onRecord({
-        accountId: draft.accountId,
+        accountId: account.id,
         date: draft.date,
         amount,
         categoryId: draft.categoryId,
@@ -470,7 +471,10 @@ function ReviewStep({
         <select
           value={draft.accountId}
           onChange={(event) =>
-            onChange({ ...draft, accountId: event.target.value })
+            onChange({
+              ...draft,
+              accountId: asId<AccountId>(event.target.value),
+            })
           }
         >
           {accounts.map(({ id, name, balance }) => (

@@ -3,6 +3,7 @@ import {
   deletedSubjects,
   perSnapshot,
 } from "../../kernel/change-log";
+import type { AccountId } from "../../kernel/id";
 import { addMoney, type Money, money } from "../../kernel/money";
 import { isBudgetCreated } from "../budget-setup/records";
 import {
@@ -25,7 +26,7 @@ import {
 } from "./records";
 
 export type Account = {
-  id: string;
+  id: AccountId;
   name: string;
   kind: AccountKind;
   closed: boolean;
@@ -42,7 +43,7 @@ export type Account = {
 export type Adjustment = {
   /** The id of the record that re-declared the balance. */
   id: string;
-  accountId: string;
+  accountId: AccountId;
   /** The day the balance was re-declared, on this device's calendar, "YYYY-MM-DD". */
   date: string;
   amount: Money;
@@ -54,7 +55,7 @@ export type Adjustment = {
 export type OpeningBalance = {
   /** The id of the record that opened the Account. */
   id: string;
-  accountId: string;
+  accountId: AccountId;
   /** The day the Account was opened, on this device's calendar, "YYYY-MM-DD". */
   date: string;
   amount: Money;
@@ -64,7 +65,7 @@ export type OpeningBalance = {
 export type BalanceCheck = {
   /** The id of the record that re-declared the balance. */
   id: string;
-  accountId: string;
+  accountId: AccountId;
   /** The day the balance was re-declared, on this device's calendar, "YYYY-MM-DD". */
   date: string;
   balance: Money;
@@ -146,7 +147,7 @@ export function openingBalances(
 /** An Account's balance. */
 export function accountBalance(
   records: readonly ChangeRecord[],
-  accountId: string,
+  accountId: AccountId,
 ): Money {
   const account = accounts(records).find(({ id }) => id === accountId);
   if (!account) throw new Error(`No Account ${accountId}`);
@@ -199,14 +200,17 @@ const deletedRedeclarations = perSnapshot(
 const ledger = perSnapshot((records: readonly ChangeRecord[]): Ledger => {
   const deleted = deletedRedeclarations(records);
   const balances = new Map<string, number>();
-  const move = (accountId: string, minorUnits: number) =>
+  const move = (accountId: AccountId, minorUnits: number) =>
     balances.set(accountId, (balances.get(accountId) ?? 0) + minorUnits);
   /** What each Transaction or Transfer currently does to which Accounts. */
-  const effects = new Map<string, [accountId: string, minorUnits: number][]>();
+  const effects = new Map<
+    string,
+    [accountId: AccountId, minorUnits: number][]
+  >();
   const gone = new Set<string>();
   const replace = (
     subjectId: string,
-    now: [accountId: string, minorUnits: number][],
+    now: [accountId: AccountId, minorUnits: number][],
   ) => {
     if (gone.has(subjectId)) return;
     for (const [accountId, minorUnits] of effects.get(subjectId) ?? []) {

@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { AccountId } from "./kernel/id";
 import type { Currency } from "./kernel/money";
 import { placeAddress, usePlace } from "./place-in-url";
 import { useAccounts } from "./slices/accounts";
@@ -20,7 +21,7 @@ type Recording = {
   focusRequest: number;
   /** Where the row belongs: leaving closes it. */
   spot: string;
-  accountId?: string;
+  accountId?: AccountId;
   transfer?: TransferDraft;
   fromBudget: boolean;
 };

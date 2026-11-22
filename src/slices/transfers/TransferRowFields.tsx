@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import { type AccountId, asId } from "../../kernel/id";
 import {
   type Currency,
   formatMoney,
@@ -15,13 +16,16 @@ import type { TransferDraft } from "./TransferSheet";
 export type TransferRowDraft = {
   /** The amount as typed. */
   typed: string;
-  fromAccountId: string;
-  toAccountId: string;
+  /** Empty until there's an open Account to choose. */
+  fromAccountId: AccountId | "";
+  toAccountId: AccountId | "";
   date: string;
 };
 
-const firstOther = (accounts: readonly Account[], id?: string) =>
-  accounts.find((account) => account.id !== id)?.id ?? "";
+const firstOther = (
+  accounts: readonly Account[],
+  id?: string,
+): AccountId | "" => accounts.find((account) => account.id !== id)?.id ?? "";
 
 /** What the row starts with, choosing whatever `draft` leaves out. */
 export function transferRowDraft(
@@ -45,7 +49,8 @@ export function transferRowInput(
   currency: Currency,
 ): TransferInput | undefined {
   const amount = parseMoney(typed, currency);
-  if (!amount || amount.minorUnits <= 0 || !toAccountId) return undefined;
+  if (!amount || amount.minorUnits <= 0) return undefined;
+  if (!fromAccountId || !toAccountId) return undefined;
   return { fromAccountId, toAccountId, date, amount };
 }
 
@@ -91,7 +96,7 @@ export function TransferRowFields({
           onChange={({ target: { value } }) =>
             onChange({
               ...draft,
-              fromAccountId: value,
+              fromAccountId: asId<AccountId>(value),
               toAccountId:
                 value === draft.toAccountId
                   ? firstOther(accounts, value)
@@ -107,7 +112,10 @@ export function TransferRowFields({
         <select
           value={draft.toAccountId}
           onChange={(event) =>
-            onChange({ ...draft, toAccountId: event.target.value })
+            onChange({
+              ...draft,
+              toAccountId: asId<AccountId>(event.target.value),
+            })
           }
         >
           {accounts.filter(({ id }) => id !== draft.fromAccountId).map(option)}

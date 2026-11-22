@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import type { ChangeRecord } from "../../kernel/change-log";
+import { type AccountId, asId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { type Month, month, nextMonth } from "../../kernel/month";
 import type { AccountOpened } from "../accounts/records";
@@ -13,7 +14,7 @@ import type { TransactionRecorded } from "../transactions/records";
 import { available, overspent, readyToAssign } from "./index";
 
 const CATEGORIES = Array.from({ length: 24 }, (_, i) => `category-${i}`);
-const ACCOUNTS = ["checking", "savings", "cash"];
+const ACCOUNTS = ["checking", "savings", "cash"].map(asId<AccountId>);
 
 /**
  * About ten years of heavy use: three Accounts, 24 Categories assigned every

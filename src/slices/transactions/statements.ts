@@ -1,4 +1,5 @@
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { AccountId } from "../../kernel/id";
 import { type Money, money } from "../../kernel/money";
 import { type Month, monthOf } from "../../kernel/month";
 import { isBudgetCreated } from "../budget-setup/records";
@@ -27,7 +28,7 @@ export type Statement = {
  */
 export function statements(
   records: readonly ChangeRecord[],
-  accountId?: string,
+  accountId?: AccountId,
 ): Statement[] {
   const currency = records.findLast(isBudgetCreated)?.payload.currency;
   if (!currency) return [];
@@ -69,7 +70,7 @@ export function statements(
 }
 
 /** What an entry did to the Account's balance, or to the total across every Account. */
-function movedBy(entry: TransactionListEntry, accountId?: string): number {
+function movedBy(entry: TransactionListEntry, accountId?: AccountId): number {
   switch (entry.kind) {
     case "balance-check":
       return 0;

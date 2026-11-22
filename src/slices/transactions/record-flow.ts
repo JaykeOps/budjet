@@ -1,4 +1,5 @@
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { AccountId } from "../../kernel/id";
 import {
   type Currency,
   type Money,
@@ -22,7 +23,8 @@ export type Draft = {
   categoryId?: string;
   payee: string;
   date: string;
-  accountId: string;
+  /** Empty until there's an open Account to choose. */
+  accountId: AccountId | "";
   /** The phone doesn't show a memo, but editing keeps one. */
   memo?: string;
 };

@@ -1,4 +1,5 @@
 import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
+import { type AccountId, newId } from "../../kernel/id";
 import { formatMoney, type Money } from "../../kernel/money";
 import { isBudgetCreated } from "../budget-setup/records";
 import { type Account, accounts, adjustments, balanceChecks } from "./queries";
@@ -20,10 +21,13 @@ export function openAccount(
     kind,
     openingBalance,
   }: { name: string; kind: AccountKind; openingBalance: Money },
-): string {
-  const id = crypto.randomUUID();
+): AccountId {
+  const id = newId<AccountId>();
   log
-    .write<AccountOpened["type"], AccountOpened["payload"]>(id, "AccountOpened")
+    .write<AccountOpened["type"], AccountOpened["payload"], AccountId>(
+      id,
+      "AccountOpened",
+    )
     .ensure((records) => {
       const currency = budgetCurrency(records);
       if (openingBalance.currency !== currency) {
@@ -45,7 +49,7 @@ export function openAccount(
  */
 export function redeclareBalance(
   log: DeviceChangeLog,
-  accountId: string,
+  accountId: AccountId,
   { balance }: { balance: Money },
 ): string {
   return log
@@ -133,7 +137,7 @@ export function restoreRedeclaredBalance(
 /** Gives an Account a new name, open or closed. */
 export function renameAccount(
   log: DeviceChangeLog,
-  accountId: string,
+  accountId: AccountId,
   { name }: { name: string },
 ): void {
   log
@@ -154,7 +158,7 @@ export function renameAccount(
  * Closes an Account the user no longer uses. Its balance must be zero, so no
  * money leaves the Budget unnoticed: the user Transfers it out first.
  */
-export function closeAccount(log: DeviceChangeLog, accountId: string): void {
+export function closeAccount(log: DeviceChangeLog, accountId: AccountId): void {
   log
     .write<AccountClosed["type"], AccountClosed["payload"]>(
       accountId,
@@ -187,7 +191,7 @@ function budgetCurrency(records: readonly ChangeRecord[]): string {
 /** The Account, if it is in the Budget and still open. */
 function openAccountWith(
   records: readonly ChangeRecord[],
-  accountId: string,
+  accountId: AccountId,
 ): Account {
   const account = accounts(records).find(({ id }) => id === accountId);
   if (!account) throw new RangeError(`No Account ${accountId}`);

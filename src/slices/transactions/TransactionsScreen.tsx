@@ -1,4 +1,5 @@
 import { type ReactNode, useId, useState } from "react";
+import type { AccountId } from "../../kernel/id";
 import type { Currency } from "../../kernel/money";
 import { EmptyState } from "../../ui/EmptyState";
 import type { MenuAction } from "../../ui/Menu";
@@ -46,7 +47,7 @@ export function TransactionsScreen({
   /** The row that records on desktop, if it's open. */
   recordRow: ReactNode;
   /** The empty state's way to start recording, into the Account showing if any. */
-  onRecordFirst: (accountId?: string) => void;
+  onRecordFirst: (accountId?: AccountId) => void;
   onAddAccount: () => void;
 }) {
   const headingId = useId();

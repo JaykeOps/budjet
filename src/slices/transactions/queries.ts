@@ -1,4 +1,5 @@
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { AccountId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import {
   accounts,
@@ -24,7 +25,7 @@ export type Transaction = CurrentTransaction;
  */
 export function accountTransactions(
   records: readonly ChangeRecord[],
-  accountId: string,
+  accountId: AccountId,
 ): Transaction[] {
   return currentTransactions(records)
     .filter((transaction) => transaction.accountId === accountId)
@@ -37,8 +38,8 @@ export type TransferEntry = {
   kind: "transfer";
   id: string;
   date: string;
-  fromAccountId: string;
-  toAccountId: string;
+  fromAccountId: AccountId;
+  toAccountId: AccountId;
   /** Always above zero. */
   amount: Money;
   memo?: string;
@@ -49,7 +50,7 @@ export type AdjustmentEntry = {
   kind: "adjustment";
   /** The id of the record that re-declared the balance. */
   id: string;
-  accountId: string;
+  accountId: AccountId;
   /** The day the balance was re-declared. */
   date: string;
   amount: Money;
@@ -62,7 +63,7 @@ export type BalanceCheckEntry = {
   kind: "balance-check";
   /** The id of the record that re-declared the balance. */
   id: string;
-  accountId: string;
+  accountId: AccountId;
   /** The day the balance was re-declared. */
   date: string;
   balance: Money;
@@ -87,7 +88,7 @@ export type TransactionListEntry =
  */
 export function transactionList(
   records: readonly ChangeRecord[],
-  accountId?: string,
+  accountId?: AccountId,
 ): TransactionListEntry[] {
   // Keyed by subject for Transactions and Transfers, by record for what the Accounts slice lists.
   const firstRecorded = new Map<string, number>();
@@ -103,7 +104,7 @@ export function transactionList(
     }
     firstRecorded.set(id, index);
   });
-  const inAccount = (entry: { accountId: string }) =>
+  const inAccount = (entry: { accountId: AccountId }) =>
     accountId === undefined || entry.accountId === accountId;
   const transfers: TransferEntry[] = [];
   for (const [id, transfer] of currentTransfers(records)) {
@@ -156,12 +157,12 @@ export type KnownPayee = {
   /** The last Category it had, unless that Category is hidden now. */
   categoryId?: string;
   /** The Account it was last recorded in, unless that Account is closed now. */
-  accountId?: string;
+  accountId?: AccountId;
 };
 
 /** Every Payee the Budget's Transactions name, in alphabetical order, with what it can fill in. */
 export function knownPayees(records: readonly ChangeRecord[]): KnownPayee[] {
-  const last = new Map<string, { categoryId?: string; accountId: string }>();
+  const last = new Map<string, { categoryId?: string; accountId: AccountId }>();
   for (const { payee, categoryId, accountId } of currentTransactions(records)) {
     if (!payee) continue;
     last.set(payee, {

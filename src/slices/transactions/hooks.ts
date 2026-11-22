@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { AccountId } from "../../kernel/id";
 import type { Currency } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
@@ -14,7 +15,7 @@ import { categoryChoices } from "./record-flow";
 import { type Statement, statements } from "./statements";
 
 /** An Account's Transactions, newest first. */
-export function useAccountTransactions(accountId: string): Transaction[] {
+export function useAccountTransactions(accountId: AccountId): Transaction[] {
   return useChangeLogQuery(
     useCallback(
       (records: readonly ChangeRecord[]) =>
@@ -25,7 +26,7 @@ export function useAccountTransactions(accountId: string): Transaction[] {
 }
 
 /** The Statements of one Account, or of every Account when none is named. */
-export function useStatements(accountId?: string): Statement[] {
+export function useStatements(accountId?: AccountId): Statement[] {
   return useChangeLogQuery(
     useCallback(
       (records: readonly ChangeRecord[]) => statements(records, accountId),

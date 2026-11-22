@@ -1,10 +1,16 @@
 import { type MouseEvent, type ReactNode, type Ref, useState } from "react";
+import type { AccountId } from "./kernel/id";
 import { formatMoney } from "./kernel/money";
 import { useChangeLogQuery } from "./kernel/use-change-log-query";
 import styles from "./NavigationShell.module.css";
-import { type Place, placeAddress, usePlace } from "./place-in-url";
+import {
+  type Place,
+  placeAddress,
+  useAccountInUrl,
+  usePlace,
+} from "./place-in-url";
 import { accountsTotal, useAccounts } from "./slices/accounts";
-import { pushAddress, useUrlParameter, useUrlSearch } from "./url-parameter";
+import { pushAddress, useUrlSearch } from "./url-parameter";
 
 /**
  * The page's real navigation, around whatever place is showing: a floating tab
@@ -29,8 +35,7 @@ export function NavigationShell({
   // Links are built from the address, so they have to follow it.
   useUrlSearch();
   const place = usePlace();
-  const [accountId] = useUrlParameter("account");
-  const here = { place, accountId: accountId ?? undefined };
+  const here = { place, accountId: useAccountInUrl() };
   return (
     <div className={styles.shell}>
       <Rail
@@ -45,7 +50,7 @@ export function NavigationShell({
   );
 }
 
-type Here = { place: Place; accountId?: string };
+type Here = { place: Place; accountId?: AccountId };
 
 function Rail({
   here,

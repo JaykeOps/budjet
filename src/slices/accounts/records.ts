@@ -3,15 +3,20 @@
  * versioned contracts, so changing one is a cross-slice change (docs/adr/0005).
  */
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { AccountId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 
 /** Where an Account's money sits. Credit cards and loans are not Accounts. */
 export type AccountKind = "checking" | "savings" | "cash";
 
-/** An Account added to the Budget. Its Opening Balance goes to Ready to Assign. */
+/**
+ * An Account added to the Budget. Its Opening Balance goes to Ready to Assign.
+ * Its subject is the Account's id.
+ */
 export type AccountOpened = ChangeRecord<
   "AccountOpened",
-  { version: 1; name: string; kind: AccountKind; openingBalance: Money }
+  { version: 1; name: string; kind: AccountKind; openingBalance: Money },
+  AccountId
 >;
 
 export function isAccountOpened(record: ChangeRecord): record is AccountOpened {
@@ -21,7 +26,8 @@ export function isAccountOpened(record: ChangeRecord): record is AccountOpened {
 /** An Account's new name. The latest one wins. Its subject is the Account's id. */
 export type AccountRenamed = ChangeRecord<
   "AccountRenamed",
-  { version: 1; name: string }
+  { version: 1; name: string },
+  AccountId
 >;
 
 export function isAccountRenamed(
@@ -34,7 +40,11 @@ export function isAccountRenamed(
  * An Account the user no longer uses. Its history stays, but it takes no new
  * Transactions or Transfers. Its subject is the Account's id.
  */
-export type AccountClosed = ChangeRecord<"AccountClosed", { version: 1 }>;
+export type AccountClosed = ChangeRecord<
+  "AccountClosed",
+  { version: 1 },
+  AccountId
+>;
 
 export function isAccountClosed(record: ChangeRecord): record is AccountClosed {
   return record.type === "AccountClosed";
@@ -47,7 +57,8 @@ export function isAccountClosed(record: ChangeRecord): record is AccountClosed {
  */
 export type BalanceRedeclared = ChangeRecord<
   "BalanceRedeclared",
-  { version: 1; balance: Money }
+  { version: 1; balance: Money },
+  AccountId
 >;
 
 export function isBalanceRedeclared(

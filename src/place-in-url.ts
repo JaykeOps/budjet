@@ -1,3 +1,4 @@
+import { type AccountId, asId } from "./kernel/id";
 import { useUrlParameter } from "./url-parameter";
 
 export type Place = "budget" | "activity" | "accounts";
@@ -12,6 +13,12 @@ export function usePlace(): Place {
   return place === "activity" || place === "accounts" ? place : "budget";
 }
 
+/** The Account the address is on (`?account=…`), if any. */
+export function useAccountInUrl(): AccountId | undefined {
+  const [account] = useUrlParameter("account");
+  return account === null ? undefined : asId<AccountId>(account);
+}
+
 /**
  * The address of a place, optionally on one Account and, for Activity, one
  * Month, from the address the user is at now. The Budget's Month stays, so
@@ -19,7 +26,7 @@ export function usePlace(): Place {
  */
 export function placeAddress(
   place: Place,
-  accountId?: string,
+  accountId?: AccountId,
   statementMonth?: string,
 ): string {
   const url = new URL(window.location.href);

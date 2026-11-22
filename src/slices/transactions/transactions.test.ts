@@ -4,6 +4,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
+import { type AccountId, asId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import type {
@@ -24,6 +25,10 @@ import {
 } from "./commands";
 import { accountTransactions, payees, transactionList } from "./index";
 import type { TransactionDeleted, TransactionEdited } from "./records";
+
+const checking = asId<AccountId>("checking");
+const old = asId<AccountId>("old");
+const savings = asId<AccountId>("savings");
 
 /** A Budget in USD with one Account ("checking") and one Category ("groceries"). */
 function budget() {
@@ -61,10 +66,10 @@ function budget() {
   return {
     log,
     changeLog,
-    transactions: () => accountTransactions(changeLog.readAll(), "checking"),
+    transactions: () => accountTransactions(changeLog.readAll(), checking),
     /** Checking's list, without the Opening Balance every list ends with. */
     transactionList: () =>
-      transactionList(changeLog.readAll(), "checking").filter(
+      transactionList(changeLog.readAll(), checking).filter(
         ({ kind }) => kind !== "opening-balance",
       ),
     payees: () => payees(changeLog.readAll()),
@@ -77,7 +82,7 @@ describe("Transactions", () => {
 
     expect(() =>
       recordTransaction(log, {
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(-4550, "USD"),
       }),
@@ -88,7 +93,7 @@ describe("Transactions", () => {
   it.each([
     [
       "an Account that doesn't exist",
-      { accountId: "savings" },
+      { accountId: savings },
       /No Account savings/,
     ],
     [
@@ -108,7 +113,7 @@ describe("Transactions", () => {
 
     expect(() =>
       recordTransaction(log, {
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(-4550, "USD"),
         categoryId: "groceries",
@@ -122,7 +127,7 @@ describe("Transactions", () => {
     const { log, transactions } = budget();
 
     const groceries = recordTransaction(log, {
-      accountId: "checking",
+      accountId: checking,
       date: "2026-10-12",
       amount: money(-4550, "USD"),
       categoryId: "groceries",
@@ -130,19 +135,19 @@ describe("Transactions", () => {
       memo: "Milk and bread",
     });
     const salary = recordTransaction(log, {
-      accountId: "checking",
+      accountId: checking,
       date: "2026-10-25",
       amount: money(300000, "USD"),
       payee: "Employer",
     });
     const refund = recordTransaction(log, {
-      accountId: "checking",
+      accountId: checking,
       date: "2026-10-12",
       amount: money(1000, "USD"),
       categoryId: "groceries",
     });
     const older = recordTransaction(log, {
-      accountId: "checking",
+      accountId: checking,
       date: "2026-09-30",
       amount: money(-200, "USD"),
       categoryId: "groceries",
@@ -151,21 +156,21 @@ describe("Transactions", () => {
     expect(transactions()).toEqual([
       {
         id: salary,
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-25",
         amount: money(300000, "USD"),
         payee: "Employer",
       },
       {
         id: refund,
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(1000, "USD"),
         categoryId: "groceries",
       },
       {
         id: groceries,
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(-4550, "USD"),
         categoryId: "groceries",
@@ -174,7 +179,7 @@ describe("Transactions", () => {
       },
       {
         id: older,
-        accountId: "checking",
+        accountId: checking,
         date: "2026-09-30",
         amount: money(-200, "USD"),
         categoryId: "groceries",
@@ -185,7 +190,7 @@ describe("Transactions", () => {
   it("edits a Transaction: the edit replaces what was recorded", () => {
     const { log, transactions } = budget();
     const id = recordTransaction(log, {
-      accountId: "checking",
+      accountId: checking,
       date: "2026-10-12",
       amount: money(-4550, "USD"),
       categoryId: "groceries",
@@ -194,7 +199,7 @@ describe("Transactions", () => {
     });
 
     editTransaction(log, id, {
-      accountId: "checking",
+      accountId: checking,
       date: "2026-09-30",
       amount: money(2000, "USD"),
       payee: "Employer",
@@ -203,7 +208,7 @@ describe("Transactions", () => {
     expect(transactions()).toEqual([
       {
         id,
-        accountId: "checking",
+        accountId: checking,
         date: "2026-09-30",
         amount: money(2000, "USD"),
         payee: "Employer",
@@ -214,12 +219,12 @@ describe("Transactions", () => {
   it("deletes a Transaction, after which it can't be edited or deleted again", () => {
     const { log, transactions } = budget();
     const kept = recordTransaction(log, {
-      accountId: "checking",
+      accountId: checking,
       date: "2026-10-01",
       amount: money(2000, "USD"),
     });
     const deleted = recordTransaction(log, {
-      accountId: "checking",
+      accountId: checking,
       date: "2026-10-12",
       amount: money(-4550, "USD"),
       categoryId: "groceries",
@@ -233,7 +238,7 @@ describe("Transactions", () => {
     );
     expect(() =>
       editTransaction(log, deleted, {
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(-100, "USD"),
         categoryId: "groceries",
@@ -244,7 +249,7 @@ describe("Transactions", () => {
   it("edits under the same rules as recording", () => {
     const { log, transactions } = budget();
     const id = recordTransaction(log, {
-      accountId: "checking",
+      accountId: checking,
       date: "2026-10-12",
       amount: money(-4550, "USD"),
       categoryId: "groceries",
@@ -252,7 +257,7 @@ describe("Transactions", () => {
 
     expect(() =>
       editTransaction(log, id, {
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(-4550, "USD"),
       }),
@@ -260,7 +265,7 @@ describe("Transactions", () => {
     expect(transactions()).toEqual([
       {
         id,
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(-4550, "USD"),
         categoryId: "groceries",
@@ -278,7 +283,7 @@ describe("Transactions", () => {
         type: "TransactionEdited",
         payload: {
           version: 1,
-          accountId: "checking",
+          accountId: checking,
           date: "2026-10-12",
           amount: money(-1200, "USD"),
           categoryId: "groceries",
@@ -325,7 +330,7 @@ describe("Transactions", () => {
             type: "TransactionRecorded",
             payload: {
               version: 1,
-              accountId: "checking",
+              accountId: checking,
               date: "2026-10-12",
               amount: money(-900, "USD"),
               categoryId: "groceries",
@@ -352,16 +357,16 @@ describe("Transactions", () => {
         openingBalance: money(0, "USD"),
       },
     );
-    const record = (accountId: string, cents: number) =>
+    const record = (accountId: AccountId, cents: number) =>
       recordTransaction(log, {
         accountId,
         date: "2026-10-12",
         amount: money(cents, "USD"),
         categoryId: "groceries",
       });
-    const refund = record("old", 1000);
-    const spent = record("old", -1000);
-    const inChecking = record("checking", -500);
+    const refund = record(old, 1000);
+    const spent = record(old, -1000);
+    const inChecking = record(checking, -500);
     seedRecord<AccountClosed["type"], AccountClosed["payload"]>(
       log,
       "old",
@@ -369,10 +374,10 @@ describe("Transactions", () => {
       { version: 1 },
     );
 
-    expect(() => record("old", -200)).toThrow("Old checking is closed");
+    expect(() => record(old, -200)).toThrow("Old checking is closed");
     expect(() =>
       editTransaction(log, refund, {
-        accountId: "old",
+        accountId: old,
         date: "2026-10-12",
         amount: money(2000, "USD"),
         categoryId: "groceries",
@@ -380,7 +385,7 @@ describe("Transactions", () => {
     ).toThrow("Old checking is closed");
     expect(() =>
       editTransaction(log, spent, {
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(-1000, "USD"),
         categoryId: "groceries",
@@ -388,7 +393,7 @@ describe("Transactions", () => {
     ).toThrow("Old checking is closed");
     expect(() =>
       editTransaction(log, inChecking, {
-        accountId: "old",
+        accountId: old,
         date: "2026-10-12",
         amount: money(-500, "USD"),
         categoryId: "groceries",
@@ -398,7 +403,7 @@ describe("Transactions", () => {
       "Old checking is closed",
     );
     expect(
-      accountTransactions(changeLog.readAll(), "old").map(({ id }) => id),
+      accountTransactions(changeLog.readAll(), old).map(({ id }) => id),
     ).toEqual([spent, refund]);
   });
 
@@ -406,7 +411,7 @@ describe("Transactions", () => {
     const { log, payees } = budget();
     const record = (payee: string) =>
       recordTransaction(log, {
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(1000, "USD"),
         payee,
@@ -419,7 +424,7 @@ describe("Transactions", () => {
     deleteTransaction(log, record("Typo Mart"));
     const renamed = record("Bakry");
     editTransaction(log, renamed, {
-      accountId: "checking",
+      accountId: checking,
       date: "2026-10-12",
       amount: money(1000, "USD"),
       payee: "Bakery",
@@ -437,8 +442,8 @@ describe("Transactions", () => {
     const { log, transactionList } = budget();
     const transfer = (
       id: string,
-      fromAccountId: string,
-      toAccountId: string,
+      fromAccountId: AccountId,
+      toAccountId: AccountId,
       date: string,
       cents: number,
     ) =>
@@ -455,15 +460,15 @@ describe("Transactions", () => {
           ...(id === "to-savings" && { memo: "Rainy day" }),
         },
       );
-    transfer("to-savings", "checking", "savings", "2026-10-12", 20000);
+    transfer("to-savings", checking, savings, "2026-10-12", 20000);
     const groceries = recordTransaction(log, {
-      accountId: "checking",
+      accountId: checking,
       date: "2026-10-12",
       amount: money(-4550, "USD"),
       categoryId: "groceries",
     });
-    transfer("from-savings", "savings", "checking", "2026-10-20", 5000);
-    transfer("deleted", "checking", "savings", "2026-10-21", 100);
+    transfer("from-savings", savings, checking, "2026-10-20", 5000);
+    transfer("deleted", checking, savings, "2026-10-21", 100);
     seedRecord<TransferDeleted["type"], TransferDeleted["payload"]>(
       log,
       "deleted",
@@ -476,14 +481,14 @@ describe("Transactions", () => {
         kind: "transfer",
         id: "from-savings",
         date: "2026-10-20",
-        fromAccountId: "savings",
-        toAccountId: "checking",
+        fromAccountId: savings,
+        toAccountId: checking,
         amount: money(5000, "USD"),
       },
       {
         kind: "transaction",
         id: groceries,
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(-4550, "USD"),
         categoryId: "groceries",
@@ -492,8 +497,8 @@ describe("Transactions", () => {
         kind: "transfer",
         id: "to-savings",
         date: "2026-10-12",
-        fromAccountId: "checking",
-        toAccountId: "savings",
+        fromAccountId: checking,
+        toAccountId: savings,
         amount: money(20000, "USD"),
         memo: "Rainy day",
       },
@@ -503,7 +508,7 @@ describe("Transactions", () => {
   it("lists an Account's Adjustments among its Transactions, on the day the balance was re-declared", () => {
     const { changeLog, log, transactionList } = budget();
     const groceries = recordTransaction(log, {
-      accountId: "checking",
+      accountId: checking,
       date: "2100-01-15",
       amount: money(-4550, "USD"),
       categoryId: "groceries",
@@ -526,7 +531,7 @@ describe("Transactions", () => {
       {
         kind: "adjustment",
         id: redeclared.id,
-        accountId: "checking",
+        accountId: checking,
         date: "2100-01-14",
         amount: money(-450, "USD"),
         balance: money(95000, "USD"),
@@ -552,7 +557,7 @@ describe("Transactions", () => {
       {
         kind: "balance-check",
         id: checked.id,
-        accountId: "checking",
+        accountId: checking,
         date: "2100-01-14",
         balance: money(100000, "USD"),
       },
