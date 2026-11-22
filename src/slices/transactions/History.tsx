@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { AccountId } from "../../kernel/id";
 import { formatMoney, type Money } from "../../kernel/money";
 import { currentMonth, type Month, monthName } from "../../kernel/month";
 import { Menu, type MenuAction } from "../../ui/Menu";
@@ -48,7 +49,7 @@ export function History({
   label: string;
   statements: Statement[];
   /** The Account the history is seen from. Without one, each row names its Account. */
-  accountId?: string;
+  accountId?: AccountId;
   askedMonth?: Month;
   actionsFor: (entry: TransactionListEntry) => MenuAction[];
   /** What tapping a row does on a phone. */
@@ -269,14 +270,14 @@ function EntryRow({
 }
 
 /** How to read each entry, seen from one Account or, each naming its own, across all. */
-export function useDescribe(accountId?: string) {
+export function useDescribe(accountId?: AccountId) {
   const accountNames = new Map(useAccounts().map(({ id, name }) => [id, name]));
   const categoryNames = new Map(
     useCategoryGroups().flatMap(({ categories }) =>
       categories.map(({ id, name }) => [id, name]),
     ),
   );
-  const name = (id: string) => accountNames.get(id) ?? "";
+  const name = (id: AccountId) => accountNames.get(id) ?? "";
 
   return (entry: TransactionListEntry): Described => {
     /** Across every Account, the detail adds which Account it is in. */

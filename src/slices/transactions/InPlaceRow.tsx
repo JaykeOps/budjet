@@ -121,7 +121,7 @@ function EditTransaction({
         return {
           changed: draftChanged(draft, started, currency),
           save:
-            !missingField(draft, currency) && amount
+            !missingField(draft, currency) && amount && accountId
               ? () =>
                   onEdit(editing.id, {
                     accountId,

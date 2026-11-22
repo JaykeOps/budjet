@@ -4,6 +4,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
+import { type AccountId, asId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import type { BudgetCreated } from "../budget-setup/records";
@@ -51,7 +52,7 @@ function deviceAt(changeLog: ChangeLog, deviceId: string, at: Date) {
 function redeclareOn(
   changeLog: ChangeLog,
   deviceId: string,
-  accountId: string,
+  accountId: AccountId,
   at: Date,
   minorUnits: number,
 ) {
@@ -130,7 +131,7 @@ describe("Accounts", () => {
       kind: "savings",
       openingBalance: money(50000, "USD"),
     });
-    const recordTransaction = (accountId: string, amount: number) =>
+    const recordTransaction = (accountId: AccountId, amount: number) =>
       seedRecord<TransactionRecorded["type"], TransactionRecorded["payload"]>(
         log,
         crypto.randomUUID(),
@@ -689,9 +690,9 @@ describe("Accounts", () => {
     ]);
 
     expect(() => renameAccount(log, id, { name: " " })).toThrow(/needs a name/);
-    expect(() => renameAccount(log, "missing", { name: "X" })).toThrow(
-      /No Account missing/,
-    );
+    expect(() =>
+      renameAccount(log, asId<AccountId>("missing"), { name: "X" }),
+    ).toThrow(/No Account missing/);
   });
 
   it("closes an Account only once its balance is zero, pointing to Transfers", () => {

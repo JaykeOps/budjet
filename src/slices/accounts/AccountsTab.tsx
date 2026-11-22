@@ -1,4 +1,5 @@
 import { useId } from "react";
+import type { AccountId } from "../../kernel/id";
 import { formatMoney } from "../../kernel/money";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
 import { EmptyState } from "../../ui/EmptyState";
@@ -18,7 +19,7 @@ export function AccountsTab({
   ...check
 }: BalanceCheckActions & {
   onAdd: () => void;
-  onOpenAccount: (accountId: string) => void;
+  onOpenAccount: (accountId: AccountId) => void;
 }) {
   const headingId = useId();
   const totalId = useId();

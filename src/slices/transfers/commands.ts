@@ -1,4 +1,5 @@
 import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
+import type { AccountId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import { monthOf } from "../../kernel/month";
 import { accounts } from "../accounts";
@@ -12,8 +13,8 @@ import type {
 import { currentTransfers } from "./records";
 
 export type TransferInput = {
-  fromAccountId: string;
-  toAccountId: string;
+  fromAccountId: AccountId;
+  toAccountId: AccountId;
   /** A calendar date, "YYYY-MM-DD". */
   date: string;
   /** Above zero: the money that leaves `fromAccountId` for `toAccountId`. */

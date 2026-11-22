@@ -32,3 +32,5 @@ export function newId<Of extends Id<IdKind>>(): Of {
 export function asId<Of extends Id<IdKind>>(value: string): Of {
   return value as Of;
 }
+
+export type AccountId = Id<"Account">;

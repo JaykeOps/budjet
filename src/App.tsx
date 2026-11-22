@@ -10,6 +10,7 @@ import { FolderBanner, type FolderConnection } from "./FolderBanner";
 import { useFirstCategoryChanges } from "./first-categories";
 import { FirstRun } from "./first-run/FirstRun";
 import type { DeviceChangeLog } from "./kernel/change-log";
+import type { AccountId } from "./kernel/id";
 import { parseMonth } from "./kernel/month";
 import {
   DeviceChangeLogProvider,
@@ -18,7 +19,7 @@ import {
 import { useMonthInUrl } from "./month-in-url";
 import { NavigationShell } from "./NavigationShell";
 import { requestPersistentStorage } from "./persistent-storage";
-import { placeAddress, usePlace } from "./place-in-url";
+import { placeAddress, useAccountInUrl, usePlace } from "./place-in-url";
 import { isDesktop, useRecordingRow } from "./RecordingRow";
 import { RecordMenu } from "./RecordMenu";
 import {
@@ -224,16 +225,18 @@ function AccountTransactions({
   ComponentProps<typeof TransactionsScreen>,
   "showing" | "onShow" | "onRecordFirst"
 > & { onRecordInRow: () => void }) {
-  const [accountId] = useUrlParameter("account");
+  const accountId = useAccountInUrl();
   const [statementMonth] = useUrlParameter("statement");
   const commands = useRecordCommands();
   // The row only shows on desktop, so a phone records through the sheet.
-  const [recordingOnPhone, setRecordingOnPhone] = useState<{ into?: string }>();
+  const [recordingOnPhone, setRecordingOnPhone] = useState<{
+    into?: AccountId;
+  }>();
   return (
     <>
       <TransactionsScreen
         showing={{
-          accountId: accountId ?? undefined,
+          accountId,
           month: parseMonth(statementMonth),
         }}
         onShow={({ accountId, month }) =>

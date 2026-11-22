@@ -3,6 +3,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
+import { type AccountId, asId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import type { AccountOpened } from "../accounts/records";
@@ -28,6 +29,9 @@ import {
   withDirection,
   withPayee,
 } from "./record-flow";
+
+const checking = asId<AccountId>("checking");
+const savings = asId<AccountId>("savings");
 
 /** A USD Budget with Accounts "checking" and "savings", and Categories "groceries" and "dining". */
 function budget() {
@@ -79,7 +83,7 @@ const draft: Draft = {
   typed: "18.50",
   payee: "",
   date: "2026-10-15",
-  accountId: "checking",
+  accountId: checking,
 };
 
 describe("knownPayees", () => {
@@ -87,19 +91,19 @@ describe("knownPayees", () => {
     const { log, records } = budget();
     recordTransaction(log, {
       ...spend,
-      accountId: "checking",
+      accountId: checking,
       categoryId: "groceries",
       payee: "Corner Bistro",
     });
     recordTransaction(log, {
       ...spend,
-      accountId: "savings",
+      accountId: savings,
       categoryId: "dining",
       payee: "Corner Bistro",
     });
 
     expect(knownPayees(records())).toEqual([
-      { name: "Corner Bistro", categoryId: "dining", accountId: "savings" },
+      { name: "Corner Bistro", categoryId: "dining", accountId: savings },
     ]);
   });
 
@@ -107,14 +111,14 @@ describe("knownPayees", () => {
     const { log, records } = budget();
     recordTransaction(log, {
       ...spend,
-      accountId: "checking",
+      accountId: checking,
       categoryId: "groceries",
       payee: "Corner Bistro",
     });
     recordTransaction(log, {
       ...spend,
       amount: money(500, "USD"),
-      accountId: "checking",
+      accountId: checking,
       payee: "Corner Bistro",
     });
 
@@ -125,7 +129,7 @@ describe("knownPayees", () => {
     const { log, records } = budget();
     recordTransaction(log, {
       ...spend,
-      accountId: "savings",
+      accountId: savings,
       categoryId: "dining",
       payee: "Corner Bistro",
     });
@@ -138,7 +142,7 @@ describe("knownPayees", () => {
 
 describe("withPayee", () => {
   const known = [
-    { name: "Corner Bistro", categoryId: "dining", accountId: "savings" },
+    { name: "Corner Bistro", categoryId: "dining", accountId: savings },
   ];
 
   it("fills in a known Payee's Category and Account when no Category is chosen", () => {
@@ -146,7 +150,7 @@ describe("withPayee", () => {
       ...draft,
       payee: "Corner Bistro",
       categoryId: "dining",
-      accountId: "savings",
+      accountId: savings,
     });
   });
 
@@ -157,7 +161,7 @@ describe("withPayee", () => {
       ...draft,
       payee: "Corner Bistro",
       categoryId: "groceries",
-      accountId: "savings",
+      accountId: savings,
     });
   });
 
@@ -252,7 +256,7 @@ describe("categoryChoices", () => {
     );
     recordTransaction(log, {
       ...spend,
-      accountId: "checking",
+      accountId: checking,
       categoryId: "groceries",
     });
     seedRecord(log, "dining", "CategoryHidden", { version: 1 });
@@ -287,7 +291,7 @@ describe("categoryChoices", () => {
 describe("categoryChoices while editing a Transaction", () => {
   const lunch = {
     id: "lunch",
-    accountId: "checking",
+    accountId: checking,
     date: "2026-10-12",
     amount: money(-1850, "USD"),
     categoryId: "groceries",
@@ -327,7 +331,7 @@ describe("categoryChoices while editing a Transaction", () => {
     const { log, records } = budget();
     const paycheck = {
       id: "paycheck",
-      accountId: "checking",
+      accountId: checking,
       date: "2026-10-12",
       amount: money(5000, "USD"),
     };
@@ -359,7 +363,7 @@ describe("draftOf", () => {
     expect(
       draftOf({
         id: "lunch",
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(-1850, "USD"),
         categoryId: "groceries",
@@ -373,7 +377,7 @@ describe("draftOf", () => {
       payee: "Corner Bistro",
       memo: "With Sam",
       date: "2026-10-12",
-      accountId: "checking",
+      accountId: checking,
     });
   });
 
@@ -381,7 +385,7 @@ describe("draftOf", () => {
     expect(
       draftOf({
         id: "paycheck",
-        accountId: "checking",
+        accountId: checking,
         date: "2026-10-12",
         amount: money(5000, "USD"),
       }),
@@ -390,7 +394,7 @@ describe("draftOf", () => {
       typed: "50.00",
       payee: "",
       date: "2026-10-12",
-      accountId: "checking",
+      accountId: checking,
     });
   });
 });
@@ -409,7 +413,7 @@ describe("the row on desktop", () => {
     categoryId: "groceries",
     payee: "Corner Shop",
     date: "2026-10-03",
-    accountId: "savings",
+    accountId: savings,
   };
 
   it("clears for the next one, keeping the date and Account", () => {
@@ -418,7 +422,7 @@ describe("the row on desktop", () => {
       typed: "",
       payee: "",
       date: "2026-10-03",
-      accountId: "savings",
+      accountId: savings,
     });
   });
 
@@ -479,7 +483,7 @@ describe("draftChanged", () => {
     categoryId: "groceries",
     payee: "Rewe",
     date: "2026-10-15",
-    accountId: "checking",
+    accountId: checking,
   };
 
   it("sees the same Transaction however it's written", () => {
@@ -496,7 +500,7 @@ describe("draftChanged", () => {
       { categoryId: undefined },
       { payee: "Aldi" },
       { date: "2026-10-16" },
-      { accountId: "savings" },
+      { accountId: savings },
     ] satisfies Partial<Draft>[]) {
       expect(draftChanged({ ...started, ...change }, started, "USD")).toBe(
         true,

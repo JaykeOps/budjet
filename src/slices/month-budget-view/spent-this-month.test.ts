@@ -4,6 +4,7 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "../../kernel/change-log";
+import { type AccountId, asId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -21,6 +22,8 @@ import type {
 } from "../categories/records";
 import type { TransactionRecorded } from "../transactions/records";
 import { spentThisMonth } from "./index";
+
+const checking = asId<AccountId>("checking");
 
 const october: Month = "2026-10";
 const september: Month = "2026-09";
@@ -79,7 +82,7 @@ function budget() {
         "TransactionRecorded",
         {
           version: 1,
-          accountId: "checking",
+          accountId: checking,
           date,
           amount: money(amount, "USD"),
           ...(categoryId && { categoryId }),

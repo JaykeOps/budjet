@@ -3,6 +3,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
+import { type AccountId, asId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import { accountBalance } from "../accounts";
@@ -12,6 +13,10 @@ import type { BudgetCreated } from "../budget-setup/records";
 import { available, readyToAssign } from "../budget-totals";
 import { deleteTransfer, editTransfer, makeTransfer } from "./commands";
 import { transfers } from "./index";
+
+const checking = asId<AccountId>("checking");
+const savings = asId<AccountId>("savings");
+const wallet = asId<AccountId>("wallet");
 
 /** A Budget in USD with two Accounts: "checking" holding $1,000 and "savings" holding $500. */
 function budget() {
@@ -42,7 +47,7 @@ function budget() {
   return {
     changeLog,
     log,
-    balance: (accountId: string) =>
+    balance: (accountId: AccountId) =>
       accountBalance(changeLog.readAll(), accountId),
   };
 }
@@ -52,14 +57,14 @@ describe("Transfers", () => {
     const { log, balance } = budget();
 
     makeTransfer(log, {
-      fromAccountId: "checking",
-      toAccountId: "savings",
+      fromAccountId: checking,
+      toAccountId: savings,
       date: "2026-10-12",
       amount: money(20000, "USD"),
     });
 
-    expect(balance("checking")).toEqual(money(80000, "USD"));
-    expect(balance("savings")).toEqual(money(70000, "USD"));
+    expect(balance(checking)).toEqual(money(80000, "USD"));
+    expect(balance(savings)).toEqual(money(70000, "USD"));
   });
 
   it("leaves Ready to Assign and every Category's Available unchanged", () => {
@@ -77,8 +82,8 @@ describe("Transfers", () => {
     );
 
     makeTransfer(log, {
-      fromAccountId: "savings",
-      toAccountId: "checking",
+      fromAccountId: savings,
+      toAccountId: checking,
       date: "2026-10-12",
       amount: money(30000, "USD"),
     });
@@ -92,12 +97,12 @@ describe("Transfers", () => {
   it.each([
     [
       "the same Account on both ends",
-      { toAccountId: "checking" },
+      { toAccountId: checking },
       /two different Accounts/,
     ],
     [
       "an Account that doesn't exist",
-      { fromAccountId: "wallet" },
+      { fromAccountId: wallet },
       /No Account wallet/,
     ],
     [
@@ -113,41 +118,41 @@ describe("Transfers", () => {
 
     expect(() =>
       makeTransfer(log, {
-        fromAccountId: "checking",
-        toAccountId: "savings",
+        fromAccountId: checking,
+        toAccountId: savings,
         date: "2026-10-12",
         amount: money(20000, "USD"),
         ...change,
       }),
     ).toThrow(error);
-    expect(balance("checking")).toEqual(money(100000, "USD"));
-    expect(balance("savings")).toEqual(money(50000, "USD"));
+    expect(balance(checking)).toEqual(money(100000, "USD"));
+    expect(balance(savings)).toEqual(money(50000, "USD"));
   });
 
   it("edits a Transfer, moving its money to match", () => {
     const { changeLog, log, balance } = budget();
     const id = makeTransfer(log, {
-      fromAccountId: "checking",
-      toAccountId: "savings",
+      fromAccountId: checking,
+      toAccountId: savings,
       date: "2026-10-12",
       amount: money(20000, "USD"),
     });
 
     editTransfer(log, id, {
-      fromAccountId: "savings",
-      toAccountId: "checking",
+      fromAccountId: savings,
+      toAccountId: checking,
       date: "2026-10-14",
       amount: money(5000, "USD"),
       memo: "  Back again ",
     });
 
-    expect(balance("checking")).toEqual(money(105000, "USD"));
-    expect(balance("savings")).toEqual(money(45000, "USD"));
+    expect(balance(checking)).toEqual(money(105000, "USD"));
+    expect(balance(savings)).toEqual(money(45000, "USD"));
     expect(transfers(changeLog.readAll())).toEqual([
       {
         id,
-        fromAccountId: "savings",
-        toAccountId: "checking",
+        fromAccountId: savings,
+        toAccountId: checking,
         date: "2026-10-14",
         amount: money(5000, "USD"),
         memo: "Back again",
@@ -158,44 +163,44 @@ describe("Transfers", () => {
   it("refuses an edit that breaks the Transfer rules", () => {
     const { log, balance } = budget();
     const id = makeTransfer(log, {
-      fromAccountId: "checking",
-      toAccountId: "savings",
+      fromAccountId: checking,
+      toAccountId: savings,
       date: "2026-10-12",
       amount: money(20000, "USD"),
     });
 
     expect(() =>
       editTransfer(log, id, {
-        fromAccountId: "savings",
-        toAccountId: "savings",
+        fromAccountId: savings,
+        toAccountId: savings,
         date: "2026-10-12",
         amount: money(20000, "USD"),
       }),
     ).toThrow(/two different Accounts/);
-    expect(balance("savings")).toEqual(money(70000, "USD"));
+    expect(balance(savings)).toEqual(money(70000, "USD"));
   });
 
   it("deletes a Transfer, giving both Accounts their money back", () => {
     const { changeLog, log, balance } = budget();
     const id = makeTransfer(log, {
-      fromAccountId: "checking",
-      toAccountId: "savings",
+      fromAccountId: checking,
+      toAccountId: savings,
       date: "2026-10-12",
       amount: money(20000, "USD"),
     });
 
     deleteTransfer(log, id);
 
-    expect(balance("checking")).toEqual(money(100000, "USD"));
-    expect(balance("savings")).toEqual(money(50000, "USD"));
+    expect(balance(checking)).toEqual(money(100000, "USD"));
+    expect(balance(savings)).toEqual(money(50000, "USD"));
     expect(transfers(changeLog.readAll())).toEqual([]);
   });
 
   it("keeps Transfers of a closed Account, but makes, edits and deletes none touching it", () => {
     const { changeLog, log, balance } = budget();
     const emptiedSavings = makeTransfer(log, {
-      fromAccountId: "savings",
-      toAccountId: "checking",
+      fromAccountId: savings,
+      toAccountId: checking,
       date: "2026-10-12",
       amount: money(50000, "USD"),
     });
@@ -206,8 +211,8 @@ describe("Transfers", () => {
       { version: 1 },
     );
     const transfer = {
-      fromAccountId: "checking",
-      toAccountId: "savings",
+      fromAccountId: checking,
+      toAccountId: savings,
       date: "2026-10-13",
       amount: money(100, "USD"),
     };
@@ -216,8 +221,8 @@ describe("Transfers", () => {
     expect(() =>
       makeTransfer(log, {
         ...transfer,
-        fromAccountId: "savings",
-        toAccountId: "checking",
+        fromAccountId: savings,
+        toAccountId: checking,
       }),
     ).toThrow("Savings is closed");
     expect(() => editTransfer(log, emptiedSavings, transfer)).toThrow(
@@ -229,15 +234,15 @@ describe("Transfers", () => {
     expect(transfers(changeLog.readAll()).map(({ id }) => id)).toEqual([
       emptiedSavings,
     ]);
-    expect(balance("savings")).toEqual(money(0, "USD"));
-    expect(balance("checking")).toEqual(money(150000, "USD"));
+    expect(balance(savings)).toEqual(money(0, "USD"));
+    expect(balance(checking)).toEqual(money(150000, "USD"));
   });
 
   it("refuses to edit or delete a Transfer that isn't in the Budget", () => {
     const { log } = budget();
     const id = makeTransfer(log, {
-      fromAccountId: "checking",
-      toAccountId: "savings",
+      fromAccountId: checking,
+      toAccountId: savings,
       date: "2026-10-12",
       amount: money(20000, "USD"),
     });
@@ -246,8 +251,8 @@ describe("Transfers", () => {
     expect(() => deleteTransfer(log, id)).toThrow(`No Transfer ${id}`);
     expect(() =>
       editTransfer(log, "nope", {
-        fromAccountId: "checking",
-        toAccountId: "savings",
+        fromAccountId: checking,
+        toAccountId: savings,
         date: "2026-10-12",
         amount: money(100, "USD"),
       }),
@@ -258,8 +263,8 @@ describe("Transfers", () => {
     const { changeLog, log } = budget();
     const make = (date: string, cents: number) =>
       makeTransfer(log, {
-        fromAccountId: "checking",
-        toAccountId: "savings",
+        fromAccountId: checking,
+        toAccountId: savings,
         date,
         amount: money(cents, "USD"),
       });
@@ -268,8 +273,8 @@ describe("Transfers", () => {
     const later = make("2026-10-20", 200);
     const sameDay = make("2026-10-12", 300);
     editTransfer(log, first, {
-      fromAccountId: "checking",
-      toAccountId: "savings",
+      fromAccountId: checking,
+      toAccountId: savings,
       date: "2026-10-12",
       amount: money(150, "USD"),
     });
@@ -287,8 +292,8 @@ describe("Transfers", () => {
   ])("keeps the most recent change from two devices when %s", (_, skew) => {
     const { changeLog, log, balance } = budget();
     const id = makeTransfer(log, {
-      fromAccountId: "checking",
-      toAccountId: "savings",
+      fromAccountId: checking,
+      toAccountId: savings,
       date: "2026-10-12",
       amount: money(20000, "USD"),
     });
@@ -298,15 +303,15 @@ describe("Transfers", () => {
     });
 
     editTransfer(phone, id, {
-      fromAccountId: "checking",
-      toAccountId: "savings",
+      fromAccountId: checking,
+      toAccountId: savings,
       date: "2026-10-12",
       amount: money(1000, "USD"),
     });
     deleteTransfer(log, id);
 
     expect(transfers(changeLog.readAll())).toEqual([]);
-    expect(balance("checking")).toEqual(money(100000, "USD"));
+    expect(balance(checking)).toEqual(money(100000, "USD"));
   });
 
   it("refuses a Transfer before a Budget exists", () => {
@@ -314,8 +319,8 @@ describe("Transfers", () => {
 
     expect(() =>
       makeTransfer(log, {
-        fromAccountId: "checking",
-        toAccountId: "savings",
+        fromAccountId: checking,
+        toAccountId: savings,
         date: "2026-10-12",
         amount: money(20000, "USD"),
       }),

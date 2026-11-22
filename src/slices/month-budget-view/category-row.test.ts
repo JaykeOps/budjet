@@ -3,6 +3,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
+import { type AccountId, asId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -20,6 +21,8 @@ import {
   categoryRowIn,
   overspentHint,
 } from "./category-row";
+
+const checking = asId<AccountId>("checking");
 
 const usd = (dollars: number) => money(Math.round(dollars * 100), "USD");
 
@@ -180,7 +183,7 @@ describe("categoryRowIn", () => {
       "TransactionRecorded",
       {
         version: 1,
-        accountId: "checking",
+        accountId: checking,
         date: "2026-11-03",
         amount: usd(-312.5),
         categoryId: "groceries",

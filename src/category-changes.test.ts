@@ -19,6 +19,7 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "./kernel/change-log";
+import type { AccountId } from "./kernel/id";
 import { money } from "./kernel/money";
 import type { Month } from "./kernel/month";
 import { openAccount } from "./slices/accounts/commands";
@@ -235,7 +236,7 @@ describe("hiding a Category that holds money", () => {
       month,
       amount: money(cents, "USD"),
     });
-  const spend = (name: string, accountId: string, cents: number) =>
+  const spend = (name: string, accountId: AccountId, cents: number) =>
     recordTransaction(log, {
       accountId,
       categoryId: category(name).id,

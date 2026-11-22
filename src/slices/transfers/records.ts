@@ -8,12 +8,13 @@ import {
   latestBySubject,
   perSnapshot,
 } from "../../kernel/change-log";
+import type { AccountId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 
 /** What a Transfer says: money moved from one Account to another on a calendar date. */
 export type TransferDetails = {
-  fromAccountId: string;
-  toAccountId: string;
+  fromAccountId: AccountId;
+  toAccountId: AccountId;
   /** A calendar date, "YYYY-MM-DD". */
   date: string;
   /** Always above zero: it leaves `fromAccountId` and arrives in `toAccountId`. */

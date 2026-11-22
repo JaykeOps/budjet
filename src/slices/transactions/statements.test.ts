@@ -5,6 +5,7 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "../../kernel/change-log";
+import { type AccountId, asId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import { accountBalance, accountsTotal } from "../accounts";
@@ -35,8 +36,8 @@ function logAt(changeLog: ChangeLog, at: Date) {
 function transfer(
   log: DeviceChangeLog,
   id: string,
-  fromAccountId: string,
-  toAccountId: string,
+  fromAccountId: AccountId,
+  toAccountId: AccountId,
   date: string,
   cents: number,
 ) {
@@ -54,7 +55,7 @@ function transfer(
   );
 }
 
-function redeclare(log: DeviceChangeLog, accountId: string, cents: number) {
+function redeclare(log: DeviceChangeLog, accountId: AccountId, cents: number) {
   seedRecord<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
     log,
     accountId,
@@ -80,7 +81,7 @@ function budget() {
       "AccountOpened",
       { version: 1, name, kind: "checking", openingBalance: usd(cents) },
     );
-    return id;
+    return asId<AccountId>(id);
   };
   const everyday = open("everyday", "Everyday", 100000);
   const wallet = open("wallet", "Wallet", 5000);
@@ -96,7 +97,7 @@ function budget() {
     "CategoryCreated",
     { version: 1, name: "Groceries", groupId: "needs", position: 0 },
   );
-  const record = (accountId: string, date: string, cents: number) =>
+  const record = (accountId: AccountId, date: string, cents: number) =>
     recordTransaction(log, {
       accountId,
       date,
@@ -109,7 +110,7 @@ function budget() {
     everyday,
     wallet,
     record,
-    read: (accountId?: string) => statements(changeLog.readAll(), accountId),
+    read: (accountId?: AccountId) => statements(changeLog.readAll(), accountId),
   };
 }
 
