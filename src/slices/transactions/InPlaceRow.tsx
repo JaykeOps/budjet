@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { TransactionId } from "../../kernel/id";
+import type { TransactionId, TransferId } from "../../kernel/id";
 import { type Currency, money, parseMoney } from "../../kernel/money";
 import { useToast } from "../../ui/Toast";
 import { useAccounts } from "../accounts";
@@ -40,8 +40,8 @@ import {
 type RowActions = {
   onEdit: (id: TransactionId, input: TransactionInput) => void;
   onDelete: (id: TransactionId) => void;
-  onEditTransfer: (id: string, input: TransferInput) => void;
-  onDeleteTransfer: (id: string) => void;
+  onEditTransfer: (id: TransferId, input: TransferInput) => void;
+  onDeleteTransfer: (id: TransferId) => void;
   onDeleteRedeclared: (entry: TransactionListEntry) => void;
 };
 

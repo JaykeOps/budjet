@@ -3,7 +3,12 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId, type CategoryId } from "../../kernel/id";
+import {
+  type AccountId,
+  asId,
+  type CategoryId,
+  type TransferId,
+} from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import { accountBalance } from "../accounts";
@@ -13,6 +18,10 @@ import type { BudgetCreated } from "../budget-setup/records";
 import { available, readyToAssign } from "../budget-totals";
 import { deleteTransfer, editTransfer, makeTransfer } from "./commands";
 import { transfers } from "./index";
+
+const nopeId = asId<TransferId>("nope");
+
+const nope = nopeId;
 
 const groceriesId = asId<CategoryId>("groceries");
 
@@ -254,7 +263,7 @@ describe("Transfers", () => {
 
     expect(() => deleteTransfer(log, id)).toThrow(`No Transfer ${id}`);
     expect(() =>
-      editTransfer(log, "nope", {
+      editTransfer(log, nope, {
         fromAccountId: checking,
         toAccountId: savings,
         date: "2026-10-12",

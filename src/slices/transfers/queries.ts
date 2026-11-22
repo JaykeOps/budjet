@@ -1,11 +1,12 @@
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { TransferId } from "../../kernel/id";
 import {
   currentTransfers,
   isTransferMade,
   type TransferDetails,
 } from "./records";
 
-export type Transfer = { id: string } & TransferDetails;
+export type Transfer = { id: TransferId } & TransferDetails;
 
 /**
  * Every Transfer in the Budget, newest date first. On the same date the most

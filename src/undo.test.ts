@@ -5,7 +5,13 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "./kernel/change-log";
-import type { AccountId, CategoryId, TransactionId } from "./kernel/id";
+import {
+  type AccountId,
+  asId,
+  type CategoryId,
+  type TransactionId,
+  type TransferId,
+} from "./kernel/id";
 import { type Money, money } from "./kernel/money";
 import type { Month } from "./kernel/month";
 import { accounts, adjustments, balanceChecks } from "./slices/accounts";
@@ -264,7 +270,9 @@ describe("undoing a Transfer's delete and edit", () => {
     const [newest, restored] = listed(records, checking);
     expect(newest).toBe(later);
     expect(restored).not.toBe(deleted);
-    expect(currentTransfers(records).get(restored ?? "")).toEqual({
+    // `listed` mixes kinds of entry; the second one here is the restored Transfer.
+    const restoredTransfer = asId<TransferId>(restored ?? "");
+    expect(currentTransfers(records).get(restoredTransfer)).toEqual({
       fromAccountId: checking,
       toAccountId: savings,
       date: "2026-10-12",

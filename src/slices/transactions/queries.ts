@@ -1,5 +1,5 @@
 import type { ChangeRecord } from "../../kernel/change-log";
-import type { AccountId, CategoryId } from "../../kernel/id";
+import type { AccountId, CategoryId, TransferId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import {
   accounts,
@@ -36,7 +36,7 @@ export function accountTransactions(
 /** A Transfer as a list shows it, once, whichever Accounts it is listed for. */
 export type TransferEntry = {
   kind: "transfer";
-  id: string;
+  id: TransferId;
   date: string;
   fromAccountId: AccountId;
   toAccountId: AccountId;
