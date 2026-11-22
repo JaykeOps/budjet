@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type ChangeLog,
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
@@ -34,8 +34,8 @@ import { moveOutChoices } from "./move-out";
 
 function setUp() {
   const changeLog = createInMemoryChangeLog();
-  const writer = createChangeLogWriter(changeLog, "this-device");
-  return { writer, groups: () => categoryGroups(changeLog.readAll()) };
+  const log = createDeviceChangeLog(changeLog, "this-device");
+  return { log, groups: () => categoryGroups(changeLog.readAll()) };
 }
 
 /** Each Category Group's name followed by its Categories' names, in order. */
@@ -53,9 +53,9 @@ describe("Categories", () => {
   });
 
   it("starts a new Budget with the starter set of ordinary, visible Categories", () => {
-    const { writer, groups } = setUp();
+    const { log, groups } = setUp();
 
-    addStarterSet(writer);
+    addStarterSet(log);
 
     expect(outline(groups())).toEqual([
       ["Bills", ["Rent", "Power", "Phone", "Internet"]],
@@ -67,38 +67,38 @@ describe("Categories", () => {
   });
 
   it("adds a new Category Group, and Categories in it, at the end", () => {
-    const { writer, groups } = setUp();
-    addStarterSet(writer);
+    const { log, groups } = setUp();
+    addStarterSet(log);
 
-    const fun = createCategoryGroup(writer, { name: "Fun" });
-    createCategory(writer, { groupId: fun, name: "Games" });
-    createCategory(writer, { groupId: fun, name: "  Concerts " });
+    const fun = createCategoryGroup(log, { name: "Fun" });
+    createCategory(log, { groupId: fun, name: "Games" });
+    createCategory(log, { groupId: fun, name: "  Concerts " });
 
     expect(outline(groups()).at(-1)).toEqual(["Fun", ["Games", "Concerts"]]);
   });
 
   it("only creates a Category inside an existing Category Group", () => {
-    const { writer } = setUp();
+    const { log } = setUp();
     expect(() =>
-      createCategory(writer, { groupId: "nowhere", name: "Games" }),
+      createCategory(log, { groupId: "nowhere", name: "Games" }),
     ).toThrow(/no such Category Group/);
   });
 
   it("refuses a blank name", () => {
-    const { writer, groups } = setUp();
-    expect(() => createCategoryGroup(writer, { name: "  " })).toThrow(
+    const { log, groups } = setUp();
+    expect(() => createCategoryGroup(log, { name: "  " })).toThrow(
       /can't be blank/,
     );
     expect(groups()).toEqual([]);
   });
 
   it("renames Category Groups and Categories", () => {
-    const { writer, groups } = setUp();
-    addStarterSet(writer);
+    const { log, groups } = setUp();
+    addStarterSet(log);
     const [bills] = groups();
 
-    renameCategoryGroup(writer, bills.id, { name: "Fixed costs" });
-    renameCategory(writer, bills.categories[2].id, { name: "Mobile" });
+    renameCategoryGroup(log, bills.id, { name: "Fixed costs" });
+    renameCategory(log, bills.categories[2].id, { name: "Mobile" });
 
     expect(outline(groups())[0]).toEqual([
       "Fixed costs",
@@ -107,32 +107,32 @@ describe("Categories", () => {
   });
 
   it("only renames a Category that exists, to a name that isn't blank", () => {
-    const { writer, groups } = setUp();
-    addStarterSet(writer);
+    const { log, groups } = setUp();
+    addStarterSet(log);
     const rent = groups()[0].categories[0];
 
-    expect(() => renameCategory(writer, "nothing", { name: "X" })).toThrow(
+    expect(() => renameCategory(log, "nothing", { name: "X" })).toThrow(
       /no such Category/,
     );
-    expect(() => renameCategory(writer, rent.id, { name: "" })).toThrow(
+    expect(() => renameCategory(log, rent.id, { name: "" })).toThrow(
       /can't be blank/,
     );
     expect(groups()[0].categories[0].name).toBe("Rent");
   });
 
   it("reorders Category Groups", () => {
-    const { writer, groups } = setUp();
-    addStarterSet(writer);
+    const { log, groups } = setUp();
+    addStarterSet(log);
     const [, everyday, savings] = groups();
 
-    moveCategoryGroup(writer, savings.id, { toIndex: 0 });
+    moveCategoryGroup(log, savings.id, { toIndex: 0 });
     expect(groups().map(({ name }) => name)).toEqual([
       "Savings",
       "Bills",
       "Everyday",
     ]);
 
-    moveCategoryGroup(writer, everyday.id, { toIndex: 1 });
+    moveCategoryGroup(log, everyday.id, { toIndex: 1 });
     expect(groups().map(({ name }) => name)).toEqual([
       "Savings",
       "Everyday",
@@ -141,12 +141,12 @@ describe("Categories", () => {
   });
 
   it("reorders Categories within their Category Group", () => {
-    const { writer, groups } = setUp();
-    addStarterSet(writer);
+    const { log, groups } = setUp();
+    addStarterSet(log);
     const [bills] = groups();
     const internet = bills.categories[3];
 
-    moveCategory(writer, internet.id, { groupId: bills.id, toIndex: 1 });
+    moveCategory(log, internet.id, { groupId: bills.id, toIndex: 1 });
 
     expect(outline(groups())[0]).toEqual([
       "Bills",
@@ -155,12 +155,12 @@ describe("Categories", () => {
   });
 
   it("moves a Category to another Category Group", () => {
-    const { writer, groups } = setUp();
-    addStarterSet(writer);
+    const { log, groups } = setUp();
+    addStarterSet(log);
     const [bills, everyday] = groups();
     const phone = bills.categories[2];
 
-    moveCategory(writer, phone.id, { groupId: everyday.id, toIndex: 1 });
+    moveCategory(log, phone.id, { groupId: everyday.id, toIndex: 1 });
 
     expect(outline(groups()).slice(0, 2)).toEqual([
       ["Bills", ["Rent", "Power", "Internet"]],
@@ -169,18 +169,18 @@ describe("Categories", () => {
   });
 
   it("only moves to a Category Group that exists, and a place within it", () => {
-    const { writer, groups } = setUp();
-    addStarterSet(writer);
+    const { log, groups } = setUp();
+    addStarterSet(log);
     const [bills, , savings] = groups();
     const rent = bills.categories[0];
 
     expect(() =>
-      moveCategory(writer, rent.id, { groupId: "nowhere", toIndex: 0 }),
+      moveCategory(log, rent.id, { groupId: "nowhere", toIndex: 0 }),
     ).toThrow(/no such Category Group/);
     expect(() =>
-      moveCategory(writer, rent.id, { groupId: savings.id, toIndex: 2 }),
+      moveCategory(log, rent.id, { groupId: savings.id, toIndex: 2 }),
     ).toThrow(/no place 2/);
-    expect(() => moveCategoryGroup(writer, bills.id, { toIndex: 3 })).toThrow(
+    expect(() => moveCategoryGroup(log, bills.id, { toIndex: 3 })).toThrow(
       /no place 3/,
     );
     expect(outline(groups())).toEqual(outline(groupsAfterStarterSet()));
@@ -189,17 +189,17 @@ describe("Categories", () => {
   it("keeps the most recent reorder when two devices reorder, in either order", () => {
     const orders = [false, true].map((laptopFirst) => {
       const shared = setUp();
-      addStarterSet(shared.writer);
+      addStarterSet(shared.log);
       const records = createInMemoryChangeLog();
-      records.append(shared.writer.changeLog.readAll());
+      records.append(shared.log.readAll());
       const [, everyday, savings] = categoryGroups(records.readAll());
 
       // Two devices each start from the same records; the phone's clock runs
       // behind, but it reorders after seeing the laptop's change.
       const laptop = deviceCopy(records, "laptop", 2_000_000_000_000);
-      moveCategoryGroup(laptop.writer, savings.id, { toIndex: 0 });
+      moveCategoryGroup(laptop.log, savings.id, { toIndex: 0 });
       const phone = deviceCopy(laptop.changeLog, "phone", 1);
-      moveCategoryGroup(phone.writer, everyday.id, { toIndex: 0 });
+      moveCategoryGroup(phone.log, everyday.id, { toIndex: 0 });
 
       const merged = createInMemoryChangeLog();
       const sources = [laptop.changeLog, phone.changeLog];
@@ -217,17 +217,17 @@ describe("Categories", () => {
 
 describe("Leaving a Category Group out of Spent this Month", () => {
   it("starts a new Category Group counted, whatever its name", () => {
-    const { writer, groups } = setUp();
+    const { log, groups } = setUp();
 
-    createCategoryGroup(writer, { name: "Savings" });
+    createCategoryGroup(log, { name: "Savings" });
 
     expect(groups()[0].leftOutOfSpentThisMonth).toBe(false);
   });
 
   it("starts the starter set with only its Savings Group left out", () => {
-    const { writer, groups } = setUp();
+    const { log, groups } = setUp();
 
-    addStarterSet(writer);
+    addStarterSet(log);
 
     expect(
       groups().map(({ name, leftOutOfSpentThisMonth }) => [
@@ -242,39 +242,35 @@ describe("Leaving a Category Group out of Spent this Month", () => {
   });
 
   it("can be set and set back, and the latest setting wins", () => {
-    const { writer, groups } = setUp();
-    const id = createCategoryGroup(writer, { name: "Fun" });
+    const { log, groups } = setUp();
+    const id = createCategoryGroup(log, { name: "Fun" });
 
-    setCategoryGroupSpentThisMonth(writer, id, { leftOut: true });
+    setCategoryGroupSpentThisMonth(log, id, { leftOut: true });
     expect(groups()[0].leftOutOfSpentThisMonth).toBe(true);
 
-    setCategoryGroupSpentThisMonth(writer, id, { leftOut: false });
+    setCategoryGroupSpentThisMonth(log, id, { leftOut: false });
     expect(groups()[0].leftOutOfSpentThisMonth).toBe(false);
   });
 
   it("is refused for a Category Group that doesn't exist", () => {
-    const { writer } = setUp();
+    const { log } = setUp();
 
     expect(() =>
-      setCategoryGroupSpentThisMonth(writer, "nowhere", { leftOut: true }),
+      setCategoryGroupSpentThisMonth(log, "nowhere", { leftOut: true }),
     ).toThrow(/no such Category Group/);
   });
 
   it("keeps the most recent setting when two devices set it, in either order", () => {
     const settings = [false, true].map((laptopFirst) => {
       const shared = setUp();
-      const id = createCategoryGroup(shared.writer, { name: "Fun" });
+      const id = createCategoryGroup(shared.log, { name: "Fun" });
 
       // The phone's clock runs behind, but it sets this after seeing the
       // laptop's change, so the phone's is the most recent edit.
-      const laptop = deviceCopy(
-        shared.writer.changeLog,
-        "laptop",
-        2_000_000_000_000,
-      );
-      setCategoryGroupSpentThisMonth(laptop.writer, id, { leftOut: true });
+      const laptop = deviceCopy(shared.log, "laptop", 2_000_000_000_000);
+      setCategoryGroupSpentThisMonth(laptop.log, id, { leftOut: true });
       const phone = deviceCopy(laptop.changeLog, "phone", 1);
-      setCategoryGroupSpentThisMonth(phone.writer, id, { leftOut: false });
+      setCategoryGroupSpentThisMonth(phone.log, id, { leftOut: false });
 
       const merged = createInMemoryChangeLog();
       const sources = [laptop.changeLog, phone.changeLog];
@@ -290,31 +286,35 @@ describe("Leaving a Category Group out of Spent this Month", () => {
 });
 
 function groupsAfterStarterSet() {
-  const { writer, groups } = setUp();
-  addStarterSet(writer);
+  const { log, groups } = setUp();
+  addStarterSet(log);
   return groups();
 }
 
 /** A device holding a copy of the given records, with its own clock. */
-function deviceCopy(source: ChangeLog, deviceId: string, now: number) {
+function deviceCopy(
+  source: Pick<ChangeLog, "readAll">,
+  deviceId: string,
+  now: number,
+) {
   const changeLog = createInMemoryChangeLog();
   changeLog.append(source.readAll());
   return {
     changeLog,
-    writer: createChangeLogWriter(changeLog, deviceId, { now: () => now }),
+    log: createDeviceChangeLog(changeLog, deviceId, { now: () => now }),
   };
 }
 
 /** A Budget in USD with the starter set, and a way to seed the money records other slices publish. */
 function budgetWithStarterSet() {
   const changeLog = createInMemoryChangeLog();
-  const writer = createChangeLogWriter(changeLog, "this-device");
-  writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  const log = createDeviceChangeLog(changeLog, "this-device");
+  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
   );
-  addStarterSet(writer);
+  addStarterSet(log);
   const groups = () => categoryGroups(changeLog.readAll());
   const find = (name: string) => {
     const category = groups()
@@ -324,19 +324,19 @@ function budgetWithStarterSet() {
     return category;
   };
   return {
-    writer,
+    log,
     groups,
     find,
     id: (name: string) => find(name).id,
     assign(categoryId: string, month: Month, amount: number) {
-      writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+      log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
         assignmentSubject(categoryId, month),
         "AssignmentSet",
         { version: 1, categoryId, month, amount: money(amount, "USD") },
       );
     },
     spend(categoryId: string, date: string, amount: number) {
-      writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      log.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
         crypto.randomUUID(),
         "TransactionRecorded",
         {
@@ -357,7 +357,7 @@ describe("Hiding Categories", () => {
     const phone = budget.id("Phone");
     budget.assign(phone, "2026-10", 5000);
 
-    restoreHidden(budget.writer, phone);
+    restoreHidden(budget.log, phone);
 
     expect(budget.find("Phone").hidden).toBe(true);
   });
@@ -366,18 +366,13 @@ describe("Hiding Categories", () => {
     const choices = (
       budget: ReturnType<typeof budgetWithStarterSet>,
       name: string,
-    ) =>
-      moveOutChoices(
-        budget.writer.changeLog.readAll(),
-        budget.id(name),
-        "2026-10",
-      );
+    ) => moveOutChoices(budget.log.readAll(), budget.id(name), "2026-10");
 
     it("offers every other visible Category when moving money out", () => {
       const budget = budgetWithStarterSet();
       budget.assign(budget.id("Rent"), "2026-10", 75000);
       budget.assign(budget.id("Power"), "2026-10", 1000);
-      hideCategory(budget.writer, budget.id("Phone"), {
+      hideCategory(budget.log, budget.id("Phone"), {
         currentMonth: "2026-10",
       });
 
@@ -428,7 +423,7 @@ describe("Hiding Categories", () => {
     budget.assign(phone, "2026-09", 5000);
     budget.spend(phone, "2026-09-20", 5000);
 
-    hideCategory(budget.writer, phone, { currentMonth: "2026-10" });
+    hideCategory(budget.log, phone, { currentMonth: "2026-10" });
 
     expect(budget.find("Phone").hidden).toBe(true);
     expect(budget.find("Rent").hidden).toBe(false);
@@ -437,9 +432,9 @@ describe("Hiding Categories", () => {
   it("brings a hidden Category back when it is unhidden", () => {
     const budget = budgetWithStarterSet();
     const phone = budget.id("Phone");
-    hideCategory(budget.writer, phone, { currentMonth: "2026-10" });
+    hideCategory(budget.log, phone, { currentMonth: "2026-10" });
 
-    unhideCategory(budget.writer, phone);
+    unhideCategory(budget.log, phone);
 
     expect(budget.find("Phone").hidden).toBe(false);
   });
@@ -450,7 +445,7 @@ describe("Hiding Categories", () => {
     budget.assign(phone, "2026-09", 5000);
 
     expect(() =>
-      hideCategory(budget.writer, phone, { currentMonth: "2026-10" }),
+      hideCategory(budget.log, phone, { currentMonth: "2026-10" }),
     ).toThrow(/Phone still has \$50\.00 Available/);
     expect(budget.find("Phone").hidden).toBe(false);
   });
@@ -461,7 +456,7 @@ describe("Hiding Categories", () => {
     budget.spend(phone, "2026-10-02", 1000);
 
     expect(() =>
-      hideCategory(budget.writer, phone, { currentMonth: "2026-10" }),
+      hideCategory(budget.log, phone, { currentMonth: "2026-10" }),
     ).toThrow(/Phone still has −\$10\.00 Available/);
   });
 
@@ -471,7 +466,7 @@ describe("Hiding Categories", () => {
     budget.assign(phone, "2026-12", 5000);
 
     expect(() =>
-      hideCategory(budget.writer, phone, { currentMonth: "2026-10" }),
+      hideCategory(budget.log, phone, { currentMonth: "2026-10" }),
     ).toThrow(/Phone has Assignments in later Months/);
     expect(budget.find("Phone").hidden).toBe(false);
   });
@@ -481,7 +476,7 @@ describe("Deleting Categories and Category Groups", () => {
   it("deletes a Category that was never used", () => {
     const budget = budgetWithStarterSet();
 
-    deleteCategory(budget.writer, budget.id("Phone"));
+    deleteCategory(budget.log, budget.id("Phone"));
 
     expect(outline(budget.groups())[0]).toEqual([
       "Bills",
@@ -497,8 +492,8 @@ describe("Deleting Categories and Category Groups", () => {
     budget.assign(internet, "2026-10", 5000);
     budget.assign(internet, "2026-10", 0);
 
-    deleteCategory(budget.writer, phone);
-    deleteCategory(budget.writer, internet);
+    deleteCategory(budget.log, phone);
+    deleteCategory(budget.log, internet);
 
     expect(outline(budget.groups())[0]).toEqual(["Bills", ["Rent", "Power"]]);
   });
@@ -510,10 +505,8 @@ describe("Deleting Categories and Category Groups", () => {
     budget.spend(phone, "2026-10-02", 1000);
     budget.assign(power, "2026-10", 2500);
 
-    expect(() => deleteCategory(budget.writer, phone)).toThrow(
-      CategoryInUseError,
-    );
-    expect(() => deleteCategory(budget.writer, power)).toThrow(
+    expect(() => deleteCategory(budget.log, phone)).toThrow(CategoryInUseError);
+    expect(() => deleteCategory(budget.log, power)).toThrow(
       "Power has Transactions or Assignments, so it can't be deleted. You can hide it instead.",
     );
     expect(outline(budget.groups())[0]).toEqual([
@@ -525,7 +518,7 @@ describe("Deleting Categories and Category Groups", () => {
   it("refuses to delete a Category with a Take-back", () => {
     const budget = budgetWithStarterSet();
     const power = budget.id("Power");
-    budget.writer.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+    budget.log.write<TakeBackSet["type"], TakeBackSet["payload"]>(
       assignmentSubject(power, "2026-10"),
       "TakeBackSet",
       {
@@ -536,21 +529,19 @@ describe("Deleting Categories and Category Groups", () => {
       },
     );
 
-    expect(() => deleteCategory(budget.writer, power)).toThrow(
-      CategoryInUseError,
-    );
+    expect(() => deleteCategory(budget.log, power)).toThrow(CategoryInUseError);
   });
 
   it("deletes an empty Category Group, but not one with Categories in it", () => {
     const budget = budgetWithStarterSet();
     const [, , savings] = budget.groups();
 
-    expect(() => deleteCategoryGroup(budget.writer, savings.id)).toThrow(
+    expect(() => deleteCategoryGroup(budget.log, savings.id)).toThrow(
       "Savings still has Categories. Move or delete them first.",
     );
 
-    deleteCategory(budget.writer, budget.id("Emergency Fund"));
-    deleteCategoryGroup(budget.writer, savings.id);
+    deleteCategory(budget.log, budget.id("Emergency Fund"));
+    deleteCategoryGroup(budget.log, savings.id);
 
     expect(outline(budget.groups()).map(([name]) => name)).toEqual([
       "Bills",
@@ -561,11 +552,11 @@ describe("Deleting Categories and Category Groups", () => {
   it("counts a hidden Category as being in its Category Group", () => {
     const budget = budgetWithStarterSet();
     const [, , savings] = budget.groups();
-    hideCategory(budget.writer, budget.id("Emergency Fund"), {
+    hideCategory(budget.log, budget.id("Emergency Fund"), {
       currentMonth: "2026-10",
     });
 
-    expect(() => deleteCategoryGroup(budget.writer, savings.id)).toThrow(
+    expect(() => deleteCategoryGroup(budget.log, savings.id)).toThrow(
       /still has Categories/,
     );
   });

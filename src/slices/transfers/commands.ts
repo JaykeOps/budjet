@@ -1,4 +1,4 @@
-import type { ChangeLogWriter, ChangeRecord } from "../../kernel/change-log";
+import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
 import type { Money } from "../../kernel/money";
 import { monthOf } from "../../kernel/month";
 import { accounts } from "../accounts";
@@ -23,29 +23,28 @@ export type TransferInput = {
 
 /** Moves money from one open Account to another and returns the Transfer's id. */
 export function makeTransfer(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   input: TransferInput,
 ): string {
-  const details = validTransfer(writer.changeLog.readAll(), input);
+  const details = validTransfer(log.readAll(), input);
   const id = crypto.randomUUID();
-  writer.write<TransferMade["type"], TransferMade["payload"]>(
-    id,
-    "TransferMade",
-    { version: 1, ...details },
-  );
+  log.write<TransferMade["type"], TransferMade["payload"]>(id, "TransferMade", {
+    version: 1,
+    ...details,
+  });
   return id;
 }
 
 /** Replaces a Transfer's details. The same rules apply as when making one. */
 export function editTransfer(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   id: string,
   input: TransferInput,
 ): void {
-  const records = writer.changeLog.readAll();
+  const records = log.readAll();
   requireTransfer(records, id);
   const details = validTransfer(records, input);
-  writer.write<TransferEdited["type"], TransferEdited["payload"]>(
+  log.write<TransferEdited["type"], TransferEdited["payload"]>(
     id,
     "TransferEdited",
     { version: 1, ...details },
@@ -53,9 +52,9 @@ export function editTransfer(
 }
 
 /** Takes a Transfer out of the Budget, unless it touches a closed Account. */
-export function deleteTransfer(writer: ChangeLogWriter, id: string): void {
-  requireTransfer(writer.changeLog.readAll(), id);
-  writer.write<TransferDeleted["type"], TransferDeleted["payload"]>(
+export function deleteTransfer(log: DeviceChangeLog, id: string): void {
+  requireTransfer(log.readAll(), id);
+  log.write<TransferDeleted["type"], TransferDeleted["payload"]>(
     id,
     "TransferDeleted",
     { version: 1 },
@@ -68,17 +67,17 @@ export function deleteTransfer(writer: ChangeLogWriter, id: string): void {
  * place. Returns its id.
  */
 export function restoreTransfer(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   restores: string,
   input: TransferInput,
 ): string {
-  const details = validTransfer(writer.changeLog.readAll(), input);
+  const details = validTransfer(log.readAll(), input);
   const id = crypto.randomUUID();
-  writer.write<TransferMade["type"], TransferMade["payload"]>(
-    id,
-    "TransferMade",
-    { version: 1, restores, ...details },
-  );
+  log.write<TransferMade["type"], TransferMade["payload"]>(id, "TransferMade", {
+    version: 1,
+    restores,
+    ...details,
+  });
   return id;
 }
 

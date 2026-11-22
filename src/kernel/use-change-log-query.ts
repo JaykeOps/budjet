@@ -4,34 +4,26 @@ import {
   useMemo,
   useSyncExternalStore,
 } from "react";
-import type {
-  ChangeLog,
-  ChangeLogWriter,
-  ChangeRecord,
-  SaveState,
-} from "./change-log";
+import type { ChangeRecord, DeviceChangeLog, SaveState } from "./change-log";
 
-const ChangeLogWriterContext = createContext<ChangeLogWriter | null>(null);
+const DeviceChangeLogContext = createContext<DeviceChangeLog | null>(null);
 
-/** Gives the components below it this device's ChangeLogWriter, which they read and write the Change Log through. */
-export const ChangeLogWriterProvider = ChangeLogWriterContext.Provider;
+/** Gives the components below it this device's DeviceChangeLog, which they read and write the Change Log through. */
+export const DeviceChangeLogProvider = DeviceChangeLogContext.Provider;
 
-export function useChangeLogWriter(): ChangeLogWriter {
-  const writer = useContext(ChangeLogWriterContext);
-  if (!writer)
+export function useDeviceChangeLog(): DeviceChangeLog {
+  const log = useContext(DeviceChangeLogContext);
+  if (!log)
     throw new Error(
-      "useChangeLogWriter needs a ChangeLogWriterProvider above it",
+      "useDeviceChangeLog needs a DeviceChangeLogProvider above it",
     );
-  return writer;
+  return log;
 }
 
 /** Whether every change has reached where the Change Log keeps them. */
 export function useSaveState(): SaveState {
-  const { changeLog } = useChangeLogWriter();
-  return useSyncExternalStore(
-    changeLog.subscribeToSaveState,
-    changeLog.saveState,
-  );
+  const log = useDeviceChangeLog();
+  return useSyncExternalStore(log.subscribeToSaveState, log.saveState);
 }
 
 type Query<Result> = (records: readonly ChangeRecord[]) => Result;
@@ -42,12 +34,9 @@ type Query<Result> = (records: readonly ChangeRecord[]) => Result;
  * (a module-level query), not an inline one.
  */
 export function useChangeLogQuery<Result>(query: Query<Result>): Result {
-  const { changeLog } = useChangeLogWriter();
-  const getSnapshot = useMemo(
-    () => cachedQuery(changeLog, query),
-    [changeLog, query],
-  );
-  return useSyncExternalStore(changeLog.subscribe, getSnapshot);
+  const log = useDeviceChangeLog();
+  const getSnapshot = useMemo(() => cachedQuery(log, query), [log, query]);
+  return useSyncExternalStore(log.subscribe, getSnapshot);
 }
 
 /**
@@ -55,13 +44,13 @@ export function useChangeLogQuery<Result>(query: Query<Result>): Result {
  * useSyncExternalStore sees an unchanged snapshot and skips the re-render.
  */
 function cachedQuery<Result>(
-  changeLog: ChangeLog,
+  log: Pick<DeviceChangeLog, "readAll">,
   query: Query<Result>,
 ): () => Result {
   let records: readonly ChangeRecord[] | undefined;
   let result = undefined as Result;
   return () => {
-    const latest = changeLog.readAll();
+    const latest = log.readAll();
     if (latest !== records) {
       records = latest;
       const next = query(latest);

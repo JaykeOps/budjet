@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type ChangeRecord,
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
   deletedSubjects,
   latestBySubject,
@@ -19,7 +19,7 @@ describe("perSnapshot", () => {
     expect(count(log.readAll())).toBe(0);
     expect(count(log.readAll())).toBe(0);
     expect(replays).toBe(1);
-    createChangeLogWriter(log, "device").write("thing", "Named", {});
+    createDeviceChangeLog(log, "device").write("thing", "Named", {});
     expect(count(log.readAll())).toBe(1);
     expect(replays).toBe(2);
   });
@@ -39,7 +39,7 @@ function fakeClock(start: number) {
 describe("Change Log", () => {
   it("returns records in timestamp order, whatever order they were appended in", () => {
     const clock = fakeClock(1_000);
-    const phone = createChangeLogWriter(
+    const phone = createDeviceChangeLog(
       createInMemoryChangeLog(),
       "phone",
       clock,
@@ -57,7 +57,7 @@ describe("Change Log", () => {
 
   it("notifies subscribers on append until they unsubscribe", () => {
     const log = createInMemoryChangeLog();
-    const phone = createChangeLogWriter(log, "phone");
+    const phone = createDeviceChangeLog(log, "phone");
     let notifications = 0;
     const unsubscribe = log.subscribe(() => {
       notifications++;
@@ -75,13 +75,13 @@ describe("Change Log", () => {
       // The laptop's clock runs an hour fast.
       const laptopClock = fakeClock(10 * HOUR);
       const laptopLog = createInMemoryChangeLog();
-      const laptop = createChangeLogWriter(laptopLog, "laptop", laptopClock);
+      const laptop = createDeviceChangeLog(laptopLog, "laptop", laptopClock);
       const earlier = laptop.write("thing", "Named", { name: "from laptop" });
 
       // Five minutes later the phone has synced the laptop's edit, then edits.
       const phoneLog = createInMemoryChangeLog();
       phoneLog.append([earlier]);
-      const phone = createChangeLogWriter(
+      const phone = createDeviceChangeLog(
         phoneLog,
         "phone",
         fakeClock(9 * HOUR + 5 * MINUTE),
@@ -94,12 +94,12 @@ describe("Change Log", () => {
 
     it("with the device id breaking a tie", () => {
       const sameTime = { now: () => 1_000 };
-      const apple = createChangeLogWriter(
+      const apple = createDeviceChangeLog(
         createInMemoryChangeLog(),
         "device-a",
         sameTime,
       );
-      const banana = createChangeLogWriter(
+      const banana = createDeviceChangeLog(
         createInMemoryChangeLog(),
         "device-b",
         sameTime,
@@ -113,7 +113,7 @@ describe("Change Log", () => {
 
     it("keeping each thing's own latest record", () => {
       const log = createInMemoryChangeLog();
-      const phone = createChangeLogWriter(log, "phone");
+      const phone = createDeviceChangeLog(log, "phone");
       phone.write("rent", "Named", { name: "Rent" });
       const power = phone.write("power", "Named", { name: "Power" });
       const rent = phone.write("rent", "Named", { name: "Housing" });
@@ -131,7 +131,7 @@ describe("Change Log", () => {
 describe("deletedSubjects", () => {
   it("names every subject with a delete record, wherever it falls among the rest", () => {
     const log = createInMemoryChangeLog();
-    const phone = createChangeLogWriter(log, "phone");
+    const phone = createDeviceChangeLog(log, "phone");
     phone.write("kept", "Named", { name: "Rent" });
     phone.write("gone", "Named", { name: "Power" });
     phone.write("gone", "Deleted", {});
@@ -147,7 +147,7 @@ describe("writing at an earlier record's place", () => {
   it("sorts the new record where that record is, not last, and keeps the clock moving forward", () => {
     const log = createInMemoryChangeLog();
     let clock = 1_000;
-    const phone = createChangeLogWriter(log, "phone", { now: () => clock++ });
+    const phone = createDeviceChangeLog(log, "phone", { now: () => clock++ });
     const earlier = phone.write("thing", "Named", { name: "a" });
     const next = phone.write("thing", "Named", { name: "b" });
 

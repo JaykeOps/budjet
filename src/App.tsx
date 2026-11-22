@@ -9,11 +9,11 @@ import { useCategoryChanges } from "./category-changes";
 import { FolderBanner, type FolderConnection } from "./FolderBanner";
 import { useFirstCategoryChanges } from "./first-categories";
 import { FirstRun } from "./first-run/FirstRun";
-import type { ChangeLogWriter } from "./kernel/change-log";
+import type { DeviceChangeLog } from "./kernel/change-log";
 import { parseMonth } from "./kernel/month";
 import {
-  ChangeLogWriterProvider,
-  useChangeLogWriter,
+  DeviceChangeLogProvider,
+  useDeviceChangeLog,
 } from "./kernel/use-change-log-query";
 import { useMonthInUrl } from "./month-in-url";
 import { NavigationShell } from "./NavigationShell";
@@ -45,13 +45,13 @@ type KeepInFolder = ComponentProps<typeof FirstRun>["keepInFolder"];
 type FolderOffer = ComponentProps<typeof MoveIntoFolderOffer> | undefined;
 
 export function App({
-  writer,
+  log,
   keepInFolder,
   folderChosen,
   folderConnection,
   folderOffer,
 }: {
-  writer: ChangeLogWriter;
+  log: DeviceChangeLog;
   keepInFolder: KeepInFolder;
   /** A folder is already chosen for the Budget setup is about to write. */
   folderChosen?: boolean;
@@ -60,14 +60,14 @@ export function App({
   folderOffer: FolderOffer;
 }) {
   return (
-    <ChangeLogWriterProvider value={writer}>
+    <DeviceChangeLogProvider value={log}>
       <Root
         keepInFolder={keepInFolder}
         folderChosen={folderChosen}
         folderConnection={folderConnection}
         folderOffer={folderOffer}
       />
-    </ChangeLogWriterProvider>
+    </DeviceChangeLogProvider>
   );
 }
 
@@ -139,7 +139,7 @@ function Shell({
   folderConnection?: FolderConnection;
   folderOffer: FolderOffer;
 }) {
-  const writer = useChangeLogWriter();
+  const log = useDeviceChangeLog();
   const accounts = useAccounts();
   const place = usePlace();
   const toast = useToast();
@@ -154,7 +154,7 @@ function Shell({
         <OpenAccountForm
           label="Add your first Account"
           currency={budget.currency}
-          onOpen={(input) => openAccount(writer, input)}
+          onOpen={(input) => openAccount(log, input)}
         />
       </Page>
     );
@@ -175,7 +175,7 @@ function Shell({
             onAssign={assignmentChanges.onAssign}
             onCopyLastMonth={(month, unticked) =>
               assignmentChanges.onCopyLastMonth(month, [
-                ...hiddenCategoryIds(writer),
+                ...hiddenCategoryIds(log),
                 ...unticked,
               ])
             }
@@ -205,7 +205,7 @@ function Shell({
         onClose={() => setAddingAccount(false)}
         currency={budget.currency}
         onOpen={(input) => {
-          const id = openAccount(writer, input);
+          const id = openAccount(log, input);
           setAddingAccount(false);
           toast({ text: `Added ${input.name.trim()}` });
           pushAddress(placeAddress("accounts", id));
@@ -257,8 +257,8 @@ function AccountTransactions({
 }
 
 /** Copy last Month leaves hidden Categories out. */
-function hiddenCategoryIds(writer: ChangeLogWriter): string[] {
-  return categoryGroups(writer.changeLog.readAll())
+function hiddenCategoryIds(log: DeviceChangeLog): string[] {
+  return categoryGroups(log.readAll())
     .flatMap((group) => group.categories)
     .filter(({ hidden }) => hidden)
     .map(({ id }) => id);

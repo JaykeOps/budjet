@@ -5,10 +5,10 @@
  * the thing or closing its Account, and the toast says so.
  */
 import { useMemo } from "react";
-import type { ChangeLogWriter } from "./kernel/change-log";
+import type { DeviceChangeLog } from "./kernel/change-log";
 import { formatMoney, money } from "./kernel/money";
 import { type Month, monthNameAlone, previousMonth } from "./kernel/month";
-import { useChangeLogWriter } from "./kernel/use-change-log-query";
+import { useDeviceChangeLog } from "./kernel/use-change-log-query";
 import {
   deleteRedeclaredBalance,
   restoreRedeclaredBalance,
@@ -47,139 +47,133 @@ import { useToast } from "./ui/Toast";
 
 export type Undo = () => void;
 
-function transactionNow(
-  writer: ChangeLogWriter,
-  id: string,
-): CurrentTransaction {
-  const now = currentTransactions(writer.changeLog.readAll()).find(
+function transactionNow(log: DeviceChangeLog, id: string): CurrentTransaction {
+  const now = currentTransactions(log.readAll()).find(
     (transaction) => transaction.id === id,
   );
   if (!now) throw new RangeError(`No Transaction ${id}`);
   return now;
 }
 
-function transferNow(writer: ChangeLogWriter, id: string): TransferInput {
-  const now = currentTransfers(writer.changeLog.readAll()).get(id);
+function transferNow(log: DeviceChangeLog, id: string): TransferInput {
+  const now = currentTransfers(log.readAll()).get(id);
   if (!now) throw new RangeError(`No Transfer ${id}`);
   return now;
 }
 
 /** Undoing writes the previous values as a new record. */
 export function editTransactionWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   id: string,
   input: TransactionInput,
 ): Undo {
-  const previous = transactionNow(writer, id);
-  editTransaction(writer, id, input);
-  return () => editTransaction(writer, id, previous);
+  const previous = transactionNow(log, id);
+  editTransaction(log, id, input);
+  return () => editTransaction(log, id, previous);
 }
 
 /** Undoing writes a new Transaction, with a fresh id, in the same place. */
 export function deleteTransactionWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   id: string,
 ): Undo {
-  const deleted = transactionNow(writer, id);
-  deleteTransaction(writer, id);
+  const deleted = transactionNow(log, id);
+  deleteTransaction(log, id);
   return () => {
-    restoreTransaction(writer, deleted);
+    restoreTransaction(log, deleted);
   };
 }
 
 /** Undoing writes the previous details as a new record. */
 export function editTransferWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   id: string,
   input: TransferInput,
 ): Undo {
-  const previous = transferNow(writer, id);
-  editTransfer(writer, id, input);
-  return () => editTransfer(writer, id, previous);
+  const previous = transferNow(log, id);
+  editTransfer(log, id, input);
+  return () => editTransfer(log, id, previous);
 }
 
 /** Undoing writes a new Transfer, with a fresh id, in the same place. */
-export function deleteTransferWithUndo(
-  writer: ChangeLogWriter,
-  id: string,
-): Undo {
-  const deleted = transferNow(writer, id);
-  deleteTransfer(writer, id);
+export function deleteTransferWithUndo(log: DeviceChangeLog, id: string): Undo {
+  const deleted = transferNow(log, id);
+  deleteTransfer(log, id);
   return () => {
-    restoreTransfer(writer, id, deleted);
+    restoreTransfer(log, id, deleted);
   };
 }
 
 /** Undoing writes the same balance, with a fresh id, in the same place in the Change Log. */
 export function deleteRedeclaredBalanceWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   recordId: string,
 ): Undo {
-  deleteRedeclaredBalance(writer, recordId);
+  deleteRedeclaredBalance(log, recordId);
   return () => {
-    restoreRedeclaredBalance(writer, recordId);
+    restoreRedeclaredBalance(log, recordId);
   };
 }
 
 export type Place = { categoryId: string; month: Month };
 
 /** Notes the Assignment and Take-back at each place, and returns what writes them back. */
-export function rememberMoney(writer: ChangeLogWriter, places: Place[]): Undo {
-  const current = currentAssignments(writer.changeLog.readAll());
+export function rememberMoney(log: DeviceChangeLog, places: Place[]): Undo {
+  const current = currentAssignments(log.readAll());
   const remembered = places.map((place) => {
     const now = current.get(assignmentSubject(place.categoryId, place.month));
     return { ...place, assigned: now?.assigned, takenBack: now?.takenBack };
   });
   return () => {
-    for (const place of remembered) restoreAssignment(writer, place);
+    for (const place of remembered) restoreAssignment(log, place);
   };
 }
 
 /** Undoing writes the previous Assignment and Take-back as new records. */
 export function setAssignmentWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   input: AssignmentInput,
 ): Undo {
-  const undo = rememberMoney(writer, [input]);
-  setAssignment(writer, input);
+  const undo = rememberMoney(log, [input]);
+  setAssignment(log, input);
   return undo;
 }
 
 /** Undoing writes both Categories' previous Assignments and Take-backs. */
 export function moveMoneyWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   input: MoveMoneyInput,
 ): Undo {
   const { fromCategoryId, toCategoryId, month } = input;
-  const undo = rememberMoney(writer, [
+  const undo = rememberMoney(log, [
     { categoryId: fromCategoryId, month },
     { categoryId: toCategoryId, month },
   ]);
-  moveMoney(writer, input);
+  moveMoney(log, input);
   return undo;
 }
 
 /** Undoing empties what it filled. A Category it left alone has nothing to write back. */
 export function copyLastMonthWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   input: Parameters<typeof copyLastMonth>[1],
 ): { copied: number; undo: Undo } {
   const { month } = input;
   const lastMonth = previousMonth(month);
-  const places = [...currentAssignments(writer.changeLog.readAll()).values()]
+  const places = [...currentAssignments(log.readAll()).values()]
     .filter((current) => current.month === lastMonth)
     .map(({ categoryId }) => ({ categoryId, month }));
-  const undo = rememberMoney(writer, places);
-  return { copied: copyLastMonth(writer, input), undo };
+  const undo = rememberMoney(log, places);
+  return { copied: copyLastMonth(log, input), undo };
 }
 
 /** What the Budget's Assignments do when changed: the change, and its toast with Undo. */
 export function useAssignmentChanges() {
-  const writer = useChangeLogWriter();
+  const log = useDeviceChangeLog();
   const toast = useToast();
   return useMemo(() => {
     const nameOf = (id: string) =>
-      categoryGroups(writer.changeLog.readAll())
+      categoryGroups(log.readAll())
         .flatMap(({ categories }) => categories)
         .find((category) => category.id === id)?.name ?? "that Category";
     return {
@@ -194,18 +188,18 @@ export function useAssignmentChanges() {
             amount.minorUnits < 0
               ? `Took ${size} back from ${name}`
               : `Assigned ${size} to ${name}`,
-          onUndo: setAssignmentWithUndo(writer, input),
+          onUndo: setAssignmentWithUndo(log, input),
         });
       },
       onMoveMoney(input: MoveMoneyInput) {
         const { amount, fromCategoryId, toCategoryId } = input;
         toast({
           text: `Moved ${formatMoney(amount)} from ${nameOf(fromCategoryId)} to ${nameOf(toCategoryId)}`,
-          onUndo: moveMoneyWithUndo(writer, input),
+          onUndo: moveMoneyWithUndo(log, input),
         });
       },
       onCopyLastMonth(month: Month, skipping: Iterable<string>) {
-        const { copied, undo } = copyLastMonthWithUndo(writer, {
+        const { copied, undo } = copyLastMonthWithUndo(log, {
           month,
           skipping,
         });
@@ -217,46 +211,46 @@ export function useAssignmentChanges() {
         });
       },
     };
-  }, [writer, toast]);
+  }, [log, toast]);
 }
 
 /** What a history's rows do when changed: the change, and its toast with Undo. */
 export function useHistoryChanges() {
-  const writer = useChangeLogWriter();
+  const log = useDeviceChangeLog();
   const toast = useToast();
   return useMemo(
     () => ({
       onEdit(id: string, input: TransactionInput) {
         toast({
           text: "Changes saved",
-          onUndo: editTransactionWithUndo(writer, id, input),
+          onUndo: editTransactionWithUndo(log, id, input),
         });
       },
       onDelete(id: string) {
         toast({
           text: "Transaction deleted",
-          onUndo: deleteTransactionWithUndo(writer, id),
+          onUndo: deleteTransactionWithUndo(log, id),
         });
       },
       onEditTransfer(id: string, input: TransferInput) {
         toast({
           text: "Changes saved",
-          onUndo: editTransferWithUndo(writer, id, input),
+          onUndo: editTransferWithUndo(log, id, input),
         });
       },
       onDeleteTransfer(id: string) {
         toast({
           text: "Transfer deleted",
-          onUndo: deleteTransferWithUndo(writer, id),
+          onUndo: deleteTransferWithUndo(log, id),
         });
       },
       onDeleteRedeclaredBalance(recordId: string, what: string) {
         toast({
           text: `${what} deleted`,
-          onUndo: deleteRedeclaredBalanceWithUndo(writer, recordId),
+          onUndo: deleteRedeclaredBalanceWithUndo(log, recordId),
         });
       },
     }),
-    [writer, toast],
+    [log, toast],
   );
 }

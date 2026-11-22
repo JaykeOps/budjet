@@ -1,4 +1,4 @@
-import type { ChangeLogWriter } from "../kernel/change-log";
+import type { DeviceChangeLog } from "../kernel/change-log";
 import type { Currency } from "../kernel/money";
 import type { OpenAccountInput } from "../slices/accounts";
 import { openAccount } from "../slices/accounts/commands";
@@ -12,7 +12,7 @@ export type CategoriesChoice = "starter" | "blank";
  * first, because a refusal part way through would leave half a Budget.
  */
 export function openMyBudget(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   {
     currency,
     categories,
@@ -33,7 +33,7 @@ export function openMyBudget(
     }
   }
 
-  createBudget(writer, { currency });
-  if (categories === "starter") addStarterSet(writer);
-  for (const account of accounts) openAccount(writer, account);
+  createBudget(log, { currency });
+  if (categories === "starter") addStarterSet(log);
+  for (const account of accounts) openAccount(log, account);
 }

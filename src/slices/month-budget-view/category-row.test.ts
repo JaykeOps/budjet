@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
@@ -141,9 +141,9 @@ describe("categoryRow", () => {
 
 describe("categoryRowIn", () => {
   it("agrees with Budget Totals' Available, which stays the one calculation of it", () => {
-    const log = createInMemoryChangeLog();
-    const writer = createChangeLogWriter(log, "phone");
-    writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+    const changeLog = createInMemoryChangeLog();
+    const log = createDeviceChangeLog(changeLog, "phone");
+    log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
       "budget",
       "BudgetCreated",
       { version: 1, currency: "USD" },
@@ -154,22 +154,22 @@ describe("categoryRowIn", () => {
       month,
       amount: usd(dollars),
     });
-    writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+    log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
       assignmentSubject("groceries", "2026-10"),
       "AssignmentSet",
       amountIn("2026-10", 300),
     );
-    writer.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+    log.write<TakeBackSet["type"], TakeBackSet["payload"]>(
       assignmentSubject("groceries", "2026-11"),
       "TakeBackSet",
       amountIn("2026-11", 40),
     );
-    writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+    log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
       assignmentSubject("groceries", "2026-11"),
       "AssignmentSet",
       amountIn("2026-11", 25),
     );
-    writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+    log.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
       "lunch",
       "TransactionRecorded",
       {
@@ -180,7 +180,7 @@ describe("categoryRowIn", () => {
         categoryId: "groceries",
       },
     );
-    const records = log.readAll();
+    const records = changeLog.readAll();
 
     for (const of of ["2026-10", "2026-11", "2026-12"] as const) {
       expect(categoryRowIn(records, "groceries", of, "USD").available).toEqual(

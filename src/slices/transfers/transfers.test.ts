@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
@@ -15,8 +15,8 @@ import { transfers } from "./index";
 /** A Budget in USD with two Accounts: "checking" holding $1,000 and "savings" holding $500. */
 function budget() {
   const changeLog = createInMemoryChangeLog();
-  const writer = createChangeLogWriter(changeLog, "this-device");
-  writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  const log = createDeviceChangeLog(changeLog, "this-device");
+  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
@@ -25,7 +25,7 @@ function budget() {
     ["checking", "Checking", 100000],
     ["savings", "Savings", 50000],
   ] as const) {
-    writer.write<AccountOpened["type"], AccountOpened["payload"]>(
+    log.write<AccountOpened["type"], AccountOpened["payload"]>(
       id,
       "AccountOpened",
       {
@@ -38,7 +38,7 @@ function budget() {
   }
   return {
     changeLog,
-    writer,
+    log,
     balance: (accountId: string) =>
       accountBalance(changeLog.readAll(), accountId),
   };
@@ -46,9 +46,9 @@ function budget() {
 
 describe("Transfers", () => {
   it("moves money out of one Account and into another", () => {
-    const { writer, balance } = budget();
+    const { log, balance } = budget();
 
-    makeTransfer(writer, {
+    makeTransfer(log, {
       fromAccountId: "checking",
       toAccountId: "savings",
       date: "2026-10-12",
@@ -60,8 +60,8 @@ describe("Transfers", () => {
   });
 
   it("leaves Ready to Assign and every Category's Available unchanged", () => {
-    const { changeLog, writer } = budget();
-    writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+    const { changeLog, log } = budget();
+    log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
       "groceries/2026-10",
       "AssignmentSet",
       {
@@ -72,7 +72,7 @@ describe("Transfers", () => {
       },
     );
 
-    makeTransfer(writer, {
+    makeTransfer(log, {
       fromAccountId: "savings",
       toAccountId: "checking",
       date: "2026-10-12",
@@ -105,10 +105,10 @@ describe("Transfers", () => {
     ["a negative amount", { amount: money(-100, "USD") }, /above zero/],
     ["a date that isn't a calendar date", { date: "12/10/2026" }, /date/],
   ])("refuses a Transfer with %s", (_, change, error) => {
-    const { writer, balance } = budget();
+    const { log, balance } = budget();
 
     expect(() =>
-      makeTransfer(writer, {
+      makeTransfer(log, {
         fromAccountId: "checking",
         toAccountId: "savings",
         date: "2026-10-12",
@@ -121,15 +121,15 @@ describe("Transfers", () => {
   });
 
   it("edits a Transfer, moving its money to match", () => {
-    const { changeLog, writer, balance } = budget();
-    const id = makeTransfer(writer, {
+    const { changeLog, log, balance } = budget();
+    const id = makeTransfer(log, {
       fromAccountId: "checking",
       toAccountId: "savings",
       date: "2026-10-12",
       amount: money(20000, "USD"),
     });
 
-    editTransfer(writer, id, {
+    editTransfer(log, id, {
       fromAccountId: "savings",
       toAccountId: "checking",
       date: "2026-10-14",
@@ -152,8 +152,8 @@ describe("Transfers", () => {
   });
 
   it("refuses an edit that breaks the Transfer rules", () => {
-    const { writer, balance } = budget();
-    const id = makeTransfer(writer, {
+    const { log, balance } = budget();
+    const id = makeTransfer(log, {
       fromAccountId: "checking",
       toAccountId: "savings",
       date: "2026-10-12",
@@ -161,7 +161,7 @@ describe("Transfers", () => {
     });
 
     expect(() =>
-      editTransfer(writer, id, {
+      editTransfer(log, id, {
         fromAccountId: "savings",
         toAccountId: "savings",
         date: "2026-10-12",
@@ -172,15 +172,15 @@ describe("Transfers", () => {
   });
 
   it("deletes a Transfer, giving both Accounts their money back", () => {
-    const { changeLog, writer, balance } = budget();
-    const id = makeTransfer(writer, {
+    const { changeLog, log, balance } = budget();
+    const id = makeTransfer(log, {
       fromAccountId: "checking",
       toAccountId: "savings",
       date: "2026-10-12",
       amount: money(20000, "USD"),
     });
 
-    deleteTransfer(writer, id);
+    deleteTransfer(log, id);
 
     expect(balance("checking")).toEqual(money(100000, "USD"));
     expect(balance("savings")).toEqual(money(50000, "USD"));
@@ -188,14 +188,14 @@ describe("Transfers", () => {
   });
 
   it("keeps Transfers of a closed Account, but makes, edits and deletes none touching it", () => {
-    const { changeLog, writer, balance } = budget();
-    const emptiedSavings = makeTransfer(writer, {
+    const { changeLog, log, balance } = budget();
+    const emptiedSavings = makeTransfer(log, {
       fromAccountId: "savings",
       toAccountId: "checking",
       date: "2026-10-12",
       amount: money(50000, "USD"),
     });
-    writer.write<AccountClosed["type"], AccountClosed["payload"]>(
+    log.write<AccountClosed["type"], AccountClosed["payload"]>(
       "savings",
       "AccountClosed",
       { version: 1 },
@@ -207,18 +207,18 @@ describe("Transfers", () => {
       amount: money(100, "USD"),
     };
 
-    expect(() => makeTransfer(writer, transfer)).toThrow("Savings is closed");
+    expect(() => makeTransfer(log, transfer)).toThrow("Savings is closed");
     expect(() =>
-      makeTransfer(writer, {
+      makeTransfer(log, {
         ...transfer,
         fromAccountId: "savings",
         toAccountId: "checking",
       }),
     ).toThrow("Savings is closed");
-    expect(() => editTransfer(writer, emptiedSavings, transfer)).toThrow(
+    expect(() => editTransfer(log, emptiedSavings, transfer)).toThrow(
       "Savings is closed",
     );
-    expect(() => deleteTransfer(writer, emptiedSavings)).toThrow(
+    expect(() => deleteTransfer(log, emptiedSavings)).toThrow(
       "Savings is closed",
     );
     expect(transfers(changeLog.readAll()).map(({ id }) => id)).toEqual([
@@ -229,18 +229,18 @@ describe("Transfers", () => {
   });
 
   it("refuses to edit or delete a Transfer that isn't in the Budget", () => {
-    const { writer } = budget();
-    const id = makeTransfer(writer, {
+    const { log } = budget();
+    const id = makeTransfer(log, {
       fromAccountId: "checking",
       toAccountId: "savings",
       date: "2026-10-12",
       amount: money(20000, "USD"),
     });
-    deleteTransfer(writer, id);
+    deleteTransfer(log, id);
 
-    expect(() => deleteTransfer(writer, id)).toThrow(`No Transfer ${id}`);
+    expect(() => deleteTransfer(log, id)).toThrow(`No Transfer ${id}`);
     expect(() =>
-      editTransfer(writer, "nope", {
+      editTransfer(log, "nope", {
         fromAccountId: "checking",
         toAccountId: "savings",
         date: "2026-10-12",
@@ -250,9 +250,9 @@ describe("Transfers", () => {
   });
 
   it("lists Transfers newest date first, the latest made first on the same date", () => {
-    const { changeLog, writer } = budget();
+    const { changeLog, log } = budget();
     const make = (date: string, cents: number) =>
-      makeTransfer(writer, {
+      makeTransfer(log, {
         fromAccountId: "checking",
         toAccountId: "savings",
         date,
@@ -262,7 +262,7 @@ describe("Transfers", () => {
     const first = make("2026-10-12", 100);
     const later = make("2026-10-20", 200);
     const sameDay = make("2026-10-12", 300);
-    editTransfer(writer, first, {
+    editTransfer(log, first, {
       fromAccountId: "checking",
       toAccountId: "savings",
       date: "2026-10-12",
@@ -280,15 +280,15 @@ describe("Transfers", () => {
     ["the edit's device clock runs behind", -60_000],
     ["the edit's device clock runs ahead", 60_000],
   ])("keeps the most recent change from two devices when %s", (_, skew) => {
-    const { changeLog, writer, balance } = budget();
-    const id = makeTransfer(writer, {
+    const { changeLog, log, balance } = budget();
+    const id = makeTransfer(log, {
       fromAccountId: "checking",
       toAccountId: "savings",
       date: "2026-10-12",
       amount: money(20000, "USD"),
     });
     const now = Date.now();
-    const phone = createChangeLogWriter(changeLog, "phone", {
+    const phone = createDeviceChangeLog(changeLog, "phone", {
       now: () => now + skew,
     });
 
@@ -298,17 +298,17 @@ describe("Transfers", () => {
       date: "2026-10-12",
       amount: money(1000, "USD"),
     });
-    deleteTransfer(writer, id);
+    deleteTransfer(log, id);
 
     expect(transfers(changeLog.readAll())).toEqual([]);
     expect(balance("checking")).toEqual(money(100000, "USD"));
   });
 
   it("refuses a Transfer before a Budget exists", () => {
-    const writer = createChangeLogWriter(createInMemoryChangeLog(), "device");
+    const log = createDeviceChangeLog(createInMemoryChangeLog(), "device");
 
     expect(() =>
-      makeTransfer(writer, {
+      makeTransfer(log, {
         fromAccountId: "checking",
         toAccountId: "savings",
         date: "2026-10-12",

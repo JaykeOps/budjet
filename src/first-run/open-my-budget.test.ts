@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../kernel/change-log";
 import { money } from "../kernel/money";
@@ -11,7 +11,7 @@ import { openMyBudget } from "./open-my-budget";
 
 function setUp() {
   const changeLog = createInMemoryChangeLog();
-  return { changeLog, writer: createChangeLogWriter(changeLog, "this-device") };
+  return { changeLog, log: createDeviceChangeLog(changeLog, "this-device") };
 }
 
 const checking = {
@@ -27,9 +27,9 @@ const cash = {
 
 describe("Open my Budget", () => {
   it("creates the Budget, then the Categories, then each Account, in that order", () => {
-    const { changeLog, writer } = setUp();
+    const { changeLog, log } = setUp();
 
-    openMyBudget(writer, {
+    openMyBudget(log, {
       currency: "SEK",
       categories: "starter",
       accounts: [checking, cash],
@@ -47,9 +47,9 @@ describe("Open my Budget", () => {
   });
 
   it("adds no Categories when the user starts blank", () => {
-    const { changeLog, writer } = setUp();
+    const { changeLog, log } = setUp();
 
-    openMyBudget(writer, {
+    openMyBudget(log, {
       currency: "SEK",
       categories: "blank",
       accounts: [checking],
@@ -66,10 +66,10 @@ describe("Open my Budget", () => {
     ],
     ["an Account with no name", [{ ...checking, name: "  " }]],
   ])("writes nothing when given %s", (_, given) => {
-    const { changeLog, writer } = setUp();
+    const { changeLog, log } = setUp();
 
     expect(() =>
-      openMyBudget(writer, {
+      openMyBudget(log, {
         currency: "SEK",
         categories: "starter",
         accounts: given,

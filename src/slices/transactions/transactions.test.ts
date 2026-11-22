@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type ChangeRecord,
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
@@ -27,13 +27,13 @@ import type { TransactionDeleted, TransactionEdited } from "./records";
 /** A Budget in USD with one Account ("checking") and one Category ("groceries"). */
 function budget() {
   const changeLog = createInMemoryChangeLog();
-  const writer = createChangeLogWriter(changeLog, "this-device");
-  writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  const log = createDeviceChangeLog(changeLog, "this-device");
+  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
   );
-  writer.write<AccountOpened["type"], AccountOpened["payload"]>(
+  log.write<AccountOpened["type"], AccountOpened["payload"]>(
     "checking",
     "AccountOpened",
     {
@@ -43,18 +43,18 @@ function budget() {
       openingBalance: money(100000, "USD"),
     },
   );
-  writer.write<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+  log.write<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
     "everyday",
     "CategoryGroupCreated",
     { version: 1, name: "Everyday", position: 0 },
   );
-  writer.write<CategoryCreated["type"], CategoryCreated["payload"]>(
+  log.write<CategoryCreated["type"], CategoryCreated["payload"]>(
     "groceries",
     "CategoryCreated",
     { version: 1, name: "Groceries", groupId: "everyday", position: 0 },
   );
   return {
-    writer,
+    log,
     changeLog,
     transactions: () => accountTransactions(changeLog.readAll(), "checking"),
     /** Checking's list, without the Opening Balance every list ends with. */
@@ -68,10 +68,10 @@ function budget() {
 
 describe("Transactions", () => {
   it("refuses money going out without a Category", () => {
-    const { writer, transactions } = budget();
+    const { log, transactions } = budget();
 
     expect(() =>
-      recordTransaction(writer, {
+      recordTransaction(log, {
         accountId: "checking",
         date: "2026-10-12",
         amount: money(-4550, "USD"),
@@ -99,10 +99,10 @@ describe("Transactions", () => {
     ["a date that isn't a calendar date", { date: "12/10/2026" }, /date/],
     ["no amount", { amount: money(0, "USD") }, /needs an amount/],
   ])("refuses %s", (_, change, error) => {
-    const { writer, transactions } = budget();
+    const { log, transactions } = budget();
 
     expect(() =>
-      recordTransaction(writer, {
+      recordTransaction(log, {
         accountId: "checking",
         date: "2026-10-12",
         amount: money(-4550, "USD"),
@@ -114,9 +114,9 @@ describe("Transactions", () => {
   });
 
   it("lists an Account's Transactions newest first, latest recorded first on the same date", () => {
-    const { writer, transactions } = budget();
+    const { log, transactions } = budget();
 
-    const groceries = recordTransaction(writer, {
+    const groceries = recordTransaction(log, {
       accountId: "checking",
       date: "2026-10-12",
       amount: money(-4550, "USD"),
@@ -124,19 +124,19 @@ describe("Transactions", () => {
       payee: "Corner Shop",
       memo: "Milk and bread",
     });
-    const salary = recordTransaction(writer, {
+    const salary = recordTransaction(log, {
       accountId: "checking",
       date: "2026-10-25",
       amount: money(300000, "USD"),
       payee: "Employer",
     });
-    const refund = recordTransaction(writer, {
+    const refund = recordTransaction(log, {
       accountId: "checking",
       date: "2026-10-12",
       amount: money(1000, "USD"),
       categoryId: "groceries",
     });
-    const older = recordTransaction(writer, {
+    const older = recordTransaction(log, {
       accountId: "checking",
       date: "2026-09-30",
       amount: money(-200, "USD"),
@@ -178,8 +178,8 @@ describe("Transactions", () => {
   });
 
   it("edits a Transaction: the edit replaces what was recorded", () => {
-    const { writer, transactions } = budget();
-    const id = recordTransaction(writer, {
+    const { log, transactions } = budget();
+    const id = recordTransaction(log, {
       accountId: "checking",
       date: "2026-10-12",
       amount: money(-4550, "USD"),
@@ -188,7 +188,7 @@ describe("Transactions", () => {
       memo: "Milk",
     });
 
-    editTransaction(writer, id, {
+    editTransaction(log, id, {
       accountId: "checking",
       date: "2026-09-30",
       amount: money(2000, "USD"),
@@ -207,27 +207,27 @@ describe("Transactions", () => {
   });
 
   it("deletes a Transaction, after which it can't be edited or deleted again", () => {
-    const { writer, transactions } = budget();
-    const kept = recordTransaction(writer, {
+    const { log, transactions } = budget();
+    const kept = recordTransaction(log, {
       accountId: "checking",
       date: "2026-10-01",
       amount: money(2000, "USD"),
     });
-    const deleted = recordTransaction(writer, {
+    const deleted = recordTransaction(log, {
       accountId: "checking",
       date: "2026-10-12",
       amount: money(-4550, "USD"),
       categoryId: "groceries",
     });
 
-    deleteTransaction(writer, deleted);
+    deleteTransaction(log, deleted);
 
     expect(transactions().map(({ id }) => id)).toEqual([kept]);
-    expect(() => deleteTransaction(writer, deleted)).toThrow(
+    expect(() => deleteTransaction(log, deleted)).toThrow(
       `No Transaction ${deleted}`,
     );
     expect(() =>
-      editTransaction(writer, deleted, {
+      editTransaction(log, deleted, {
         accountId: "checking",
         date: "2026-10-12",
         amount: money(-100, "USD"),
@@ -237,8 +237,8 @@ describe("Transactions", () => {
   });
 
   it("edits under the same rules as recording", () => {
-    const { writer, transactions } = budget();
-    const id = recordTransaction(writer, {
+    const { log, transactions } = budget();
+    const id = recordTransaction(log, {
       accountId: "checking",
       date: "2026-10-12",
       amount: money(-4550, "USD"),
@@ -246,7 +246,7 @@ describe("Transactions", () => {
     });
 
     expect(() =>
-      editTransaction(writer, id, {
+      editTransaction(log, id, {
         accountId: "checking",
         date: "2026-10-12",
         amount: money(-4550, "USD"),
@@ -335,8 +335,8 @@ describe("Transactions", () => {
   });
 
   it("keeps a closed Account's Transactions but takes no new ones, and no changes to them", () => {
-    const { changeLog, writer } = budget();
-    writer.write<AccountOpened["type"], AccountOpened["payload"]>(
+    const { changeLog, log } = budget();
+    log.write<AccountOpened["type"], AccountOpened["payload"]>(
       "old",
       "AccountOpened",
       {
@@ -347,7 +347,7 @@ describe("Transactions", () => {
       },
     );
     const record = (accountId: string, cents: number) =>
-      recordTransaction(writer, {
+      recordTransaction(log, {
         accountId,
         date: "2026-10-12",
         amount: money(cents, "USD"),
@@ -356,7 +356,7 @@ describe("Transactions", () => {
     const refund = record("old", 1000);
     const spent = record("old", -1000);
     const inChecking = record("checking", -500);
-    writer.write<AccountClosed["type"], AccountClosed["payload"]>(
+    log.write<AccountClosed["type"], AccountClosed["payload"]>(
       "old",
       "AccountClosed",
       { version: 1 },
@@ -364,7 +364,7 @@ describe("Transactions", () => {
 
     expect(() => record("old", -200)).toThrow("Old checking is closed");
     expect(() =>
-      editTransaction(writer, refund, {
+      editTransaction(log, refund, {
         accountId: "old",
         date: "2026-10-12",
         amount: money(2000, "USD"),
@@ -372,7 +372,7 @@ describe("Transactions", () => {
       }),
     ).toThrow("Old checking is closed");
     expect(() =>
-      editTransaction(writer, spent, {
+      editTransaction(log, spent, {
         accountId: "checking",
         date: "2026-10-12",
         amount: money(-1000, "USD"),
@@ -380,14 +380,14 @@ describe("Transactions", () => {
       }),
     ).toThrow("Old checking is closed");
     expect(() =>
-      editTransaction(writer, inChecking, {
+      editTransaction(log, inChecking, {
         accountId: "old",
         date: "2026-10-12",
         amount: money(-500, "USD"),
         categoryId: "groceries",
       }),
     ).toThrow("Old checking is closed");
-    expect(() => deleteTransaction(writer, spent)).toThrow(
+    expect(() => deleteTransaction(log, spent)).toThrow(
       "Old checking is closed",
     );
     expect(
@@ -396,9 +396,9 @@ describe("Transactions", () => {
   });
 
   it("suggests each Payee used before once, in alphabetical order, from Transactions that still exist", () => {
-    const { writer, payees } = budget();
+    const { log, payees } = budget();
     const record = (payee: string) =>
-      recordTransaction(writer, {
+      recordTransaction(log, {
         accountId: "checking",
         date: "2026-10-12",
         amount: money(1000, "USD"),
@@ -409,9 +409,9 @@ describe("Transactions", () => {
     record("Corner Shop");
     record("Employer");
     record("");
-    deleteTransaction(writer, record("Typo Mart"));
+    deleteTransaction(log, record("Typo Mart"));
     const renamed = record("Bakry");
-    editTransaction(writer, renamed, {
+    editTransaction(log, renamed, {
       accountId: "checking",
       date: "2026-10-12",
       amount: money(1000, "USD"),
@@ -427,7 +427,7 @@ describe("Transactions", () => {
   });
 
   it("lists an Account's Transfers among its Transactions", () => {
-    const { writer, transactionList } = budget();
+    const { log, transactionList } = budget();
     const transfer = (
       id: string,
       fromAccountId: string,
@@ -435,7 +435,7 @@ describe("Transactions", () => {
       date: string,
       cents: number,
     ) =>
-      writer.write<TransferMade["type"], TransferMade["payload"]>(
+      log.write<TransferMade["type"], TransferMade["payload"]>(
         id,
         "TransferMade",
         {
@@ -448,7 +448,7 @@ describe("Transactions", () => {
         },
       );
     transfer("to-savings", "checking", "savings", "2026-10-12", 20000);
-    const groceries = recordTransaction(writer, {
+    const groceries = recordTransaction(log, {
       accountId: "checking",
       date: "2026-10-12",
       amount: money(-4550, "USD"),
@@ -456,7 +456,7 @@ describe("Transactions", () => {
     });
     transfer("from-savings", "savings", "checking", "2026-10-20", 5000);
     transfer("deleted", "checking", "savings", "2026-10-21", 100);
-    writer.write<TransferDeleted["type"], TransferDeleted["payload"]>(
+    log.write<TransferDeleted["type"], TransferDeleted["payload"]>(
       "deleted",
       "TransferDeleted",
       { version: 1 },
@@ -492,15 +492,15 @@ describe("Transactions", () => {
   });
 
   it("lists an Account's Adjustments among its Transactions, on the day the balance was re-declared", () => {
-    const { changeLog, writer, transactionList } = budget();
-    const groceries = recordTransaction(writer, {
+    const { changeLog, log, transactionList } = budget();
+    const groceries = recordTransaction(log, {
       accountId: "checking",
       date: "2100-01-15",
       amount: money(-4550, "USD"),
       categoryId: "groceries",
     });
     // A clock ahead of the records already written, which the Change Log keeps in order.
-    const redeclared = createChangeLogWriter(changeLog, "this-device", {
+    const redeclared = createDeviceChangeLog(changeLog, "this-device", {
       now: () => new Date(2100, 0, 14, 12).getTime(),
     }).write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
       "checking",
@@ -523,7 +523,7 @@ describe("Transactions", () => {
 
   it("lists re-declaring the current balance as a Balance check, not an Adjustment", () => {
     const { changeLog, transactionList } = budget();
-    const checked = createChangeLogWriter(changeLog, "this-device", {
+    const checked = createDeviceChangeLog(changeLog, "this-device", {
       now: () => new Date(2100, 0, 14, 12).getTime(),
     }).write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
       "checking",

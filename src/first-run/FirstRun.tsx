@@ -17,7 +17,7 @@ import {
   money,
   parseMoney,
 } from "../kernel/money";
-import { useChangeLogWriter } from "../kernel/use-change-log-query";
+import { useDeviceChangeLog } from "../kernel/use-change-log-query";
 import type { AccountKind } from "../slices/accounts";
 import { starterSet } from "../slices/categories/commands";
 import {
@@ -85,7 +85,7 @@ export function FirstRun({
   /** The user already answered where it lives, so setup starts at the question after it. */
   folderChosen?: boolean;
 }) {
-  const writer = useChangeLogWriter();
+  const log = useDeviceChangeLog();
   const [stepIndex, setStepIndex] = useState(folderChosen ? 2 : 0);
   const [currency, setCurrency] = useState(() =>
     guessCurrency(navigator.language),
@@ -152,7 +152,7 @@ export function FirstRun({
           adding={adding}
           onAddingChange={setAdding}
           onOpen={(openingBalances) =>
-            openMyBudget(writer, {
+            openMyBudget(log, {
               currency,
               categories,
               accounts: openingBalances,

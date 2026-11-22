@@ -27,8 +27,15 @@ export type ChangeLog = {
   subscribeToSaveState(listener: () => void): () => void;
 };
 
-export type ChangeLogWriter = {
-  readonly changeLog: ChangeLog;
+/**
+ * This device's way into the Change Log: it reads it, and adds the Change
+ * Records this device makes, stamped by this device's clock. It has no `append`
+ * or `merge`, so a record can't be added any other way.
+ */
+export type DeviceChangeLog = Pick<
+  ChangeLog,
+  "readAll" | "subscribe" | "saveState" | "subscribeToSaveState"
+> & {
   write<Type extends string, Payload>(
     subjectId: string,
     type: Type,
@@ -48,14 +55,17 @@ export type ChangeLogWriter = {
   ): ChangeRecord<Type, Payload>;
 };
 
-/** Appends records made on this device to the Change Log. */
-export function createChangeLogWriter(
+/** This device's DeviceChangeLog over `changeLog`. */
+export function createDeviceChangeLog(
   changeLog: ChangeLog,
   deviceId: string,
   { now = Date.now }: { now?: () => number } = {},
-): ChangeLogWriter {
+): DeviceChangeLog {
   return {
-    changeLog,
+    readAll: changeLog.readAll,
+    subscribe: changeLog.subscribe,
+    saveState: changeLog.saveState,
+    subscribeToSaveState: changeLog.subscribeToSaveState,
     write(subjectId, type, payload) {
       const record = {
         id: crypto.randomUUID(),
