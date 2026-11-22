@@ -1,4 +1,5 @@
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { assignmentsAfter, available, readyToAssign } from "../budget-totals";
@@ -11,13 +12,18 @@ export type MoveOutChoices = {
   /** Its Assignments in later Months, which hiding clears. */
   later: { month: Month; amount: Money }[];
   /** The visible Categories that can take it or, when covering, give all of it. */
-  others: { id: string; name: string; groupName: string; available: Money }[];
+  others: {
+    id: CategoryId;
+    name: string;
+    groupName: string;
+    available: Money;
+  }[];
 };
 
 /** Where a Category's Available in `month` can go. Undefined before a Budget exists. */
 export function moveOutChoices(
   records: readonly ChangeRecord[],
-  categoryId: string,
+  categoryId: CategoryId,
   month: Month,
 ): MoveOutChoices | undefined {
   const left = available(records, categoryId, month);

@@ -1,4 +1,6 @@
 /** Where things can go when reordering. Pure, so nothing here writes. */
+
+import type { CategoryId } from "../../kernel/id";
 import type { CategoryGroup } from "./queries";
 
 /** Where a Category can be: which Category Group, and its place among the others. */
@@ -7,7 +9,7 @@ export type CategoryPlace = { groupId: string; toIndex: number };
 /** Where a Category is now. */
 export function categoryAt(
   groups: readonly CategoryGroup[],
-  categoryId: string,
+  categoryId: CategoryId,
 ): (CategoryPlace & { group: CategoryGroup }) | undefined {
   for (const group of groups) {
     const toIndex = group.categories.findIndex(({ id }) => id === categoryId);
@@ -22,7 +24,7 @@ export function categoryAt(
  */
 export function categoryStep(
   groups: readonly CategoryGroup[],
-  categoryId: string,
+  categoryId: CategoryId,
   by: -1 | 1,
 ): CategoryPlace | undefined {
   const here = categoryAt(groups, categoryId);
@@ -52,7 +54,7 @@ export function groupStep(
 /** E.g. "2 of 6 in Everyday". */
 export function categoryPlace(
   groups: readonly CategoryGroup[],
-  categoryId: string,
+  categoryId: CategoryId,
 ): string {
   const here = categoryAt(groups, categoryId);
   if (!here) return "";
@@ -72,7 +74,7 @@ export function groupPlace(
 /** The list with a Category somewhere else, for showing it before it's placed. */
 export function withCategoryAt(
   groups: readonly CategoryGroup[],
-  categoryId: string,
+  categoryId: CategoryId,
   { groupId, toIndex }: CategoryPlace,
 ): CategoryGroup[] {
   const moved = categoryAt(groups, categoryId)?.group.categories.find(

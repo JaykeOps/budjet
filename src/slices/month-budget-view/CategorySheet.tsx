@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { CategoryId } from "../../kernel/id";
 import {
   addMoney,
   type Currency,
@@ -42,15 +43,19 @@ import { useReadyToAssignLine } from "./Summary";
  */
 export type SheetSteps = {
   title: string;
-  ids: string[];
+  ids: CategoryId[];
   start: number;
   walk?: boolean;
 };
 
 export type Actions = {
   /** Either may throw when refused; the sheet shows why and stays put. */
-  onAssign: (categoryId: string, amount: Money) => void;
-  onMove: (fromCategoryId: string, toCategoryId: string, amount: Money) => void;
+  onAssign: (categoryId: CategoryId, amount: Money) => void;
+  onMove: (
+    fromCategoryId: CategoryId,
+    toCategoryId: CategoryId,
+    amount: Money,
+  ) => void;
 };
 
 /**

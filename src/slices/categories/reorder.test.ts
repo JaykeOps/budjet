@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { asId, type CategoryId } from "../../kernel/id";
 import type { CategoryGroup } from "./queries";
 import {
   categoryPlace,
@@ -9,13 +10,18 @@ import {
   withGroupAt,
 } from "./reorder";
 
+const groceries = asId<CategoryId>("Groceries");
+const power = asId<CategoryId>("Power");
+const rent = asId<CategoryId>("Rent");
+const transport = asId<CategoryId>("Transport");
+
 function group(id: string, ...categoryIds: string[]): CategoryGroup {
   return {
     id,
     name: id,
     leftOutOfSpentThisMonth: false,
     categories: categoryIds.map((category) => ({
-      id: category,
+      id: asId<CategoryId>(category),
       name: category,
       hidden: false,
     })),
@@ -33,18 +39,18 @@ const outline = (shown: CategoryGroup[]) =>
 
 describe("a step of a Category", () => {
   it("moves within its Category Group", () => {
-    expect(categoryStep(groups, "Rent", 1)).toEqual({
+    expect(categoryStep(groups, rent, 1)).toEqual({
       groupId: "Bills",
       toIndex: 1,
     });
-    expect(categoryStep(groups, "Transport", -1)).toEqual({
+    expect(categoryStep(groups, transport, -1)).toEqual({
       groupId: "Everyday",
       toIndex: 0,
     });
   });
 
   it("crosses to the top of the next Category Group from the bottom", () => {
-    expect(categoryStep(groups, "Power", 1)).toEqual({
+    expect(categoryStep(groups, power, 1)).toEqual({
       groupId: "Empty",
       toIndex: 0,
     });
@@ -52,13 +58,13 @@ describe("a step of a Category", () => {
 
   it("crosses to the bottom of the previous Category Group from the top", () => {
     expect(
-      categoryStep(groups.slice(0, 1).concat(groups[2]), "Groceries", -1),
+      categoryStep(groups.slice(0, 1).concat(groups[2]), groceries, -1),
     ).toEqual({ groupId: "Bills", toIndex: 2 });
   });
 
   it("has nowhere to go past the first or last place", () => {
-    expect(categoryStep(groups, "Rent", -1)).toBeUndefined();
-    expect(categoryStep(groups, "Transport", 1)).toBeUndefined();
+    expect(categoryStep(groups, rent, -1)).toBeUndefined();
+    expect(categoryStep(groups, transport, 1)).toBeUndefined();
   });
 });
 
@@ -73,7 +79,7 @@ describe("a step of a Category Group", () => {
 
 describe("where something is, in words", () => {
   it("counts a Category among its Category Group's", () => {
-    expect(categoryPlace(groups, "Power")).toBe("2 of 2 in Bills");
+    expect(categoryPlace(groups, power)).toBe("2 of 2 in Bills");
   });
 
   it("counts a Category Group among the Category Groups", () => {
@@ -85,7 +91,10 @@ describe("how the list looks mid-drag", () => {
   it("shows a Category in another Category Group", () => {
     expect(
       outline(
-        withCategoryAt(groups, "Rent", { groupId: "Everyday", toIndex: 1 }),
+        withCategoryAt(groups, rent, {
+          groupId: "Everyday",
+          toIndex: 1,
+        }),
       ),
     ).toEqual([
       ["Bills", ["Power"]],
@@ -97,7 +106,10 @@ describe("how the list looks mid-drag", () => {
   it("shows a Category in an empty Category Group", () => {
     expect(
       outline(
-        withCategoryAt(groups, "Power", { groupId: "Empty", toIndex: 0 }),
+        withCategoryAt(groups, power, {
+          groupId: "Empty",
+          toIndex: 0,
+        }),
       ),
     ).toEqual([
       ["Bills", ["Rent"]],

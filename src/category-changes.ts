@@ -5,6 +5,7 @@
  */
 import { useMemo } from "react";
 import type { DeviceChangeLog } from "./kernel/change-log";
+import type { CategoryId } from "./kernel/id";
 import { formatMoney, money, subtractMoney } from "./kernel/money";
 import { currentMonth, type Month } from "./kernel/month";
 import { useDeviceChangeLog } from "./kernel/use-change-log-query";
@@ -45,7 +46,7 @@ function groupNow(log: DeviceChangeLog, groupId: string) {
   return { group: groups[index], index };
 }
 
-function categoryNow(log: DeviceChangeLog, categoryId: string) {
+function categoryNow(log: DeviceChangeLog, categoryId: CategoryId) {
   for (const group of groupsNow(log)) {
     const index = group.categories.findIndex(({ id }) => id === categoryId);
     if (index >= 0) return { category: group.categories[index], group, index };
@@ -53,7 +54,7 @@ function categoryNow(log: DeviceChangeLog, categoryId: string) {
   throw new RangeError(`No Category ${categoryId}`);
 }
 
-function hide(log: DeviceChangeLog, categoryId: string): void {
+function hide(log: DeviceChangeLog, categoryId: CategoryId): void {
   hideCategory(log, categoryId, { currentMonth: currentMonth() });
 }
 
@@ -78,7 +79,7 @@ export function createCategoryGroupWithUndo(
 /** Undoing writes the previous name as a new record. */
 export function renameCategoryWithUndo(
   log: DeviceChangeLog,
-  categoryId: string,
+  categoryId: CategoryId,
   input: { name: string },
 ): Undo {
   const { name } = categoryNow(log, categoryId).category;
@@ -104,8 +105,8 @@ export function renameCategoryGroupWithUndo(
  */
 function moveOut(
   log: DeviceChangeLog,
-  categoryId: string,
-  { month, other }: { month: Month; other?: string },
+  categoryId: CategoryId,
+  { month, other }: { month: Month; other?: CategoryId },
 ): void {
   const records = log.readAll();
   const left = available(records, categoryId, month);
@@ -130,8 +131,8 @@ function moveOut(
 }
 
 function moneyPlaces(
-  categoryId: string,
-  { month, other }: { month: Month; other?: string },
+  categoryId: CategoryId,
+  { month, other }: { month: Month; other?: CategoryId },
 ): Place[] {
   return other
     ? [
@@ -144,8 +145,8 @@ function moneyPlaces(
 /** Undoing writes back the Assignments and Take-backs it changed. */
 export function moveOutWithUndo(
   log: DeviceChangeLog,
-  categoryId: string,
-  where: { month: Month; other?: string },
+  categoryId: CategoryId,
+  where: { month: Month; other?: CategoryId },
 ): Undo {
   const restore = rememberMoney(log, moneyPlaces(categoryId, where));
   moveOut(log, categoryId, where);
@@ -161,8 +162,8 @@ export function moveOutWithUndo(
  */
 export function hideCategoryWithUndo(
   log: DeviceChangeLog,
-  categoryId: string,
-  { month = currentMonth(), other }: { month?: Month; other?: string } = {},
+  categoryId: CategoryId,
+  { month = currentMonth(), other }: { month?: Month; other?: CategoryId } = {},
 ): Undo {
   categoryNow(log, categoryId);
   const later = assignmentsAfter(log.readAll(), categoryId, month);
@@ -188,7 +189,7 @@ export function hideCategoryWithUndo(
 
 export function unhideCategoryWithUndo(
   log: DeviceChangeLog,
-  categoryId: string,
+  categoryId: CategoryId,
 ): Undo {
   unhideCategory(log, categoryId);
   return () => restoreHidden(log, categoryId);
@@ -197,7 +198,7 @@ export function unhideCategoryWithUndo(
 /** Undoing writes a new Category, with a fresh id, in the same place. */
 export function deleteCategoryWithUndo(
   log: DeviceChangeLog,
-  categoryId: string,
+  categoryId: CategoryId,
 ): Undo {
   const { category, group, index } = categoryNow(log, categoryId);
   deleteCategory(log, categoryId);
@@ -272,7 +273,7 @@ export function moveThemAndDeleteWithUndo(
 /** Undoing puts it back where it was, as new records. */
 export function moveCategoryWithUndo(
   log: DeviceChangeLog,
-  categoryId: string,
+  categoryId: CategoryId,
   to: { groupId: string; toIndex: number },
 ): Undo {
   const { group, index } = categoryNow(log, categoryId);

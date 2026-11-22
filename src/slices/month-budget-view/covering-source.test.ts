@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { type CoverCandidate, coveringSource } from "./covering-source";
+
+const diningId = asId<CategoryId>("dining");
 
 const usd = (dollars: number) => money(Math.round(dollars * 100), "USD");
 
@@ -10,10 +13,15 @@ function candidate(
   assigned: number,
   available: number,
 ): CoverCandidate {
-  return { id, groupId, assigned: usd(assigned), available: usd(available) };
+  return {
+    id: asId<CategoryId>(id),
+    groupId,
+    assigned: usd(assigned),
+    available: usd(available),
+  };
 }
 
-const dining = { id: "dining", groupId: "everyday" };
+const dining = { id: diningId, groupId: "everyday" };
 
 describe("coveringSource", () => {
   it("prefers the same Category Group, when this Month's Assignment covers the whole amount", () => {

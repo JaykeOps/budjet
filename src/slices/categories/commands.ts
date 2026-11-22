@@ -1,4 +1,5 @@
 import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
+import { type CategoryId, newId } from "../../kernel/id";
 import { formatMoney } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { assignedAfter, available, categoryUsed } from "../budget-totals";
@@ -45,8 +46,8 @@ export function createCategoryGroup(
 export function createCategory(
   log: DeviceChangeLog,
   { groupId, name }: { groupId: string; name: string },
-): string {
-  const id = crypto.randomUUID();
+): CategoryId {
+  const id = newId<CategoryId>();
   write(log, id, "CategoryCreated")
     .ensure((records) => findGroup(records, groupId))
     .commit((group) => ({
@@ -70,7 +71,7 @@ export function renameCategoryGroup(
 
 export function renameCategory(
   log: DeviceChangeLog,
-  categoryId: string,
+  categoryId: CategoryId,
   { name }: { name: string },
 ): void {
   write(log, categoryId, "CategoryRenamed")
@@ -119,7 +120,7 @@ export function moveCategoryGroup(
  */
 export function moveCategory(
   log: DeviceChangeLog,
-  categoryId: string,
+  categoryId: CategoryId,
   { groupId, toIndex }: { groupId: string; toIndex: number },
 ): void {
   log
@@ -148,7 +149,7 @@ export function moveCategory(
  */
 export function hideCategory(
   log: DeviceChangeLog,
-  categoryId: string,
+  categoryId: CategoryId,
   { currentMonth }: { currentMonth: Month },
 ): void {
   write(log, categoryId, "CategoryHidden")
@@ -170,7 +171,10 @@ export function hideCategory(
 }
 
 /** Brings a hidden Category back. */
-export function unhideCategory(log: DeviceChangeLog, categoryId: string): void {
+export function unhideCategory(
+  log: DeviceChangeLog,
+  categoryId: CategoryId,
+): void {
   write(log, categoryId, "CategoryUnhidden")
     .ensure((records) => findCategory(records, categoryId))
     .commit(() => ({ version: 1 }));
@@ -180,7 +184,10 @@ export function unhideCategory(log: DeviceChangeLog, categoryId: string): void {
  * Hides a Category again whatever it holds, for an Undo of unhiding it: it was
  * hidden like that a moment ago, and the Budget flags one holding money.
  */
-export function restoreHidden(log: DeviceChangeLog, categoryId: string): void {
+export function restoreHidden(
+  log: DeviceChangeLog,
+  categoryId: CategoryId,
+): void {
   write(log, categoryId, "CategoryHidden")
     .ensure((records) => findCategory(records, categoryId))
     .commit(() => ({ version: 1 }));
@@ -192,7 +199,7 @@ export function restoreHidden(log: DeviceChangeLog, categoryId: string): void {
  */
 export class CategoryInUseError extends Error {
   constructor(
-    readonly categoryId: string,
+    readonly categoryId: CategoryId,
     name: string,
   ) {
     super(
@@ -203,7 +210,10 @@ export class CategoryInUseError extends Error {
 }
 
 /** Deletes a Category that was never used. A used one can only be hidden. */
-export function deleteCategory(log: DeviceChangeLog, categoryId: string): void {
+export function deleteCategory(
+  log: DeviceChangeLog,
+  categoryId: CategoryId,
+): void {
   write(log, categoryId, "CategoryDeleted")
     .ensure((records) => {
       const { category } = findCategory(records, categoryId);
@@ -235,11 +245,11 @@ export function deleteCategoryGroup(
  * Every position in the new order. Writing them all makes the most recent
  * reorder win as a whole when two devices reorder the same things.
  */
-function placeAt(
-  others: string[],
-  movedId: string,
+function placeAt<Id extends string>(
+  others: Id[],
+  movedId: Id,
   toIndex: number,
-): [number, string][] {
+): [number, Id][] {
   if (!Number.isInteger(toIndex) || toIndex < 0 || toIndex > others.length) {
     throw new RangeError(`There is no place ${toIndex} to move to`);
   }
@@ -248,7 +258,10 @@ function placeAt(
     .map((id, position) => [position, id]);
 }
 
-function findCategory(records: readonly ChangeRecord[], categoryId: string) {
+function findCategory(
+  records: readonly ChangeRecord[],
+  categoryId: CategoryId,
+) {
   for (const group of categoryGroups(records)) {
     const category = group.categories.find(({ id }) => id === categoryId);
     if (category) return { group, category };

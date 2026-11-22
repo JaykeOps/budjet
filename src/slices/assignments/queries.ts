@@ -1,4 +1,5 @@
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { assignmentSubject, currentAssignments } from "./records";
@@ -10,7 +11,7 @@ import { assignmentSubject, currentAssignments } from "./records";
  */
 export function assignment(
   records: readonly ChangeRecord[],
-  categoryId: string,
+  categoryId: CategoryId,
   month: Month,
 ): Money | undefined {
   return currentAssignments(records).get(assignmentSubject(categoryId, month))
@@ -24,7 +25,7 @@ export function assignment(
  */
 export function takeBack(
   records: readonly ChangeRecord[],
-  categoryId: string,
+  categoryId: CategoryId,
   month: Month,
 ): Money | undefined {
   return currentAssignments(records).get(assignmentSubject(categoryId, month))

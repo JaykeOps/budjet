@@ -1,11 +1,12 @@
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import { formatMoney, money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { available } from "../budget-totals";
 import { categoryGroups } from "../categories";
 
 export type HiddenMoneyLine = {
-  id: string;
+  id: CategoryId;
   name: string;
   text: string;
   action: "Move it" | "Cover it";

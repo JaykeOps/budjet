@@ -1,6 +1,7 @@
 /** Assignments' public interface: queries and the hooks that wrap them. */
 import { useCallback } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
@@ -9,7 +10,7 @@ import { assignment, takeBack } from "./queries";
 export { assignment, takeBack };
 
 export function useAssignment(
-  categoryId: string,
+  categoryId: CategoryId,
   month: Month,
 ): Money | undefined {
   return useChangeLogQuery(
@@ -22,7 +23,7 @@ export function useAssignment(
 }
 
 export function useTakeBack(
-  categoryId: string,
+  categoryId: CategoryId,
   month: Month,
 ): Money | undefined {
   return useChangeLogQuery(

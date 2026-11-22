@@ -4,7 +4,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import type { BudgetCreated } from "../budget-setup/records";
@@ -28,6 +28,10 @@ import {
   balanceChecks,
 } from "./index";
 import type { BalanceRedeclared, RedeclaredBalanceDeleted } from "./records";
+
+const groceriesId = asId<CategoryId>("groceries");
+
+const groceries = groceriesId;
 
 function budgetIn(currency: string) {
   const changeLog = createInMemoryChangeLog();
@@ -141,7 +145,7 @@ describe("Accounts", () => {
           accountId,
           date: "2026-10-12",
           amount: money(amount, "USD"),
-          categoryId: "groceries",
+          categoryId: groceries,
         },
       );
 
@@ -175,7 +179,7 @@ describe("Accounts", () => {
       accountId: checking,
       date: "2026-10-12",
       amount: money(-4550, "USD"),
-      categoryId: "groceries",
+      categoryId: groceriesId,
     };
     seedRecord<TransactionRecorded["type"], TransactionRecorded["payload"]>(
       log,
@@ -282,7 +286,7 @@ describe("Accounts", () => {
       accountId: checking,
       date: "2100-10-19",
       amount: money(-1000, "USD"),
-      categoryId: "groceries",
+      categoryId: groceries,
     });
     const check = seedRecord<
       BalanceRedeclared["type"],
@@ -368,7 +372,7 @@ describe("Accounts", () => {
           accountId: checking,
           date: "2100-10-20",
           amount: money(-1000, "USD"),
-          categoryId: "groceries",
+          categoryId: groceries,
         },
       );
 

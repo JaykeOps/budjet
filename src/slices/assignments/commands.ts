@@ -3,6 +3,7 @@ import type {
   DeviceChangeLog,
   NewChangeRecord,
 } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import { addMoney, type Money, money, subtractMoney } from "../../kernel/money";
 import { type Month, previousMonth } from "../../kernel/month";
 import { isBudgetCreated } from "../budget-setup/records";
@@ -17,7 +18,7 @@ import {
 } from "./records";
 
 export type AssignmentInput = {
-  categoryId: string;
+  categoryId: CategoryId;
   month: Month;
   amount: Money;
 };
@@ -49,7 +50,7 @@ export function setAssignment(
  */
 export function copyLastMonth(
   log: DeviceChangeLog,
-  { month, skipping = [] }: { month: Month; skipping?: Iterable<string> },
+  { month, skipping = [] }: { month: Month; skipping?: Iterable<CategoryId> },
 ): number {
   const current = currentAssignments(log.readAll());
   const lastMonth = previousMonth(month);
@@ -66,8 +67,8 @@ export function copyLastMonth(
 }
 
 export type MoveMoneyInput = {
-  fromCategoryId: string;
-  toCategoryId: string;
+  fromCategoryId: CategoryId;
+  toCategoryId: CategoryId;
   month: Month;
   amount: Money;
 };
@@ -91,7 +92,7 @@ export function moveMoney(
     .writeMany<AssignmentSet | TakeBackSet>()
     .ensure((records) => {
       checkInBudgetCurrency(records, amount);
-      const assigned = (categoryId: string) =>
+      const assigned = (categoryId: CategoryId) =>
         assignment(records, categoryId, month) ?? money(0, amount.currency);
       const from = subtractMoney(assigned(fromCategoryId), amount);
       const to = addMoney(assigned(toCategoryId), amount);

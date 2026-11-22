@@ -1,7 +1,8 @@
 import { type ChangeRecord, deletedSubjects } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import { isCategoriesRecord } from "./records";
 
-export type Category = { id: string; name: string; hidden: boolean };
+export type Category = { id: CategoryId; name: string; hidden: boolean };
 export type CategoryGroup = {
   id: string;
   name: string;
@@ -9,7 +10,7 @@ export type CategoryGroup = {
   categories: Category[];
 };
 
-type Placed = { id: string; name: string; position: number };
+type Placed<Id extends string> = { id: Id; name: string; position: number };
 
 /**
  * The Category Groups in order, each with its Categories in order. Every
@@ -20,10 +21,10 @@ type Placed = { id: string; name: string; position: number };
 export function categoryGroups(
   records: readonly ChangeRecord[],
 ): CategoryGroup[] {
-  const groups = new Map<string, Placed & { leftOut: boolean }>();
+  const groups = new Map<string, Placed<string> & { leftOut: boolean }>();
   const categories = new Map<
-    string,
-    Placed & { groupId: string; hidden: boolean }
+    CategoryId,
+    Placed<CategoryId> & { groupId: string; hidden: boolean }
   >();
   // Once deleted, a thing stays deleted, whatever other devices did to it.
   const deleted = deletedSubjects(
@@ -34,13 +35,12 @@ export function categoryGroups(
   // Records come oldest first, so each later record overwrites what it changes.
   for (const record of records) {
     if (!isCategoriesRecord(record)) continue;
-    const { subjectId: id } = record;
-    const group = groups.get(id);
-    const category = categories.get(id);
+    // Each case reads its own subject: a Category Group's or a Category's id.
+    const group = groups.get(record.subjectId);
     switch (record.type) {
       case "CategoryGroupCreated":
-        groups.set(id, {
-          id,
+        groups.set(record.subjectId, {
+          id: record.subjectId,
           ...nameAndPosition(record.payload),
           leftOut: false,
         });
@@ -55,26 +55,32 @@ export function categoryGroups(
         if (group) group.leftOut = record.payload.leftOut;
         break;
       case "CategoryCreated":
-        categories.set(id, {
-          id,
+        categories.set(record.subjectId, {
+          id: record.subjectId,
           ...nameAndPosition(record.payload),
           groupId: record.payload.groupId,
           hidden: false,
         });
         break;
-      case "CategoryRenamed":
+      case "CategoryRenamed": {
+        const category = categories.get(record.subjectId);
         if (category) category.name = record.payload.name;
         break;
-      case "CategoryPlaced":
+      }
+      case "CategoryPlaced": {
+        const category = categories.get(record.subjectId);
         if (category) {
           category.groupId = record.payload.groupId;
           category.position = record.payload.position;
         }
         break;
+      }
       case "CategoryHidden":
-      case "CategoryUnhidden":
+      case "CategoryUnhidden": {
+        const category = categories.get(record.subjectId);
         if (category) category.hidden = record.type === "CategoryHidden";
         break;
+      }
     }
   }
 
@@ -100,7 +106,7 @@ function nameAndPosition({
   return { name, position };
 }
 
-function inOrder<Thing extends Placed>(things: Thing[]): Thing[] {
+function inOrder<Thing extends Placed<string>>(things: Thing[]): Thing[] {
   return things.sort(
     (a, b) =>
       a.position - b.position || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),

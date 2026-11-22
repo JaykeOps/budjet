@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { assignPanel } from "./assign-panel";
 import { type CategoryAmounts, categoryRow } from "./category-row";
 import type { SheetCategory } from "./category-sheet";
+
+const holidayId = asId<CategoryId>("holiday");
+
+const holiday = holidayId;
 
 const usd = (dollars: number) => money(Math.round(dollars * 100), "USD");
 const october = "2026-10" as const;
@@ -18,7 +23,7 @@ function category(
     spending = 0,
   } = amounts;
   return {
-    id: "holiday",
+    id: holiday,
     name: "Holiday",
     groupId: "group",
     groupName: "Group",

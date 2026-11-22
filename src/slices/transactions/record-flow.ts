@@ -1,5 +1,5 @@
 import type { ChangeRecord } from "../../kernel/change-log";
-import type { AccountId } from "../../kernel/id";
+import type { AccountId, CategoryId } from "../../kernel/id";
 import {
   type Currency,
   type Money,
@@ -20,7 +20,7 @@ export type Draft = {
   /** The amount as typed, without a sign. */
   typed: string;
   /** None means none chosen yet for money out, and Ready to Assign for money in. */
-  categoryId?: string;
+  categoryId?: CategoryId;
   payee: string;
   date: string;
   /** Empty until there's an open Account to choose. */
@@ -101,7 +101,11 @@ export function matchingPayees(
     .slice(0, 3);
 }
 
-export type CategoryChoice = { id: string; name: string; available: Money };
+export type CategoryChoice = {
+  id: CategoryId;
+  name: string;
+  available: Money;
+};
 
 export type CategoryChoices = {
   readyToAssign: Money;

@@ -10,7 +10,7 @@ import { FolderBanner, type FolderConnection } from "./FolderBanner";
 import { useFirstCategoryChanges } from "./first-categories";
 import { FirstRun } from "./first-run/FirstRun";
 import type { DeviceChangeLog } from "./kernel/change-log";
-import type { AccountId } from "./kernel/id";
+import type { AccountId, CategoryId } from "./kernel/id";
 import { parseMonth } from "./kernel/month";
 import {
   DeviceChangeLogProvider,
@@ -260,7 +260,7 @@ function AccountTransactions({
 }
 
 /** Copy last Month leaves hidden Categories out. */
-function hiddenCategoryIds(log: DeviceChangeLog): string[] {
+function hiddenCategoryIds(log: DeviceChangeLog): CategoryId[] {
   return categoryGroups(log.readAll())
     .flatMap((group) => group.categories)
     .filter(({ hidden }) => hidden)

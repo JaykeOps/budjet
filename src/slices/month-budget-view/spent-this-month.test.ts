@@ -4,7 +4,7 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { seedRecord } from "../../kernel/seed-record";
@@ -22,6 +22,12 @@ import type {
 } from "../categories/records";
 import type { TransactionRecorded } from "../transactions/records";
 import { spentThisMonth } from "./index";
+
+const groceriesId = asId<CategoryId>("groceries");
+const holidayId = asId<CategoryId>("holiday");
+
+const groceries = groceriesId;
+const holiday = holidayId;
 
 const checking = asId<AccountId>("checking");
 
@@ -61,7 +67,7 @@ function budget() {
   category("holiday", "savings");
 
   return {
-    assign(categoryId: string, of: Month, amount: number) {
+    assign(categoryId: CategoryId, of: Month, amount: number) {
       seed<AssignmentSet>(
         log,
         assignmentSubject(categoryId, of),
@@ -75,7 +81,7 @@ function budget() {
       );
     },
     /** Records a Transaction: a negative amount goes out, a positive one comes in. */
-    record(date: string, amount: number, categoryId?: string) {
+    record(date: string, amount: number, categoryId?: CategoryId) {
       seed<TransactionRecorded>(
         log,
         crypto.randomUUID(),
@@ -97,14 +103,14 @@ function budget() {
         { version: 1, leftOut: true },
       );
     },
-    move(categoryId: string, groupId: string) {
+    move(categoryId: CategoryId, groupId: string) {
       seed<CategoryPlaced>(log, categoryId, "CategoryPlaced", {
         version: 1,
         groupId,
         position: 0,
       });
     },
-    hide(categoryId: string) {
+    hide(categoryId: CategoryId) {
       seed<CategoryHidden>(log, categoryId, "CategoryHidden", {
         version: 1,
       });
@@ -146,7 +152,7 @@ describe("Spent this Month", () => {
     it("is true when the only Transaction is in a left-out Group", () => {
       const { leaveOut, record, records } = budget();
       leaveOut("savings");
-      record("2026-10-05", -5000, "holiday");
+      record("2026-10-05", -5000, holiday);
       const card = spentThisMonth(records(), october);
       expect(card?.daily).toEqual([]);
       expect(card?.recorded).toBe(true);
@@ -158,14 +164,14 @@ describe("Spent this Month", () => {
       expect(spentThisMonth(inflow.records(), october)?.recorded).toBe(true);
 
       const hidden = budget();
-      hidden.hide("holiday");
-      hidden.record("2026-10-05", -5000, "holiday");
+      hidden.hide(holiday);
+      hidden.record("2026-10-05", -5000, holiday);
       expect(spentThisMonth(hidden.records(), october)?.recorded).toBe(true);
     });
 
     it("is false when the Transactions are all in other Months", () => {
       const { record, records } = budget();
-      record("2026-09-30", -5000, "groceries");
+      record("2026-09-30", -5000, groceries);
       expect(spentThisMonth(records(), october)?.recorded).toBe(false);
     });
   });
@@ -180,15 +186,15 @@ describe("Spent this Month", () => {
 
   it("gives the total, the Month's Assignments and each day's net Spending", () => {
     const b = budget();
-    b.assign("groceries", october, 60_000);
-    b.assign("holiday", october, 20_000);
-    b.assign("groceries", september, 99_999);
-    b.record("2026-10-03", -1_000, "groceries");
-    b.record("2026-10-03", -500, "holiday");
-    b.record("2026-10-01", -2_000, "groceries");
-    b.record("2026-10-09", 300, "groceries");
-    b.record("2026-09-30", -7_777, "groceries");
-    b.record("2026-11-01", -8_888, "groceries");
+    b.assign(groceries, october, 60_000);
+    b.assign(holiday, october, 20_000);
+    b.assign(groceries, september, 99_999);
+    b.record("2026-10-03", -1_000, groceries);
+    b.record("2026-10-03", -500, holiday);
+    b.record("2026-10-01", -2_000, groceries);
+    b.record("2026-10-09", 300, groceries);
+    b.record("2026-09-30", -7_777, groceries);
+    b.record("2026-11-01", -8_888, groceries);
 
     expect(b.card()).toEqual({
       spent: 3_200,
@@ -210,18 +216,18 @@ describe("Spent this Month", () => {
 
   it("goes negative when refunds outweigh money going out", () => {
     const b = budget();
-    b.record("2026-10-02", -1_000, "groceries");
-    b.record("2026-10-05", 4_000, "groceries");
+    b.record("2026-10-02", -1_000, groceries);
+    b.record("2026-10-05", 4_000, groceries);
 
     expect(b.card()?.spent).toBe(-3_000);
   });
 
   it("leaves out a left-out Group's Spending, Assignments and days", () => {
     const b = budget();
-    b.assign("groceries", october, 60_000);
-    b.assign("holiday", october, 20_000);
-    b.record("2026-10-01", -1_000, "groceries");
-    b.record("2026-10-02", -5_000, "holiday");
+    b.assign(groceries, october, 60_000);
+    b.assign(holiday, october, 20_000);
+    b.record("2026-10-01", -1_000, groceries);
+    b.record("2026-10-02", -5_000, holiday);
 
     b.leaveOut("savings");
 
@@ -234,9 +240,9 @@ describe("Spent this Month", () => {
 
   it("leaves out a refund in a left-out Group too", () => {
     const b = budget();
-    b.record("2026-10-01", -1_000, "groceries");
-    b.record("2026-10-01", 4_000, "holiday");
-    b.record("2026-10-02", 4_000, "holiday");
+    b.record("2026-10-01", -1_000, groceries);
+    b.record("2026-10-01", 4_000, holiday);
+    b.record("2026-10-02", 4_000, holiday);
 
     b.leaveOut("savings");
 
@@ -249,14 +255,14 @@ describe("Spent this Month", () => {
 
   it("counts a Category by the Group it is in now, including for past Months", () => {
     const b = budget();
-    b.assign("groceries", september, 60_000);
-    b.record("2026-09-15", -1_000, "groceries");
+    b.assign(groceries, september, 60_000);
+    b.record("2026-09-15", -1_000, groceries);
     b.leaveOut("savings");
 
-    b.move("groceries", "savings");
+    b.move(groceries, "savings");
     expect(b.card(september)).toEqual({ spent: 0, of: 0, daily: [] });
 
-    b.move("groceries", "everyday");
+    b.move(groceries, "everyday");
     expect(b.card(september)).toEqual({
       spent: 1_000,
       of: 60_000,
@@ -266,21 +272,21 @@ describe("Spent this Month", () => {
 
   it("agrees with the rows it sums, which don't include hidden Categories", () => {
     const b = budget();
-    b.assign("groceries", october, 60_000);
-    b.record("2026-10-01", -1_000, "groceries");
+    b.assign(groceries, october, 60_000);
+    b.record("2026-10-01", -1_000, groceries);
 
-    b.hide("groceries");
+    b.hide(groceries);
 
     expect(b.card()).toEqual({ spent: 0, of: 0, daily: [] });
   });
 
   it("changes nothing else when a Group is left out", () => {
     const b = budget();
-    b.assign("holiday", october, 20_000);
-    b.record("2026-10-02", -5_000, "holiday");
+    b.assign(holiday, october, 20_000);
+    b.record("2026-10-02", -5_000, holiday);
     const figures = () => ({
-      available: available(b.records(), "holiday", october),
-      spending: spending(b.records(), "holiday", october),
+      available: available(b.records(), holiday, october),
+      spending: spending(b.records(), holiday, october),
       readyToAssign: readyToAssign(b.records()),
       groups: categoryGroups(b.records()).map(({ name, categories }) => [
         name,

@@ -5,7 +5,7 @@ import {
   createInMemoryChangeLog,
   type DeviceChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId } from "../../kernel/id";
+import { type AccountId, asId, type CategoryId } from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import { accountBalance, accountsTotal } from "../accounts";
@@ -22,6 +22,8 @@ import type {
 import type { TransferMade } from "../transfers/records";
 import { deleteTransaction, recordTransaction } from "./commands";
 import { statements } from "./index";
+
+const groceries = asId<CategoryId>("groceries");
 
 const usd = (cents: number) => money(cents, "USD");
 
@@ -102,7 +104,7 @@ function budget() {
       accountId,
       date,
       amount: usd(cents),
-      ...(cents < 0 && { categoryId: "groceries" }),
+      ...(cents < 0 && { categoryId: groceries }),
     });
   return {
     changeLog,

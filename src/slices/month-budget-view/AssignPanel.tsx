@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { CategoryId } from "../../kernel/id";
 import { type Currency, formatMoney } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { assignPanel } from "./assign-panel";
@@ -95,7 +96,7 @@ function FocusedRow({
   currency,
 }: {
   column: AssignedColumn;
-  categoryId: string;
+  categoryId: CategoryId;
   month: Month;
   currency: Currency;
 }) {

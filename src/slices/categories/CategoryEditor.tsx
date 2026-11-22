@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import type { ChangeRecord } from "../../kernel/change-log";
+import type { CategoryId } from "../../kernel/id";
 import { formatMoney } from "../../kernel/money";
 import { currentMonth, type Month } from "../../kernel/month";
 import { useChangeLogQuery } from "../../kernel/use-change-log-query";
@@ -18,22 +19,26 @@ import { moveOutChoices } from "./move-out";
 import { type Category, type CategoryGroup, categoryGroups } from "./queries";
 import { CategoryMoves, GroupMoves, type Moves, useReorder } from "./Reorder";
 
-type Named = { id: string; name: string };
+type Named<Id extends string = string> = { id: Id; name: string };
 
 /** What the app shell does for each change. Any of them may refuse by throwing. */
 export type CategoryChanges = Moves & {
   addCategory: (groupId: string, name: string) => void;
   addGroup: (name: string) => void;
-  renameCategory: (categoryId: string, name: string) => void;
+  renameCategory: (categoryId: CategoryId, name: string) => void;
   renameGroup: (groupId: string, name: string) => void;
   /** `other` takes its money or covers it; without one, Ready to Assign does. */
-  hide: (category: Named, other?: string) => void;
-  unhide: (category: Named) => void;
-  deleteCategory: (category: Named) => void;
+  hide: (category: Named<CategoryId>, other?: CategoryId) => void;
+  unhide: (category: Named<CategoryId>) => void;
+  deleteCategory: (category: Named<CategoryId>) => void;
   deleteGroup: (group: Named) => void;
   moveThemAndDelete: (group: Named, toGroupId: string) => void;
   setLeftOut: (group: Named, leftOut: boolean) => void;
-  moveOut: (category: Named, month: Month, other?: string) => void;
+  moveOut: (
+    category: Named<CategoryId>,
+    month: Month,
+    other?: CategoryId,
+  ) => void;
 };
 
 type Open = { kind: "category" | "group"; id: string };
@@ -112,7 +117,7 @@ export function CategoryEditor({
           data-dragging={dragging === group.id}
         >
           <div className={`${styles.row} ${styles.head}`} data-group-head>
-            {handle("group", group)}
+            {handle({ kind: "group", thing: group })}
             <NameField
               label={`Name of ${group.name}`}
               name={group.name}
@@ -134,7 +139,7 @@ export function CategoryEditor({
                 data-row-id={category.id}
                 data-dragging={dragging === category.id}
               >
-                {handle("category", category)}
+                {handle({ kind: "category", thing: category })}
                 <NameField
                   label={`Name of ${category.name}`}
                   name={category.name}
@@ -229,7 +234,7 @@ function AvailablePill({
   categoryId,
   month,
 }: {
-  categoryId: string;
+  categoryId: CategoryId;
   month: Month;
 }) {
   const amount = useAvailable(categoryId, month);
