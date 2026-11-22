@@ -26,12 +26,11 @@ export function makeTransfer(
   log: DeviceChangeLog,
   input: TransferInput,
 ): string {
-  const details = validTransfer(log.readAll(), input);
   const id = crypto.randomUUID();
-  log.write<TransferMade["type"], TransferMade["payload"]>(id, "TransferMade", {
-    version: 1,
-    ...details,
-  });
+  log
+    .write<TransferMade["type"], TransferMade["payload"]>(id, "TransferMade")
+    .ensure((records) => validTransfer(records, input))
+    .commit((details) => ({ version: 1, ...details }));
   return id;
 }
 
@@ -41,24 +40,27 @@ export function editTransfer(
   id: string,
   input: TransferInput,
 ): void {
-  const records = log.readAll();
-  requireTransfer(records, id);
-  const details = validTransfer(records, input);
-  log.write<TransferEdited["type"], TransferEdited["payload"]>(
-    id,
-    "TransferEdited",
-    { version: 1, ...details },
-  );
+  log
+    .write<TransferEdited["type"], TransferEdited["payload"]>(
+      id,
+      "TransferEdited",
+    )
+    .ensure((records) => {
+      requireTransfer(records, id);
+      return validTransfer(records, input);
+    })
+    .commit((details) => ({ version: 1, ...details }));
 }
 
 /** Takes a Transfer out of the Budget, unless it touches a closed Account. */
 export function deleteTransfer(log: DeviceChangeLog, id: string): void {
-  requireTransfer(log.readAll(), id);
-  log.write<TransferDeleted["type"], TransferDeleted["payload"]>(
-    id,
-    "TransferDeleted",
-    { version: 1 },
-  );
+  log
+    .write<TransferDeleted["type"], TransferDeleted["payload"]>(
+      id,
+      "TransferDeleted",
+    )
+    .ensure((records) => requireTransfer(records, id))
+    .commit(() => ({ version: 1 }));
 }
 
 /**
@@ -71,13 +73,11 @@ export function restoreTransfer(
   restores: string,
   input: TransferInput,
 ): string {
-  const details = validTransfer(log.readAll(), input);
   const id = crypto.randomUUID();
-  log.write<TransferMade["type"], TransferMade["payload"]>(id, "TransferMade", {
-    version: 1,
-    restores,
-    ...details,
-  });
+  log
+    .write<TransferMade["type"], TransferMade["payload"]>(id, "TransferMade")
+    .ensure((records) => validTransfer(records, input))
+    .commit((details) => ({ version: 1, restores, ...details }));
   return id;
 }
 

@@ -4,6 +4,7 @@ import {
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
+import { seedRecord } from "../../kernel/seed-record";
 import { accountBalance } from "../accounts";
 import type { AccountClosed, AccountOpened } from "../accounts/records";
 import type { AssignmentSet } from "../assignments/records";
@@ -16,7 +17,8 @@ import { transfers } from "./index";
 function budget() {
   const changeLog = createInMemoryChangeLog();
   const log = createDeviceChangeLog(changeLog, "this-device");
-  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  seedRecord<BudgetCreated["type"], BudgetCreated["payload"]>(
+    log,
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
@@ -25,7 +27,8 @@ function budget() {
     ["checking", "Checking", 100000],
     ["savings", "Savings", 50000],
   ] as const) {
-    log.write<AccountOpened["type"], AccountOpened["payload"]>(
+    seedRecord<AccountOpened["type"], AccountOpened["payload"]>(
+      log,
       id,
       "AccountOpened",
       {
@@ -61,7 +64,8 @@ describe("Transfers", () => {
 
   it("leaves Ready to Assign and every Category's Available unchanged", () => {
     const { changeLog, log } = budget();
-    log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+    seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
+      log,
       "groceries/2026-10",
       "AssignmentSet",
       {
@@ -195,7 +199,8 @@ describe("Transfers", () => {
       date: "2026-10-12",
       amount: money(50000, "USD"),
     });
-    log.write<AccountClosed["type"], AccountClosed["payload"]>(
+    seedRecord<AccountClosed["type"], AccountClosed["payload"]>(
+      log,
       "savings",
       "AccountClosed",
       { version: 1 },

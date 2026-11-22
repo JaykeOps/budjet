@@ -33,11 +33,13 @@ export function recordTransaction(
   input: TransactionInput,
 ): string {
   const id = crypto.randomUUID();
-  log.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
-    id,
-    "TransactionRecorded",
-    checkedPayload(log.readAll(), input),
-  );
+  log
+    .write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      id,
+      "TransactionRecorded",
+    )
+    .ensure((records) => checkedPayload(records, input))
+    .commit((payload) => payload);
   return id;
 }
 
@@ -50,23 +52,27 @@ export function editTransaction(
   id: string,
   input: TransactionInput,
 ): void {
-  const records = log.readAll();
-  checkChangeable(records, id);
-  log.write<TransactionEdited["type"], TransactionEdited["payload"]>(
-    id,
-    "TransactionEdited",
-    checkedPayload(records, input),
-  );
+  log
+    .write<TransactionEdited["type"], TransactionEdited["payload"]>(
+      id,
+      "TransactionEdited",
+    )
+    .ensure((records) => {
+      checkChangeable(records, id);
+      return checkedPayload(records, input);
+    })
+    .commit((payload) => payload);
 }
 
 /** Removes a Transaction, in any Month, unless its Account is closed. */
 export function deleteTransaction(log: DeviceChangeLog, id: string): void {
-  checkChangeable(log.readAll(), id);
-  log.write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
-    id,
-    "TransactionDeleted",
-    { version: 1 },
-  );
+  log
+    .write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
+      id,
+      "TransactionDeleted",
+    )
+    .ensure((records) => checkChangeable(records, id))
+    .commit(() => ({ version: 1 }));
 }
 
 /**
@@ -79,11 +85,13 @@ export function restoreTransaction(
   { id: restores, ...input }: CurrentTransaction,
 ): string {
   const id = crypto.randomUUID();
-  log.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
-    id,
-    "TransactionRecorded",
-    { ...checkedPayload(log.readAll(), input), restores },
-  );
+  log
+    .write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      id,
+      "TransactionRecorded",
+    )
+    .ensure((records) => checkedPayload(records, input))
+    .commit((payload) => ({ ...payload, restores }));
   return id;
 }
 

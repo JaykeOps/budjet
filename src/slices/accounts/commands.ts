@@ -21,19 +21,19 @@ export function openAccount(
     openingBalance,
   }: { name: string; kind: AccountKind; openingBalance: Money },
 ): string {
-  const currency = budgetCurrency(log.readAll());
-  if (openingBalance.currency !== currency) {
-    throw new RangeError(
-      `The Opening Balance must be in ${currency}, the Budget's currency`,
-    );
-  }
-  const trimmed = checkedName(name);
   const id = crypto.randomUUID();
-  log.write<AccountOpened["type"], AccountOpened["payload"]>(
-    id,
-    "AccountOpened",
-    { version: 1, name: trimmed, kind, openingBalance },
-  );
+  log
+    .write<AccountOpened["type"], AccountOpened["payload"]>(id, "AccountOpened")
+    .ensure((records) => {
+      const currency = budgetCurrency(records);
+      if (openingBalance.currency !== currency) {
+        throw new RangeError(
+          `The Opening Balance must be in ${currency}, the Budget's currency`,
+        );
+      }
+      return checkedName(name);
+    })
+    .commit((trimmed) => ({ version: 1, name: trimmed, kind, openingBalance }));
   return id;
 }
 
@@ -48,19 +48,21 @@ export function redeclareBalance(
   accountId: string,
   { balance }: { balance: Money },
 ): string {
-  const records = log.readAll();
-  const currency = budgetCurrency(records);
-  openAccountWith(records, accountId);
-  if (balance.currency !== currency) {
-    throw new RangeError(
-      `A balance must be in ${currency}, the Budget's currency`,
-    );
-  }
-  return log.write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
-    accountId,
-    "BalanceRedeclared",
-    { version: 1, balance },
-  ).id;
+  return log
+    .write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+      accountId,
+      "BalanceRedeclared",
+    )
+    .ensure((records) => {
+      const currency = budgetCurrency(records);
+      openAccountWith(records, accountId);
+      if (balance.currency !== currency) {
+        throw new RangeError(
+          `A balance must be in ${currency}, the Budget's currency`,
+        );
+      }
+    })
+    .commit(() => ({ version: 1, balance })).id;
 }
 
 /**
@@ -73,17 +75,23 @@ export function deleteRedeclaredBalance(
   log: DeviceChangeLog,
   recordId: string,
 ): void {
-  const records = log.readAll();
-  budgetCurrency(records);
-  const redeclared = [...adjustments(records), ...balanceChecks(records)].find(
-    ({ id }) => id === recordId,
-  );
-  if (!redeclared) throw new RangeError(`No re-declared balance ${recordId}`);
-  openAccountWith(records, redeclared.accountId);
-  log.write<
-    RedeclaredBalanceDeleted["type"],
-    RedeclaredBalanceDeleted["payload"]
-  >(recordId, "RedeclaredBalanceDeleted", { version: 1 });
+  log
+    .write<
+      RedeclaredBalanceDeleted["type"],
+      RedeclaredBalanceDeleted["payload"]
+    >(recordId, "RedeclaredBalanceDeleted")
+    .ensure((records) => {
+      budgetCurrency(records);
+      const redeclared = [
+        ...adjustments(records),
+        ...balanceChecks(records),
+      ].find(({ id }) => id === recordId);
+      if (!redeclared) {
+        throw new RangeError(`No re-declared balance ${recordId}`);
+      }
+      openAccountWith(records, redeclared.accountId);
+    })
+    .commit(() => ({ version: 1 }));
 }
 
 /**
@@ -97,24 +105,29 @@ export function restoreRedeclaredBalance(
   log: DeviceChangeLog,
   recordId: string,
 ): string {
-  const records = log.readAll();
-  const deleted = records.some(
-    (record) =>
-      isRedeclaredBalanceDeleted(record) && record.subjectId === recordId,
-  );
-  const redeclared = records
+  const missing = () =>
+    new RangeError(`No deleted re-declared balance ${recordId}`);
+  // Read first to find where the balance goes back to; `ensure` then checks.
+  const redeclared = log
+    .readAll()
     .filter(isBalanceRedeclared)
     .find(({ id }) => id === recordId);
-  if (!redeclared || !deleted) {
-    throw new RangeError(`No deleted re-declared balance ${recordId}`);
-  }
-  openAccountWith(records, redeclared.subjectId);
-  return log.writeAt<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
-    redeclared.timestamp,
-    redeclared.subjectId,
-    "BalanceRedeclared",
-    redeclared.payload,
-  ).id;
+  if (!redeclared) throw missing();
+  return log
+    .writeAt<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+      redeclared.timestamp,
+      redeclared.subjectId,
+      "BalanceRedeclared",
+    )
+    .ensure((records) => {
+      const deleted = records.some(
+        (record) =>
+          isRedeclaredBalanceDeleted(record) && record.subjectId === recordId,
+      );
+      if (!deleted) throw missing();
+      openAccountWith(records, redeclared.subjectId);
+    })
+    .commit(() => redeclared.payload).id;
 }
 
 /** Gives an Account a new name, open or closed. */
@@ -123,16 +136,18 @@ export function renameAccount(
   accountId: string,
   { name }: { name: string },
 ): void {
-  const records = log.readAll();
-  budgetCurrency(records);
-  if (!accounts(records).some(({ id }) => id === accountId)) {
-    throw new RangeError(`No Account ${accountId}`);
-  }
-  log.write<AccountRenamed["type"], AccountRenamed["payload"]>(
-    accountId,
-    "AccountRenamed",
-    { version: 1, name: checkedName(name) },
-  );
+  log
+    .write<AccountRenamed["type"], AccountRenamed["payload"]>(
+      accountId,
+      "AccountRenamed",
+    )
+    .ensure((records) => {
+      budgetCurrency(records);
+      if (!accounts(records).some(({ id }) => id === accountId)) {
+        throw new RangeError(`No Account ${accountId}`);
+      }
+    })
+    .commit(() => ({ version: 1, name: checkedName(name) }));
 }
 
 /**
@@ -140,19 +155,21 @@ export function renameAccount(
  * money leaves the Budget unnoticed: the user Transfers it out first.
  */
 export function closeAccount(log: DeviceChangeLog, accountId: string): void {
-  const records = log.readAll();
-  budgetCurrency(records);
-  const account = openAccountWith(records, accountId);
-  if (account.balance.minorUnits !== 0) {
-    throw new RangeError(
-      `Transfer the ${formatMoney(account.balance)} in ${account.name} to another Account first: only an Account with a balance of zero can be closed`,
-    );
-  }
-  log.write<AccountClosed["type"], AccountClosed["payload"]>(
-    accountId,
-    "AccountClosed",
-    { version: 1 },
-  );
+  log
+    .write<AccountClosed["type"], AccountClosed["payload"]>(
+      accountId,
+      "AccountClosed",
+    )
+    .ensure((records) => {
+      budgetCurrency(records);
+      const account = openAccountWith(records, accountId);
+      if (account.balance.minorUnits !== 0) {
+        throw new RangeError(
+          `Transfer the ${formatMoney(account.balance)} in ${account.name} to another Account first: only an Account with a balance of zero can be closed`,
+        );
+      }
+    })
+    .commit(() => ({ version: 1 }));
 }
 
 function checkedName(name: string): string {

@@ -6,6 +6,7 @@ import {
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
+import { seedRecord } from "../../kernel/seed-record";
 import {
   type AssignmentSet,
   assignmentSubject,
@@ -309,7 +310,8 @@ function deviceCopy(
 function budgetWithStarterSet() {
   const changeLog = createInMemoryChangeLog();
   const log = createDeviceChangeLog(changeLog, "this-device");
-  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  seedRecord<BudgetCreated["type"], BudgetCreated["payload"]>(
+    log,
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
@@ -329,14 +331,16 @@ function budgetWithStarterSet() {
     find,
     id: (name: string) => find(name).id,
     assign(categoryId: string, month: Month, amount: number) {
-      log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+      seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
+        log,
         assignmentSubject(categoryId, month),
         "AssignmentSet",
         { version: 1, categoryId, month, amount: money(amount, "USD") },
       );
     },
     spend(categoryId: string, date: string, amount: number) {
-      log.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      seedRecord<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+        log,
         crypto.randomUUID(),
         "TransactionRecorded",
         {
@@ -518,7 +522,8 @@ describe("Deleting Categories and Category Groups", () => {
   it("refuses to delete a Category with a Take-back", () => {
     const budget = budgetWithStarterSet();
     const power = budget.id("Power");
-    budget.log.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+    seedRecord<TakeBackSet["type"], TakeBackSet["payload"]>(
+      budget.log,
       assignmentSubject(power, "2026-10"),
       "TakeBackSet",
       {
