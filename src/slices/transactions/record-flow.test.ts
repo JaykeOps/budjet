@@ -4,6 +4,7 @@ import {
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
+import { seedRecord } from "../../kernel/seed-record";
 import type { AccountOpened } from "../accounts/records";
 import type { AssignmentSet } from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
@@ -32,13 +33,15 @@ import {
 function budget() {
   const changeLog = createInMemoryChangeLog();
   const log = createDeviceChangeLog(changeLog, "this-device");
-  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  seedRecord<BudgetCreated["type"], BudgetCreated["payload"]>(
+    log,
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
   );
   for (const id of ["checking", "savings"]) {
-    log.write<AccountOpened["type"], AccountOpened["payload"]>(
+    seedRecord<AccountOpened["type"], AccountOpened["payload"]>(
+      log,
       id,
       "AccountOpened",
       {
@@ -49,13 +52,15 @@ function budget() {
       },
     );
   }
-  log.write<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+  seedRecord<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+    log,
     "everyday",
     "CategoryGroupCreated",
     { version: 1, name: "Everyday", position: 0 },
   );
   for (const [position, id] of ["groceries", "dining"].entries()) {
-    log.write<CategoryCreated["type"], CategoryCreated["payload"]>(
+    seedRecord<CategoryCreated["type"], CategoryCreated["payload"]>(
+      log,
       id,
       "CategoryCreated",
       { version: 1, name: id, groupId: "everyday", position },
@@ -124,8 +129,8 @@ describe("knownPayees", () => {
       categoryId: "dining",
       payee: "Corner Bistro",
     });
-    log.write("dining", "CategoryHidden", { version: 1 });
-    log.write("savings", "AccountClosed", { version: 1 });
+    seedRecord(log, "dining", "CategoryHidden", { version: 1 });
+    seedRecord(log, "savings", "AccountClosed", { version: 1 });
 
     expect(knownPayees(records())).toEqual([{ name: "Corner Bistro" }]);
   });
@@ -234,7 +239,8 @@ describe("withDirection", () => {
 describe("categoryChoices", () => {
   it("lists Available in the Month by Group, and Ready to Assign, leaving hidden Categories out", () => {
     const { log, records } = budget();
-    log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+    seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
+      log,
       "groceries-2026-10",
       "AssignmentSet",
       {
@@ -249,7 +255,7 @@ describe("categoryChoices", () => {
       accountId: "checking",
       categoryId: "groceries",
     });
-    log.write("dining", "CategoryHidden", { version: 1 });
+    seedRecord(log, "dining", "CategoryHidden", { version: 1 });
 
     expect(categoryChoices(records(), "2026-10", "USD")).toEqual({
       readyToAssign: money(195000, "USD"),
@@ -271,8 +277,8 @@ describe("categoryChoices", () => {
 
   it("leaves out a Group with nothing to choose", () => {
     const { log, records } = budget();
-    log.write("groceries", "CategoryHidden", { version: 1 });
-    log.write("dining", "CategoryHidden", { version: 1 });
+    seedRecord(log, "groceries", "CategoryHidden", { version: 1 });
+    seedRecord(log, "dining", "CategoryHidden", { version: 1 });
 
     expect(categoryChoices(records(), "2026-10", "USD").groups).toEqual([]);
   });
@@ -335,7 +341,7 @@ describe("categoryChoices while editing a Transaction", () => {
   it("still offers its Category if that has since been hidden", () => {
     const { log, records } = budget();
     recordTransaction(log, lunch);
-    log.write("groceries", "CategoryHidden", { version: 1 });
+    seedRecord(log, "groceries", "CategoryHidden", { version: 1 });
 
     expect(
       categoryChoices(

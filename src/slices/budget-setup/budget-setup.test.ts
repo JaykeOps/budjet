@@ -3,6 +3,7 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
+import { seedRecord } from "../../kernel/seed-record";
 import { createBudget } from "./commands";
 import { budget } from "./index";
 import type { BudgetCreated } from "./records";
@@ -64,7 +65,8 @@ describe("Budget Setup", () => {
     const { changeLog, log } = setUp(() =>
       new Date(2026, 9, 31, 23, 59).getTime(),
     );
-    log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+    seedRecord<BudgetCreated["type"], BudgetCreated["payload"]>(
+      log,
       "budget",
       "BudgetCreated",
       { version: 1, currency: "USD" },

@@ -31,6 +31,12 @@ export type ChangeLog = {
  * This device's way into the Change Log: it reads it, and adds the Change
  * Records this device makes, stamped by this device's clock. It has no `append`
  * or `merge`, so a record can't be added any other way.
+ *
+ * A write is built in three steps, and nothing is written until the last:
+ * `write(subjectId, type)` says what changes, `ensure(check)` reads the records
+ * as they stand and refuses the write by throwing, and `commit` builds the
+ * payload from what the check found. So no record is written without a check,
+ * and the check never holds the Change Log itself.
  */
 export type DeviceChangeLog = Pick<
   ChangeLog,
@@ -39,8 +45,7 @@ export type DeviceChangeLog = Pick<
   write<Type extends string, Payload>(
     subjectId: string,
     type: Type,
-    payload: Payload,
-  ): ChangeRecord<Type, Payload>;
+  ): Write<Type, Payload>;
   /**
    * Writes a new record at the place an earlier one holds in the Change Log, by
    * taking its timestamp. For Undo, when what a record means depends on what came
@@ -51,8 +56,43 @@ export type DeviceChangeLog = Pick<
     timestamp: Timestamp,
     subjectId: string,
     type: Type,
-    payload: Payload,
-  ): ChangeRecord<Type, Payload>;
+  ): Write<Type, Payload>;
+  /**
+   * Writes any number of records from one check, each stamped after the last,
+   * all together or none. For a change that is several records, such as a
+   * reorder, or that writes a record only when something differs.
+   */
+  writeMany<Record extends ChangeRecord = ChangeRecord>(): WriteMany<Record>;
+};
+
+/**
+ * Reads the records as they stand and returns what a write is built from. It
+ * refuses the write by throwing, with the reason.
+ */
+export type Check<Found> = (records: readonly ChangeRecord[]) => Found;
+
+/**
+ * A record still to be written: what it changes and how. Over a union of
+ * record types it is one of them, so a type is never paired with another's
+ * payload.
+ */
+export type NewChangeRecord<Record extends ChangeRecord = ChangeRecord> =
+  Record extends ChangeRecord
+    ? Pick<Record, "subjectId" | "type" | "payload">
+    : never;
+
+export type Write<Type extends string, Payload> = {
+  ensure<Found>(check: Check<Found>): {
+    commit(payload: (found: Found) => Payload): ChangeRecord<Type, Payload>;
+  };
+};
+
+export type WriteMany<Record extends ChangeRecord> = {
+  ensure<Found>(check: Check<Found>): {
+    commit(
+      records: (found: Found) => readonly NewChangeRecord<Record>[],
+    ): ChangeRecord<Record["type"], Record["payload"]>[];
+  };
 };
 
 /** This device's DeviceChangeLog over `changeLog`. */
@@ -66,31 +106,64 @@ export function createDeviceChangeLog(
     subscribe: changeLog.subscribe,
     saveState: changeLog.saveState,
     subscribeToSaveState: changeLog.subscribeToSaveState,
-    write(subjectId, type, payload) {
-      const record = {
-        id: crypto.randomUUID(),
-        subjectId,
-        deviceId,
-        timestamp: nextTimestamp(changeLog.readAll().at(-1)?.timestamp, now()),
-        type,
-        payload,
-      };
-      changeLog.append([record]);
-      return record;
-    },
-    writeAt(timestamp, subjectId, type, payload) {
-      const record = {
-        id: crypto.randomUUID(),
-        subjectId,
-        deviceId,
-        timestamp,
-        writtenAt: now(),
-        type,
-        payload,
-      };
-      changeLog.append([record]);
-      return record;
-    },
+    write: (subjectId, type) => ({
+      ensure: (check) => ({
+        commit(payload) {
+          const records = changeLog.readAll();
+          const found = check(records);
+          const record = {
+            id: crypto.randomUUID(),
+            subjectId,
+            deviceId,
+            timestamp: nextTimestamp(records.at(-1)?.timestamp, now()),
+            type,
+            payload: payload(found),
+          };
+          changeLog.append([record]);
+          return record;
+        },
+      }),
+    }),
+    writeAt: (timestamp, subjectId, type) => ({
+      ensure: (check) => ({
+        commit(payload) {
+          const found = check(changeLog.readAll());
+          const record = {
+            id: crypto.randomUUID(),
+            subjectId,
+            deviceId,
+            timestamp,
+            writtenAt: now(),
+            type,
+            payload: payload(found),
+          };
+          changeLog.append([record]);
+          return record;
+        },
+      }),
+    }),
+    writeMany: () => ({
+      ensure: (check) => ({
+        commit(build) {
+          const records = changeLog.readAll();
+          const found = check(records);
+          let last = records.at(-1)?.timestamp;
+          const added = build(found).map(({ subjectId, type, payload }) => {
+            last = nextTimestamp(last, now());
+            return {
+              id: crypto.randomUUID(),
+              subjectId,
+              deviceId,
+              timestamp: last,
+              type,
+              payload,
+            };
+          });
+          if (added.length > 0) changeLog.append(added);
+          return added;
+        },
+      }),
+    }),
   };
 }
 

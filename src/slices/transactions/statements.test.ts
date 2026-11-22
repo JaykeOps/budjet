@@ -6,6 +6,7 @@ import {
   type DeviceChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
+import { seedRecord } from "../../kernel/seed-record";
 import { accountBalance, accountsTotal } from "../accounts";
 import type {
   AccountClosed,
@@ -39,17 +40,23 @@ function transfer(
   date: string,
   cents: number,
 ) {
-  log.write<TransferMade["type"], TransferMade["payload"]>(id, "TransferMade", {
-    version: 1,
-    fromAccountId,
-    toAccountId,
-    date,
-    amount: usd(cents),
-  });
+  seedRecord<TransferMade["type"], TransferMade["payload"]>(
+    log,
+    id,
+    "TransferMade",
+    {
+      version: 1,
+      fromAccountId,
+      toAccountId,
+      date,
+      amount: usd(cents),
+    },
+  );
 }
 
 function redeclare(log: DeviceChangeLog, accountId: string, cents: number) {
-  log.write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+  seedRecord<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+    log,
     accountId,
     "BalanceRedeclared",
     { version: 1, balance: usd(cents) },
@@ -60,13 +67,15 @@ function redeclare(log: DeviceChangeLog, accountId: string, cents: number) {
 function budget() {
   const changeLog = createInMemoryChangeLog();
   const log = logAt(changeLog, new Date(2100, 8, 2, 12));
-  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  seedRecord<BudgetCreated["type"], BudgetCreated["payload"]>(
+    log,
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
   );
   const open = (id: string, name: string, cents: number) => {
-    log.write<AccountOpened["type"], AccountOpened["payload"]>(
+    seedRecord<AccountOpened["type"], AccountOpened["payload"]>(
+      log,
       id,
       "AccountOpened",
       { version: 1, name, kind: "checking", openingBalance: usd(cents) },
@@ -75,12 +84,14 @@ function budget() {
   };
   const everyday = open("everyday", "Everyday", 100000);
   const wallet = open("wallet", "Wallet", 5000);
-  log.write<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+  seedRecord<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+    log,
     "needs",
     "CategoryGroupCreated",
     { version: 1, name: "Needs", position: 0 },
   );
-  log.write<CategoryCreated["type"], CategoryCreated["payload"]>(
+  seedRecord<CategoryCreated["type"], CategoryCreated["payload"]>(
+    log,
     "groceries",
     "CategoryCreated",
     { version: 1, name: "Groceries", groupId: "needs", position: 0 },
@@ -261,7 +272,8 @@ describe("Statements", () => {
   it("keeps a closed Account's history in Statements", () => {
     const { everyday, wallet, log, read } = budget();
     transfer(log, "move", wallet, everyday, "2100-10-04", 5000);
-    log.write<AccountClosed["type"], AccountClosed["payload"]>(
+    seedRecord<AccountClosed["type"], AccountClosed["payload"]>(
+      log,
       wallet,
       "AccountClosed",
       { version: 1 },

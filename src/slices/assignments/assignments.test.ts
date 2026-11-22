@@ -6,6 +6,7 @@ import {
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import { month } from "../../kernel/month";
+import { seedRecord } from "../../kernel/seed-record";
 import type { BudgetCreated } from "../budget-setup/records";
 import { available, readyToAssign } from "../budget-totals";
 import {
@@ -27,7 +28,8 @@ function budgetIn(
 ) {
   const changeLog = createInMemoryChangeLog();
   const log = createDeviceChangeLog(changeLog, deviceId, { now });
-  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  seedRecord<BudgetCreated["type"], BudgetCreated["payload"]>(
+    log,
     "budget",
     "BudgetCreated",
     { version: 1, currency },
@@ -291,7 +293,8 @@ describe("Assignments", () => {
 
     /** Stores an Assignment the way older versions could: below zero. */
     function storeNegativeAssignment(log: DeviceChangeLog, amount: number) {
-      log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+      seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
+        log,
         assignmentSubject(rent.categoryId, rent.month),
         "AssignmentSet",
         { version: 1, ...rent, amount: dollars(-amount) },
@@ -530,7 +533,8 @@ describe("Assignments", () => {
 
     it("gets the same numbers back over an old negative Assignment", () => {
       const { changeLog, log } = budgetIn("USD");
-      log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+      seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
+        log,
         assignmentSubject("rent", october),
         "AssignmentSet",
         { version: 1, ...rent, amount: money(-2000, "USD") },

@@ -5,6 +5,7 @@ import {
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
+import { seedRecord } from "../../kernel/seed-record";
 import type {
   AccountClosed,
   AccountOpened,
@@ -28,12 +29,14 @@ import type { TransactionDeleted, TransactionEdited } from "./records";
 function budget() {
   const changeLog = createInMemoryChangeLog();
   const log = createDeviceChangeLog(changeLog, "this-device");
-  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  seedRecord<BudgetCreated["type"], BudgetCreated["payload"]>(
+    log,
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
   );
-  log.write<AccountOpened["type"], AccountOpened["payload"]>(
+  seedRecord<AccountOpened["type"], AccountOpened["payload"]>(
+    log,
     "checking",
     "AccountOpened",
     {
@@ -43,12 +46,14 @@ function budget() {
       openingBalance: money(100000, "USD"),
     },
   );
-  log.write<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+  seedRecord<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+    log,
     "everyday",
     "CategoryGroupCreated",
     { version: 1, name: "Everyday", position: 0 },
   );
-  log.write<CategoryCreated["type"], CategoryCreated["payload"]>(
+  seedRecord<CategoryCreated["type"], CategoryCreated["payload"]>(
+    log,
     "groceries",
     "CategoryCreated",
     { version: 1, name: "Groceries", groupId: "everyday", position: 0 },
@@ -336,7 +341,8 @@ describe("Transactions", () => {
 
   it("keeps a closed Account's Transactions but takes no new ones, and no changes to them", () => {
     const { changeLog, log } = budget();
-    log.write<AccountOpened["type"], AccountOpened["payload"]>(
+    seedRecord<AccountOpened["type"], AccountOpened["payload"]>(
+      log,
       "old",
       "AccountOpened",
       {
@@ -356,7 +362,8 @@ describe("Transactions", () => {
     const refund = record("old", 1000);
     const spent = record("old", -1000);
     const inChecking = record("checking", -500);
-    log.write<AccountClosed["type"], AccountClosed["payload"]>(
+    seedRecord<AccountClosed["type"], AccountClosed["payload"]>(
+      log,
       "old",
       "AccountClosed",
       { version: 1 },
@@ -435,7 +442,8 @@ describe("Transactions", () => {
       date: string,
       cents: number,
     ) =>
-      log.write<TransferMade["type"], TransferMade["payload"]>(
+      seedRecord<TransferMade["type"], TransferMade["payload"]>(
+        log,
         id,
         "TransferMade",
         {
@@ -456,7 +464,8 @@ describe("Transactions", () => {
     });
     transfer("from-savings", "savings", "checking", "2026-10-20", 5000);
     transfer("deleted", "checking", "savings", "2026-10-21", 100);
-    log.write<TransferDeleted["type"], TransferDeleted["payload"]>(
+    seedRecord<TransferDeleted["type"], TransferDeleted["payload"]>(
+      log,
       "deleted",
       "TransferDeleted",
       { version: 1 },
@@ -500,9 +509,13 @@ describe("Transactions", () => {
       categoryId: "groceries",
     });
     // A clock ahead of the records already written, which the Change Log keeps in order.
-    const redeclared = createDeviceChangeLog(changeLog, "this-device", {
-      now: () => new Date(2100, 0, 14, 12).getTime(),
-    }).write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+    const redeclared = seedRecord<
+      BalanceRedeclared["type"],
+      BalanceRedeclared["payload"]
+    >(
+      createDeviceChangeLog(changeLog, "this-device", {
+        now: () => new Date(2100, 0, 14, 12).getTime(),
+      }),
       "checking",
       "BalanceRedeclared",
       { version: 1, balance: money(95000, "USD") },
@@ -523,9 +536,13 @@ describe("Transactions", () => {
 
   it("lists re-declaring the current balance as a Balance check, not an Adjustment", () => {
     const { changeLog, transactionList } = budget();
-    const checked = createDeviceChangeLog(changeLog, "this-device", {
-      now: () => new Date(2100, 0, 14, 12).getTime(),
-    }).write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+    const checked = seedRecord<
+      BalanceRedeclared["type"],
+      BalanceRedeclared["payload"]
+    >(
+      createDeviceChangeLog(changeLog, "this-device", {
+        now: () => new Date(2100, 0, 14, 12).getTime(),
+      }),
       "checking",
       "BalanceRedeclared",
       { version: 1, balance: money(100000, "USD") },

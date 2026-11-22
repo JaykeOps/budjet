@@ -12,12 +12,13 @@ export function createBudget(
   if (!isCurrency(currency)) {
     throw new RangeError(`${currency} is not a currency`);
   }
-  if (budget(log.readAll())) {
-    throw new Error("Crownkeep already has a Budget");
-  }
-  log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
-    crypto.randomUUID(),
-    "BudgetCreated",
-    { version: 2, currency, firstMonth: currentMonth() },
-  );
+  log
+    .write<BudgetCreated["type"], BudgetCreated["payload"]>(
+      crypto.randomUUID(),
+      "BudgetCreated",
+    )
+    .ensure((records) => {
+      if (budget(records)) throw new Error("Crownkeep already has a Budget");
+    })
+    .commit(() => ({ version: 2, currency, firstMonth: currentMonth() }));
 }

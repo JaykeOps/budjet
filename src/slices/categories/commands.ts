@@ -1,9 +1,13 @@
-import type { DeviceChangeLog } from "../../kernel/change-log";
+import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
 import { formatMoney } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
 import { assignedAfter, available, categoryUsed } from "../budget-totals";
 import { categoryGroups } from "./queries";
-import type { CategoriesRecord } from "./records";
+import type {
+  CategoriesRecord,
+  CategoryGroupPlaced,
+  CategoryPlaced,
+} from "./records";
 
 export const starterSet = [
   ["Bills", ["Rent", "Power", "Phone", "Internet"], { leftOut: false }],
@@ -31,12 +35,9 @@ export function createCategoryGroup(
   { name }: { name: string },
 ): string {
   const id = crypto.randomUUID();
-  const groups = categoryGroups(log.readAll());
-  write(log, id, "CategoryGroupCreated", {
-    version: 1,
-    name: validName(name),
-    position: groups.length,
-  });
+  write(log, id, "CategoryGroupCreated")
+    .ensure((records) => categoryGroups(records).length)
+    .commit((position) => ({ version: 1, name: validName(name), position }));
   return id;
 }
 
@@ -46,13 +47,14 @@ export function createCategory(
   { groupId, name }: { groupId: string; name: string },
 ): string {
   const id = crypto.randomUUID();
-  const group = findGroup(log, groupId);
-  write(log, id, "CategoryCreated", {
-    version: 1,
-    groupId,
-    name: validName(name),
-    position: group.categories.length,
-  });
+  write(log, id, "CategoryCreated")
+    .ensure((records) => findGroup(records, groupId))
+    .commit((group) => ({
+      version: 1,
+      groupId,
+      name: validName(name),
+      position: group.categories.length,
+    }));
   return id;
 }
 
@@ -61,11 +63,9 @@ export function renameCategoryGroup(
   groupId: string,
   { name }: { name: string },
 ): void {
-  findGroup(log, groupId);
-  write(log, groupId, "CategoryGroupRenamed", {
-    version: 1,
-    name: validName(name),
-  });
+  write(log, groupId, "CategoryGroupRenamed")
+    .ensure((records) => findGroup(records, groupId))
+    .commit(() => ({ version: 1, name: validName(name) }));
 }
 
 export function renameCategory(
@@ -73,11 +73,9 @@ export function renameCategory(
   categoryId: string,
   { name }: { name: string },
 ): void {
-  findCategory(log, categoryId);
-  write(log, categoryId, "CategoryRenamed", {
-    version: 1,
-    name: validName(name),
-  });
+  write(log, categoryId, "CategoryRenamed")
+    .ensure((records) => findCategory(records, categoryId))
+    .commit(() => ({ version: 1, name: validName(name) }));
 }
 
 /** Leaves a Category Group out of Spent this Month, or counts it again. */
@@ -86,11 +84,9 @@ export function setCategoryGroupSpentThisMonth(
   groupId: string,
   { leftOut }: { leftOut: boolean },
 ): void {
-  findGroup(log, groupId);
-  write(log, groupId, "CategoryGroupSpentThisMonthSet", {
-    version: 1,
-    leftOut,
-  });
+  write(log, groupId, "CategoryGroupSpentThisMonthSet")
+    .ensure((records) => findGroup(records, groupId))
+    .commit(() => ({ version: 1, leftOut }));
 }
 
 /** Puts a Category Group at `toIndex` among the Category Groups. */
@@ -99,13 +95,22 @@ export function moveCategoryGroup(
   groupId: string,
   { toIndex }: { toIndex: number },
 ): void {
-  findGroup(log, groupId);
-  const others = categoryGroups(log.readAll())
-    .map(({ id }) => id)
-    .filter((id) => id !== groupId);
-  for (const [position, id] of placeAt(others, groupId, toIndex)) {
-    write(log, id, "CategoryGroupPlaced", { version: 1, position });
-  }
+  log
+    .writeMany<CategoryGroupPlaced>()
+    .ensure((records) => {
+      findGroup(records, groupId);
+      const others = categoryGroups(records)
+        .map(({ id }) => id)
+        .filter((id) => id !== groupId);
+      return placeAt(others, groupId, toIndex);
+    })
+    .commit((places) =>
+      places.map(([position, id]) => ({
+        subjectId: id,
+        type: "CategoryGroupPlaced",
+        payload: { version: 1, position },
+      })),
+    );
 }
 
 /**
@@ -117,13 +122,22 @@ export function moveCategory(
   categoryId: string,
   { groupId, toIndex }: { groupId: string; toIndex: number },
 ): void {
-  findCategory(log, categoryId);
-  const others = findGroup(log, groupId)
-    .categories.map(({ id }) => id)
-    .filter((id) => id !== categoryId);
-  for (const [position, id] of placeAt(others, categoryId, toIndex)) {
-    write(log, id, "CategoryPlaced", { version: 1, groupId, position });
-  }
+  log
+    .writeMany<CategoryPlaced>()
+    .ensure((records) => {
+      findCategory(records, categoryId);
+      const others = findGroup(records, groupId)
+        .categories.map(({ id }) => id)
+        .filter((id) => id !== categoryId);
+      return placeAt(others, categoryId, toIndex);
+    })
+    .commit((places) =>
+      places.map(([position, id]) => ({
+        subjectId: id,
+        type: "CategoryPlaced",
+        payload: { version: 1, groupId, position },
+      })),
+    );
 }
 
 /**
@@ -137,26 +151,29 @@ export function hideCategory(
   categoryId: string,
   { currentMonth }: { currentMonth: Month },
 ): void {
-  const { category } = findCategory(log, categoryId);
-  const records = log.readAll();
-  const left = available(records, categoryId, currentMonth);
-  if (left && left.minorUnits !== 0) {
-    throw new Error(
-      `${category.name} still has ${formatMoney(left)} Available. Move it to another Category first.`,
-    );
-  }
-  if (assignedAfter(records, categoryId, currentMonth)) {
-    throw new Error(
-      `${category.name} has Assignments in later Months. Set them to zero first.`,
-    );
-  }
-  write(log, categoryId, "CategoryHidden", { version: 1 });
+  write(log, categoryId, "CategoryHidden")
+    .ensure((records) => {
+      const { category } = findCategory(records, categoryId);
+      const left = available(records, categoryId, currentMonth);
+      if (left && left.minorUnits !== 0) {
+        throw new Error(
+          `${category.name} still has ${formatMoney(left)} Available. Move it to another Category first.`,
+        );
+      }
+      if (assignedAfter(records, categoryId, currentMonth)) {
+        throw new Error(
+          `${category.name} has Assignments in later Months. Set them to zero first.`,
+        );
+      }
+    })
+    .commit(() => ({ version: 1 }));
 }
 
 /** Brings a hidden Category back. */
 export function unhideCategory(log: DeviceChangeLog, categoryId: string): void {
-  findCategory(log, categoryId);
-  write(log, categoryId, "CategoryUnhidden", { version: 1 });
+  write(log, categoryId, "CategoryUnhidden")
+    .ensure((records) => findCategory(records, categoryId))
+    .commit(() => ({ version: 1 }));
 }
 
 /**
@@ -164,8 +181,9 @@ export function unhideCategory(log: DeviceChangeLog, categoryId: string): void {
  * hidden like that a moment ago, and the Budget flags one holding money.
  */
 export function restoreHidden(log: DeviceChangeLog, categoryId: string): void {
-  findCategory(log, categoryId);
-  write(log, categoryId, "CategoryHidden", { version: 1 });
+  write(log, categoryId, "CategoryHidden")
+    .ensure((records) => findCategory(records, categoryId))
+    .commit(() => ({ version: 1 }));
 }
 
 /**
@@ -186,11 +204,14 @@ export class CategoryInUseError extends Error {
 
 /** Deletes a Category that was never used. A used one can only be hidden. */
 export function deleteCategory(log: DeviceChangeLog, categoryId: string): void {
-  const { category } = findCategory(log, categoryId);
-  if (categoryUsed(log.readAll(), categoryId)) {
-    throw new CategoryInUseError(categoryId, category.name);
-  }
-  write(log, categoryId, "CategoryDeleted", { version: 1 });
+  write(log, categoryId, "CategoryDeleted")
+    .ensure((records) => {
+      const { category } = findCategory(records, categoryId);
+      if (categoryUsed(records, categoryId)) {
+        throw new CategoryInUseError(categoryId, category.name);
+      }
+    })
+    .commit(() => ({ version: 1 }));
 }
 
 /** Deletes a Category Group with no Categories in it, hidden ones included. */
@@ -198,13 +219,16 @@ export function deleteCategoryGroup(
   log: DeviceChangeLog,
   groupId: string,
 ): void {
-  const group = findGroup(log, groupId);
-  if (group.categories.length > 0) {
-    throw new Error(
-      `${group.name} still has Categories. Move or delete them first.`,
-    );
-  }
-  write(log, groupId, "CategoryGroupDeleted", { version: 1 });
+  write(log, groupId, "CategoryGroupDeleted")
+    .ensure((records) => {
+      const group = findGroup(records, groupId);
+      if (group.categories.length > 0) {
+        throw new Error(
+          `${group.name} still has Categories. Move or delete them first.`,
+        );
+      }
+    })
+    .commit(() => ({ version: 1 }));
 }
 
 /**
@@ -224,16 +248,16 @@ function placeAt(
     .map((id, position) => [position, id]);
 }
 
-function findCategory(log: DeviceChangeLog, categoryId: string) {
-  for (const group of categoryGroups(log.readAll())) {
+function findCategory(records: readonly ChangeRecord[], categoryId: string) {
+  for (const group of categoryGroups(records)) {
     const category = group.categories.find(({ id }) => id === categoryId);
     if (category) return { group, category };
   }
   throw new Error("There is no such Category");
 }
 
-function findGroup(log: DeviceChangeLog, groupId: string) {
-  const group = categoryGroups(log.readAll()).find(({ id }) => id === groupId);
+function findGroup(records: readonly ChangeRecord[], groupId: string) {
+  const group = categoryGroups(records).find(({ id }) => id === groupId);
   if (!group) throw new Error("There is no such Category Group");
   return group;
 }
@@ -244,11 +268,14 @@ function validName(name: string): string {
   return trimmed;
 }
 
-function write<Record extends CategoriesRecord>(
+/** Starts a write of one of the records Categories publishes, typed by its `type`. */
+function write<Type extends CategoriesRecord["type"]>(
   log: DeviceChangeLog,
   subjectId: string,
-  type: Record["type"],
-  payload: Record["payload"],
-): void {
-  log.write(subjectId, type, payload);
+  type: Type,
+) {
+  return log.write<Type, Extract<CategoriesRecord, { type: Type }>["payload"]>(
+    subjectId,
+    type,
+  );
 }

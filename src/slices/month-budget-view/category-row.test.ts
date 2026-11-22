@@ -5,6 +5,7 @@ import {
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
+import { seedRecord } from "../../kernel/seed-record";
 import {
   type AssignmentSet,
   assignmentSubject,
@@ -143,7 +144,8 @@ describe("categoryRowIn", () => {
   it("agrees with Budget Totals' Available, which stays the one calculation of it", () => {
     const changeLog = createInMemoryChangeLog();
     const log = createDeviceChangeLog(changeLog, "phone");
-    log.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+    seedRecord<BudgetCreated["type"], BudgetCreated["payload"]>(
+      log,
       "budget",
       "BudgetCreated",
       { version: 1, currency: "USD" },
@@ -154,22 +156,26 @@ describe("categoryRowIn", () => {
       month,
       amount: usd(dollars),
     });
-    log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+    seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
+      log,
       assignmentSubject("groceries", "2026-10"),
       "AssignmentSet",
       amountIn("2026-10", 300),
     );
-    log.write<TakeBackSet["type"], TakeBackSet["payload"]>(
+    seedRecord<TakeBackSet["type"], TakeBackSet["payload"]>(
+      log,
       assignmentSubject("groceries", "2026-11"),
       "TakeBackSet",
       amountIn("2026-11", 40),
     );
-    log.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+    seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
+      log,
       assignmentSubject("groceries", "2026-11"),
       "AssignmentSet",
       amountIn("2026-11", 25),
     );
-    log.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+    seedRecord<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      log,
       "lunch",
       "TransactionRecorded",
       {

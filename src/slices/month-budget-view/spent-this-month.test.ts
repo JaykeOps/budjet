@@ -6,6 +6,7 @@ import {
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
+import { seedRecord } from "../../kernel/seed-record";
 import type { AccountOpened } from "../accounts/records";
 import { type AssignmentSet, assignmentSubject } from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
@@ -129,7 +130,7 @@ function seed<Record extends { type: string; payload: unknown }>(
   type: Record["type"],
   payload: Record["payload"],
 ) {
-  log.write(subjectId, type, payload);
+  seedRecord(log, subjectId, type, payload);
 }
 
 describe("Spent this Month", () => {
