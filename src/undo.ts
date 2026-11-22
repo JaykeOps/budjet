@@ -6,7 +6,7 @@
  */
 import { useMemo } from "react";
 import type { DeviceChangeLog } from "./kernel/change-log";
-import type { CategoryId } from "./kernel/id";
+import type { CategoryId, TransactionId } from "./kernel/id";
 import { formatMoney, money } from "./kernel/money";
 import { type Month, monthNameAlone, previousMonth } from "./kernel/month";
 import { useDeviceChangeLog } from "./kernel/use-change-log-query";
@@ -48,7 +48,10 @@ import { useToast } from "./ui/Toast";
 
 export type Undo = () => void;
 
-function transactionNow(log: DeviceChangeLog, id: string): CurrentTransaction {
+function transactionNow(
+  log: DeviceChangeLog,
+  id: TransactionId,
+): CurrentTransaction {
   const now = currentTransactions(log.readAll()).find(
     (transaction) => transaction.id === id,
   );
@@ -65,7 +68,7 @@ function transferNow(log: DeviceChangeLog, id: string): TransferInput {
 /** Undoing writes the previous values as a new record. */
 export function editTransactionWithUndo(
   log: DeviceChangeLog,
-  id: string,
+  id: TransactionId,
   input: TransactionInput,
 ): Undo {
   const previous = transactionNow(log, id);
@@ -76,7 +79,7 @@ export function editTransactionWithUndo(
 /** Undoing writes a new Transaction, with a fresh id, in the same place. */
 export function deleteTransactionWithUndo(
   log: DeviceChangeLog,
-  id: string,
+  id: TransactionId,
 ): Undo {
   const deleted = transactionNow(log, id);
   deleteTransaction(log, id);
@@ -221,13 +224,13 @@ export function useHistoryChanges() {
   const toast = useToast();
   return useMemo(
     () => ({
-      onEdit(id: string, input: TransactionInput) {
+      onEdit(id: TransactionId, input: TransactionInput) {
         toast({
           text: "Changes saved",
           onUndo: editTransactionWithUndo(log, id, input),
         });
       },
-      onDelete(id: string) {
+      onDelete(id: TransactionId) {
         toast({
           text: "Transaction deleted",
           onUndo: deleteTransactionWithUndo(log, id),

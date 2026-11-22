@@ -7,7 +7,7 @@ import {
   deletedSubjects,
   perSnapshot,
 } from "../../kernel/change-log";
-import type { AccountId, CategoryId } from "../../kernel/id";
+import type { AccountId, CategoryId, TransactionId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 
 /** What a Transaction says: its Account, date, amount, and optional Category, Payee and memo. */
@@ -36,8 +36,9 @@ export type TransactionRecorded = ChangeRecord<
      * The deleted Transaction that Undo brought back as this new one, whose
      * place in a list it takes. Its money counts from now, as any record's does.
      */
-    restores?: string;
-  } & TransactionFields
+    restores?: TransactionId;
+  } & TransactionFields,
+  TransactionId
 >;
 
 /**
@@ -47,13 +48,15 @@ export type TransactionRecorded = ChangeRecord<
  */
 export type TransactionEdited = ChangeRecord<
   "TransactionEdited",
-  { version: 1 } & TransactionFields
+  { version: 1 } & TransactionFields,
+  TransactionId
 >;
 
 /** A Transaction removed from the Budget. Its subject is the Transaction's id. */
 export type TransactionDeleted = ChangeRecord<
   "TransactionDeleted",
-  { version: 1 }
+  { version: 1 },
+  TransactionId
 >;
 
 export function isTransactionRecorded(
@@ -75,7 +78,7 @@ export function isTransactionDeleted(
 }
 
 /** A Transaction as it stands now, with its id. */
-export type CurrentTransaction = { id: string } & TransactionFields;
+export type CurrentTransaction = { id: TransactionId } & TransactionFields;
 
 /**
  * Every Transaction as it stands now, in the order they were first recorded.
@@ -93,7 +96,10 @@ function replayTransactions(
   // a Map keeps each Transaction where it was first recorded while its most
   // recent record replaces the value. An edit before the Transaction's
   // first TransactionRecorded is replaced by that record anyway.
-  const latest = new Map<string, TransactionRecorded | TransactionEdited>();
+  const latest = new Map<
+    TransactionId,
+    TransactionRecorded | TransactionEdited
+  >();
   const deleted = deletedSubjects(records, isTransactionDeleted);
   for (const record of records) {
     if (
