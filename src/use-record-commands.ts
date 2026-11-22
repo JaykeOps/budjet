@@ -1,5 +1,5 @@
 import { formatMoney } from "./kernel/money";
-import { useChangeLogWriter } from "./kernel/use-change-log-query";
+import { useDeviceChangeLog } from "./kernel/use-change-log-query";
 import type { TransactionInput } from "./slices/transactions";
 import {
   deleteTransaction,
@@ -11,23 +11,23 @@ import { useToast } from "./ui/Toast";
 
 /** Recording a Transaction and making a Transfer, each saying what it did in a toast with Undo. */
 export function useRecordCommands() {
-  const writer = useChangeLogWriter();
+  const log = useDeviceChangeLog();
   const toast = useToast();
   return {
     record(input: TransactionInput) {
-      const id = recordTransaction(writer, input);
+      const id = recordTransaction(log, input);
       const sign = input.amount.minorUnits > 0 ? "+" : "";
       const payee = input.payee?.trim();
       toast({
         text: `Recorded ${sign}${formatMoney(input.amount)}${payee ? ` at ${payee}` : ""}`,
-        onUndo: () => deleteTransaction(writer, id),
+        onUndo: () => deleteTransaction(log, id),
       });
     },
     transfer(input: TransferInput) {
-      const id = makeTransfer(writer, input);
+      const id = makeTransfer(log, input);
       toast({
         text: "Transfer made",
-        onUndo: () => deleteTransfer(writer, id),
+        onUndo: () => deleteTransfer(log, id),
       });
     },
   };

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   type ChangeLog,
-  type ChangeLogWriter,
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
+  type DeviceChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
+import { seedRecord } from "../../kernel/seed-record";
 import { accountBalance, accountsTotal } from "../accounts";
 import type {
   AccountClosed,
@@ -23,31 +24,39 @@ import { statements } from "./index";
 
 const usd = (cents: number) => money(cents, "USD");
 
-/** A writer whose clock reads `at`, for what takes its date from the clock. */
-function writerAt(changeLog: ChangeLog, at: Date) {
-  return createChangeLogWriter(changeLog, "this-device", {
+/** A DeviceChangeLog whose clock reads `at`, for what takes its date from the clock. */
+function logAt(changeLog: ChangeLog, at: Date) {
+  return createDeviceChangeLog(changeLog, "this-device", {
     now: () => at.getTime(),
   });
 }
 
 /** Moves money between two Accounts, in a Transfer with the id `id`. */
 function transfer(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   id: string,
   fromAccountId: string,
   toAccountId: string,
   date: string,
   cents: number,
 ) {
-  writer.write<TransferMade["type"], TransferMade["payload"]>(
+  seedRecord<TransferMade["type"], TransferMade["payload"]>(
+    log,
     id,
     "TransferMade",
-    { version: 1, fromAccountId, toAccountId, date, amount: usd(cents) },
+    {
+      version: 1,
+      fromAccountId,
+      toAccountId,
+      date,
+      amount: usd(cents),
+    },
   );
 }
 
-function redeclare(writer: ChangeLogWriter, accountId: string, cents: number) {
-  writer.write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+function redeclare(log: DeviceChangeLog, accountId: string, cents: number) {
+  seedRecord<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
+    log,
     accountId,
     "BalanceRedeclared",
     { version: 1, balance: usd(cents) },
@@ -57,14 +66,16 @@ function redeclare(writer: ChangeLogWriter, accountId: string, cents: number) {
 /** A Budget whose Everyday ($1,000.00) and Wallet ($50.00) opened on 2 September 2100. */
 function budget() {
   const changeLog = createInMemoryChangeLog();
-  const writer = writerAt(changeLog, new Date(2100, 8, 2, 12));
-  writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  const log = logAt(changeLog, new Date(2100, 8, 2, 12));
+  seedRecord<BudgetCreated["type"], BudgetCreated["payload"]>(
+    log,
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
   );
   const open = (id: string, name: string, cents: number) => {
-    writer.write<AccountOpened["type"], AccountOpened["payload"]>(
+    seedRecord<AccountOpened["type"], AccountOpened["payload"]>(
+      log,
       id,
       "AccountOpened",
       { version: 1, name, kind: "checking", openingBalance: usd(cents) },
@@ -73,18 +84,20 @@ function budget() {
   };
   const everyday = open("everyday", "Everyday", 100000);
   const wallet = open("wallet", "Wallet", 5000);
-  writer.write<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+  seedRecord<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+    log,
     "needs",
     "CategoryGroupCreated",
     { version: 1, name: "Needs", position: 0 },
   );
-  writer.write<CategoryCreated["type"], CategoryCreated["payload"]>(
+  seedRecord<CategoryCreated["type"], CategoryCreated["payload"]>(
+    log,
     "groceries",
     "CategoryCreated",
     { version: 1, name: "Groceries", groupId: "needs", position: 0 },
   );
   const record = (accountId: string, date: string, cents: number) =>
-    recordTransaction(writer, {
+    recordTransaction(log, {
       accountId,
       date,
       amount: usd(cents),
@@ -92,7 +105,7 @@ function budget() {
     });
   return {
     changeLog,
-    writer,
+    log,
     everyday,
     wallet,
     record,
@@ -167,10 +180,10 @@ describe("Statements", () => {
   });
 
   it("makes the newest Month end at the Account's balance, with every kind of entry", () => {
-    const { changeLog, writer, everyday, wallet, record, read } = budget();
+    const { changeLog, log, everyday, wallet, record, read } = budget();
     record(everyday, "2100-09-20", -2500);
-    transfer(writer, "move", everyday, wallet, "2100-09-21", 4000);
-    const redeclaring = writerAt(changeLog, new Date(2100, 8, 22));
+    transfer(log, "move", everyday, wallet, "2100-09-21", 4000);
+    const redeclaring = logAt(changeLog, new Date(2100, 8, 22));
     redeclare(redeclaring, everyday, 90000);
     redeclare(redeclaring, everyday, 90000);
 
@@ -185,7 +198,7 @@ describe("Statements", () => {
 
   it("counts an Adjustment as money in or out, and a Balance check as neither", () => {
     const { changeLog, everyday, read } = budget();
-    const redeclaring = writerAt(changeLog, new Date(2100, 8, 22));
+    const redeclaring = logAt(changeLog, new Date(2100, 8, 22));
     redeclare(redeclaring, everyday, 94733);
     redeclare(redeclaring, everyday, 94733);
     redeclare(redeclaring, everyday, 95000);
@@ -212,8 +225,8 @@ describe("Statements", () => {
   });
 
   it("counts a Transfer as money in or out of one Account", () => {
-    const { everyday, wallet, writer, read } = budget();
-    transfer(writer, "move", everyday, wallet, "2100-10-04", 2000);
+    const { everyday, wallet, log, read } = budget();
+    transfer(log, "move", everyday, wallet, "2100-10-04", 2000);
 
     expect(read(everyday)[0]).toMatchObject({
       moneyIn: usd(0),
@@ -228,8 +241,8 @@ describe("Statements", () => {
   });
 
   it("across every Account shows a Transfer once and counts it as neither in nor out", () => {
-    const { everyday, wallet, writer, read } = budget();
-    transfer(writer, "move", everyday, wallet, "2100-10-04", 2000);
+    const { everyday, wallet, log, read } = budget();
+    transfer(log, "move", everyday, wallet, "2100-10-04", 2000);
 
     const [october, september] = read();
 
@@ -257,9 +270,10 @@ describe("Statements", () => {
   });
 
   it("keeps a closed Account's history in Statements", () => {
-    const { everyday, wallet, writer, read } = budget();
-    transfer(writer, "move", wallet, everyday, "2100-10-04", 5000);
-    writer.write<AccountClosed["type"], AccountClosed["payload"]>(
+    const { everyday, wallet, log, read } = budget();
+    transfer(log, "move", wallet, everyday, "2100-10-04", 5000);
+    seedRecord<AccountClosed["type"], AccountClosed["payload"]>(
+      log,
       wallet,
       "AccountClosed",
       { version: 1 },
@@ -272,10 +286,10 @@ describe("Statements", () => {
   });
 
   it("leaves out what was deleted, and an Account's Statements leave out other Accounts", () => {
-    const { everyday, wallet, record, read, writer } = budget();
+    const { everyday, wallet, record, read, log } = budget();
     const deleted = record(everyday, "2100-10-01", 100);
     record(wallet, "2100-11-01", 100);
-    deleteTransaction(writer, deleted);
+    deleteTransaction(log, deleted);
 
     expect(read(everyday).map(({ month }) => month)).toEqual(["2100-09"]);
   });

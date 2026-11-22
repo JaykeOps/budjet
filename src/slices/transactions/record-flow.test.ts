@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
+import { seedRecord } from "../../kernel/seed-record";
 import type { AccountOpened } from "../accounts/records";
 import type { AssignmentSet } from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
@@ -31,14 +32,16 @@ import {
 /** A USD Budget with Accounts "checking" and "savings", and Categories "groceries" and "dining". */
 function budget() {
   const changeLog = createInMemoryChangeLog();
-  const writer = createChangeLogWriter(changeLog, "this-device");
-  writer.write<BudgetCreated["type"], BudgetCreated["payload"]>(
+  const log = createDeviceChangeLog(changeLog, "this-device");
+  seedRecord<BudgetCreated["type"], BudgetCreated["payload"]>(
+    log,
     "budget",
     "BudgetCreated",
     { version: 1, currency: "USD" },
   );
   for (const id of ["checking", "savings"]) {
-    writer.write<AccountOpened["type"], AccountOpened["payload"]>(
+    seedRecord<AccountOpened["type"], AccountOpened["payload"]>(
+      log,
       id,
       "AccountOpened",
       {
@@ -49,19 +52,21 @@ function budget() {
       },
     );
   }
-  writer.write<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+  seedRecord<CategoryGroupCreated["type"], CategoryGroupCreated["payload"]>(
+    log,
     "everyday",
     "CategoryGroupCreated",
     { version: 1, name: "Everyday", position: 0 },
   );
   for (const [position, id] of ["groceries", "dining"].entries()) {
-    writer.write<CategoryCreated["type"], CategoryCreated["payload"]>(
+    seedRecord<CategoryCreated["type"], CategoryCreated["payload"]>(
+      log,
       id,
       "CategoryCreated",
       { version: 1, name: id, groupId: "everyday", position },
     );
   }
-  return { writer, records: () => changeLog.readAll() };
+  return { log, records: () => changeLog.readAll() };
 }
 
 const spend = {
@@ -79,14 +84,14 @@ const draft: Draft = {
 
 describe("knownPayees", () => {
   it("remembers each Payee's last Category and Account", () => {
-    const { writer, records } = budget();
-    recordTransaction(writer, {
+    const { log, records } = budget();
+    recordTransaction(log, {
       ...spend,
       accountId: "checking",
       categoryId: "groceries",
       payee: "Corner Bistro",
     });
-    recordTransaction(writer, {
+    recordTransaction(log, {
       ...spend,
       accountId: "savings",
       categoryId: "dining",
@@ -99,14 +104,14 @@ describe("knownPayees", () => {
   });
 
   it("keeps the last Category when money later came in to Ready to Assign", () => {
-    const { writer, records } = budget();
-    recordTransaction(writer, {
+    const { log, records } = budget();
+    recordTransaction(log, {
       ...spend,
       accountId: "checking",
       categoryId: "groceries",
       payee: "Corner Bistro",
     });
-    recordTransaction(writer, {
+    recordTransaction(log, {
       ...spend,
       amount: money(500, "USD"),
       accountId: "checking",
@@ -117,15 +122,15 @@ describe("knownPayees", () => {
   });
 
   it("forgets a Category that's hidden and an Account that's closed", () => {
-    const { writer, records } = budget();
-    recordTransaction(writer, {
+    const { log, records } = budget();
+    recordTransaction(log, {
       ...spend,
       accountId: "savings",
       categoryId: "dining",
       payee: "Corner Bistro",
     });
-    writer.write("dining", "CategoryHidden", { version: 1 });
-    writer.write("savings", "AccountClosed", { version: 1 });
+    seedRecord(log, "dining", "CategoryHidden", { version: 1 });
+    seedRecord(log, "savings", "AccountClosed", { version: 1 });
 
     expect(knownPayees(records())).toEqual([{ name: "Corner Bistro" }]);
   });
@@ -233,8 +238,9 @@ describe("withDirection", () => {
 
 describe("categoryChoices", () => {
   it("lists Available in the Month by Group, and Ready to Assign, leaving hidden Categories out", () => {
-    const { writer, records } = budget();
-    writer.write<AssignmentSet["type"], AssignmentSet["payload"]>(
+    const { log, records } = budget();
+    seedRecord<AssignmentSet["type"], AssignmentSet["payload"]>(
+      log,
       "groceries-2026-10",
       "AssignmentSet",
       {
@@ -244,12 +250,12 @@ describe("categoryChoices", () => {
         amount: money(5000, "USD"),
       },
     );
-    recordTransaction(writer, {
+    recordTransaction(log, {
       ...spend,
       accountId: "checking",
       categoryId: "groceries",
     });
-    writer.write("dining", "CategoryHidden", { version: 1 });
+    seedRecord(log, "dining", "CategoryHidden", { version: 1 });
 
     expect(categoryChoices(records(), "2026-10", "USD")).toEqual({
       readyToAssign: money(195000, "USD"),
@@ -270,9 +276,9 @@ describe("categoryChoices", () => {
   });
 
   it("leaves out a Group with nothing to choose", () => {
-    const { writer, records } = budget();
-    writer.write("groceries", "CategoryHidden", { version: 1 });
-    writer.write("dining", "CategoryHidden", { version: 1 });
+    const { log, records } = budget();
+    seedRecord(log, "groceries", "CategoryHidden", { version: 1 });
+    seedRecord(log, "dining", "CategoryHidden", { version: 1 });
 
     expect(categoryChoices(records(), "2026-10", "USD").groups).toEqual([]);
   });
@@ -295,8 +301,8 @@ describe("categoryChoices while editing a Transaction", () => {
       .find((category) => category.id === id)?.available;
 
   it("leaves that Transaction's money out of its Category, in its Month and later ones", () => {
-    const { writer, records } = budget();
-    recordTransaction(writer, lunch);
+    const { log, records } = budget();
+    recordTransaction(log, lunch);
 
     for (const month of ["2026-10", "2026-11"] as const) {
       expect(
@@ -318,14 +324,14 @@ describe("categoryChoices while editing a Transaction", () => {
   });
 
   it("leaves money that came in to Ready to Assign out of Ready to Assign", () => {
-    const { writer, records } = budget();
+    const { log, records } = budget();
     const paycheck = {
       id: "paycheck",
       accountId: "checking",
       date: "2026-10-12",
       amount: money(5000, "USD"),
     };
-    recordTransaction(writer, paycheck);
+    recordTransaction(log, paycheck);
 
     expect(
       categoryChoices(records(), "2026-10", "USD", paycheck).readyToAssign,
@@ -333,9 +339,9 @@ describe("categoryChoices while editing a Transaction", () => {
   });
 
   it("still offers its Category if that has since been hidden", () => {
-    const { writer, records } = budget();
-    recordTransaction(writer, lunch);
-    writer.write("groceries", "CategoryHidden", { version: 1 });
+    const { log, records } = budget();
+    recordTransaction(log, lunch);
+    seedRecord(log, "groceries", "CategoryHidden", { version: 1 });
 
     expect(
       categoryChoices(

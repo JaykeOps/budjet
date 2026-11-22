@@ -1,4 +1,4 @@
-import type { ChangeLogWriter, ChangeRecord } from "../../kernel/change-log";
+import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
 import type { Money } from "../../kernel/money";
 import { monthOf } from "../../kernel/month";
 import { accounts } from "../accounts";
@@ -29,15 +29,17 @@ export type TransactionInput = {
  * one goes to Ready to Assign.
  */
 export function recordTransaction(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   input: TransactionInput,
 ): string {
   const id = crypto.randomUUID();
-  writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
-    id,
-    "TransactionRecorded",
-    checkedPayload(writer.changeLog.readAll(), input),
-  );
+  log
+    .write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      id,
+      "TransactionRecorded",
+    )
+    .ensure((records) => checkedPayload(records, input))
+    .commit((payload) => payload);
   return id;
 }
 
@@ -46,27 +48,31 @@ export function recordTransaction(
  * as recording one. A Transaction in a closed Account can't be changed.
  */
 export function editTransaction(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   id: string,
   input: TransactionInput,
 ): void {
-  const records = writer.changeLog.readAll();
-  checkChangeable(records, id);
-  writer.write<TransactionEdited["type"], TransactionEdited["payload"]>(
-    id,
-    "TransactionEdited",
-    checkedPayload(records, input),
-  );
+  log
+    .write<TransactionEdited["type"], TransactionEdited["payload"]>(
+      id,
+      "TransactionEdited",
+    )
+    .ensure((records) => {
+      checkChangeable(records, id);
+      return checkedPayload(records, input);
+    })
+    .commit((payload) => payload);
 }
 
 /** Removes a Transaction, in any Month, unless its Account is closed. */
-export function deleteTransaction(writer: ChangeLogWriter, id: string): void {
-  checkChangeable(writer.changeLog.readAll(), id);
-  writer.write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
-    id,
-    "TransactionDeleted",
-    { version: 1 },
-  );
+export function deleteTransaction(log: DeviceChangeLog, id: string): void {
+  log
+    .write<TransactionDeleted["type"], TransactionDeleted["payload"]>(
+      id,
+      "TransactionDeleted",
+    )
+    .ensure((records) => checkChangeable(records, id))
+    .commit(() => ({ version: 1 }));
 }
 
 /**
@@ -75,15 +81,17 @@ export function deleteTransaction(writer: ChangeLogWriter, id: string): void {
  * Returns its id.
  */
 export function restoreTransaction(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   { id: restores, ...input }: CurrentTransaction,
 ): string {
   const id = crypto.randomUUID();
-  writer.write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
-    id,
-    "TransactionRecorded",
-    { ...checkedPayload(writer.changeLog.readAll(), input), restores },
-  );
+  log
+    .write<TransactionRecorded["type"], TransactionRecorded["payload"]>(
+      id,
+      "TransactionRecorded",
+    )
+    .ensure((records) => checkedPayload(records, input))
+    .commit((payload) => ({ ...payload, restores }));
   return id;
 }
 

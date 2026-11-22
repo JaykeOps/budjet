@@ -15,9 +15,9 @@ import {
   unhideCategoryWithUndo,
 } from "./category-changes";
 import {
-  type ChangeLogWriter,
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
+  type DeviceChangeLog,
 } from "./kernel/change-log";
 import { money } from "./kernel/money";
 import type { Month } from "./kernel/month";
@@ -34,17 +34,17 @@ import {
 } from "./slices/categories/commands";
 import { recordTransaction } from "./slices/transactions/commands";
 
-let writer: ChangeLogWriter;
+let log: DeviceChangeLog;
 
 /** Each Category Group's name and its Categories' names, in order. */
 const outline = () =>
-  categoryGroups(writer.changeLog.readAll()).map(({ name, categories }) => [
+  categoryGroups(log.readAll()).map(({ name, categories }) => [
     name,
     categories.map((category) => category.name),
   ]);
 
 const group = (name: string) => {
-  const found = categoryGroups(writer.changeLog.readAll()).find(
+  const found = categoryGroups(log.readAll()).find(
     (candidate) => candidate.name === name,
   );
   if (!found) throw new Error(`No Category Group ${name}`);
@@ -52,7 +52,7 @@ const group = (name: string) => {
 };
 
 const category = (name: string) => {
-  const found = categoryGroups(writer.changeLog.readAll())
+  const found = categoryGroups(log.readAll())
     .flatMap(({ categories }) => categories)
     .find((candidate) => candidate.name === name);
   if (!found) throw new Error(`No Category ${name}`);
@@ -66,18 +66,18 @@ const starter = [
 ];
 
 beforeEach(() => {
-  writer = createChangeLogWriter(createInMemoryChangeLog(), "phone");
-  createBudget(writer, { currency: "USD" });
-  addStarterSet(writer);
+  log = createDeviceChangeLog(createInMemoryChangeLog(), "phone");
+  createBudget(log, { currency: "USD" });
+  addStarterSet(log);
 });
 
 describe("undoing a change to Categories", () => {
   it("removes a Category or Category Group just added", () => {
-    const undoCategory = createCategoryWithUndo(writer, {
+    const undoCategory = createCategoryWithUndo(log, {
       groupId: group("Bills").id,
       name: "Water",
     });
-    const undoGroup = createCategoryGroupWithUndo(writer, { name: "Fun" });
+    const undoGroup = createCategoryGroupWithUndo(log, { name: "Fun" });
     expect(outline()).toEqual([
       ["Bills", ["Rent", "Power", "Phone", "Internet", "Water"]],
       starter[1],
@@ -92,10 +92,10 @@ describe("undoing a change to Categories", () => {
   });
 
   it("writes the previous name back after a rename", () => {
-    const undoCategory = renameCategoryWithUndo(writer, category("Rent").id, {
+    const undoCategory = renameCategoryWithUndo(log, category("Rent").id, {
       name: "Mortgage",
     });
-    const undoGroup = renameCategoryGroupWithUndo(writer, group("Bills").id, {
+    const undoGroup = renameCategoryGroupWithUndo(log, group("Bills").id, {
       name: "Fixed",
     });
     expect(outline()[0]).toEqual([
@@ -112,13 +112,13 @@ describe("undoing a change to Categories", () => {
   it("hides and unhides in place", () => {
     const id = category("Power").id;
 
-    const undoHide = hideCategoryWithUndo(writer, id);
+    const undoHide = hideCategoryWithUndo(log, id);
     expect(category("Power").hidden).toBe(true);
     undoHide();
     expect(category("Power").hidden).toBe(false);
 
-    hideCategoryWithUndo(writer, id);
-    const undoUnhide = unhideCategoryWithUndo(writer, id);
+    hideCategoryWithUndo(log, id);
+    const undoUnhide = unhideCategoryWithUndo(log, id);
     expect(category("Power").hidden).toBe(false);
     undoUnhide();
     expect(category("Power").hidden).toBe(true);
@@ -128,7 +128,7 @@ describe("undoing a change to Categories", () => {
   it("brings a deleted Category back with a fresh id in the same place", () => {
     const { id } = category("Power");
 
-    deleteCategoryWithUndo(writer, id)();
+    deleteCategoryWithUndo(log, id)();
 
     expect(outline()).toEqual(starter);
     expect(category("Power").id).not.toBe(id);
@@ -136,19 +136,19 @@ describe("undoing a change to Categories", () => {
 
   it("brings a deleted hidden Category back hidden", () => {
     const { id } = category("Power");
-    hideCategoryWithUndo(writer, id);
+    hideCategoryWithUndo(log, id);
 
-    deleteCategoryWithUndo(writer, id)();
+    deleteCategoryWithUndo(log, id)();
 
     expect(category("Power").hidden).toBe(true);
   });
 
   it("brings a deleted empty Category Group back in the same place, left out as it was", () => {
-    deleteCategory(writer, category("Emergency Fund").id);
-    createCategoryGroupWithUndo(writer, { name: "Fun" });
+    deleteCategory(log, category("Emergency Fund").id);
+    createCategoryGroupWithUndo(log, { name: "Fun" });
     const { id } = group("Savings");
 
-    deleteCategoryGroupWithUndo(writer, id)();
+    deleteCategoryGroupWithUndo(log, id)();
 
     expect(outline().map(([name]) => name)).toEqual([
       "Bills",
@@ -163,7 +163,7 @@ describe("undoing a change to Categories", () => {
   it("flips Leave out of Spent this Month back", () => {
     const { id } = group("Bills");
 
-    const undo = setSpentThisMonthWithUndo(writer, id, { leftOut: true });
+    const undo = setSpentThisMonthWithUndo(log, id, { leftOut: true });
     expect(group("Bills").leftOutOfSpentThisMonth).toBe(true);
     undo();
 
@@ -173,7 +173,7 @@ describe("undoing a change to Categories", () => {
 
 describe("Move them and delete", () => {
   it("moves a Category Group's Categories after the target's, then deletes it", () => {
-    moveThemAndDeleteWithUndo(writer, group("Bills").id, group("Savings").id);
+    moveThemAndDeleteWithUndo(log, group("Bills").id, group("Savings").id);
 
     expect(outline()).toEqual([
       starter[1],
@@ -183,9 +183,9 @@ describe("Move them and delete", () => {
 
   it("moves hidden Categories too", () => {
     const { id } = category("Power");
-    hideCategoryWithUndo(writer, id);
+    hideCategoryWithUndo(log, id);
 
-    moveThemAndDeleteWithUndo(writer, group("Bills").id, group("Savings").id);
+    moveThemAndDeleteWithUndo(log, group("Bills").id, group("Savings").id);
 
     expect(category("Power").hidden).toBe(true);
     expect(group("Savings").categories.map(({ name }) => name)).toContain(
@@ -197,7 +197,7 @@ describe("Move them and delete", () => {
     const ids = group("Everyday").categories.map(({ id }) => id);
     const oldId = group("Everyday").id;
 
-    moveThemAndDeleteWithUndo(writer, oldId, group("Bills").id)();
+    moveThemAndDeleteWithUndo(log, oldId, group("Bills").id)();
 
     expect(outline()).toEqual(starter);
     expect(group("Everyday").id).not.toBe(oldId);
@@ -206,11 +206,11 @@ describe("Move them and delete", () => {
 
   it("refuses the Undo whole when another device deleted one of them", () => {
     const undo = moveThemAndDeleteWithUndo(
-      writer,
+      log,
       group("Everyday").id,
       group("Bills").id,
     );
-    deleteCategory(writer, category("Transport").id);
+    deleteCategory(log, category("Transport").id);
     const before = outline();
 
     expect(undo).toThrow();
@@ -224,25 +224,25 @@ describe("hiding a Category that holds money", () => {
   const november: Month = "2026-11";
   const december: Month = "2026-12";
   const account = () =>
-    openAccount(writer, {
+    openAccount(log, {
       name: "Checking",
       kind: "checking",
       openingBalance: money(500_000, "USD"),
     });
   const assign = (name: string, month: Month, cents: number) =>
-    setAssignment(writer, {
+    setAssignment(log, {
       categoryId: category(name).id,
       month,
       amount: money(cents, "USD"),
     });
   const spend = (name: string, accountId: string, cents: number) =>
-    recordTransaction(writer, {
+    recordTransaction(log, {
       accountId,
       categoryId: category(name).id,
       date: "2026-10-05",
       amount: money(-cents, "USD"),
     });
-  const records = () => writer.changeLog.readAll();
+  const records = () => log.readAll();
   const availableIn = (name: string, month: Month = october) =>
     available(records(), category(name).id, month)?.minorUnits;
   const assignedIn = (name: string, month: Month = october) =>
@@ -258,7 +258,7 @@ describe("hiding a Category that holds money", () => {
   it("moves what it has to Ready to Assign, then hides it", () => {
     assign("Rent", october, 75_000);
 
-    hideCategoryWithUndo(writer, category("Rent").id, { month: october });
+    hideCategoryWithUndo(log, category("Rent").id, { month: october });
 
     expect(category("Rent").hidden).toBe(true);
     expect(availableIn("Rent")).toBe(0);
@@ -269,7 +269,7 @@ describe("hiding a Category that holds money", () => {
     assign("Rent", october, 75_000);
     assign("Power", october, 1_000);
 
-    hideCategoryWithUndo(writer, category("Rent").id, {
+    hideCategoryWithUndo(log, category("Rent").id, {
       month: october,
       other: category("Power").id,
     });
@@ -283,7 +283,7 @@ describe("hiding a Category that holds money", () => {
     assign("Rent", "2026-09", 70_000);
     assign("Rent", october, 5_000);
 
-    hideCategoryWithUndo(writer, category("Rent").id, { month: october });
+    hideCategoryWithUndo(log, category("Rent").id, { month: october });
 
     expect(assignedIn("Rent")).toBe(0);
     expect(takenBackIn("Rent")).toBe(70_000);
@@ -295,7 +295,7 @@ describe("hiding a Category that holds money", () => {
   it("covers an Overspent Category from Ready to Assign", () => {
     spend("Rent", account(), 1_800);
 
-    hideCategoryWithUndo(writer, category("Rent").id, { month: october });
+    hideCategoryWithUndo(log, category("Rent").id, { month: october });
 
     expect(category("Rent").hidden).toBe(true);
     expect(availableIn("Rent")).toBe(0);
@@ -306,7 +306,7 @@ describe("hiding a Category that holds money", () => {
     spend("Rent", account(), 1_800);
     assign("Power", "2026-09", 5_000);
 
-    hideCategoryWithUndo(writer, category("Rent").id, {
+    hideCategoryWithUndo(log, category("Rent").id, {
       month: october,
       other: category("Power").id,
     });
@@ -323,7 +323,7 @@ describe("hiding a Category that holds money", () => {
     assign("Rent", december, 4_000);
     assign("Rent", "2027-06", 5_000);
 
-    hideCategoryWithUndo(writer, category("Rent").id, { month: october });
+    hideCategoryWithUndo(log, category("Rent").id, { month: october });
 
     expect(assignedIn("Rent", november)).toBe(0);
     expect(assignedIn("Rent", december)).toBe(0);
@@ -337,7 +337,7 @@ describe("hiding a Category that holds money", () => {
     assign("Rent", october, 10_000);
     assign("Rent", november, -3_000);
 
-    hideCategoryWithUndo(writer, category("Rent").id, { month: october });
+    hideCategoryWithUndo(log, category("Rent").id, { month: october });
 
     expect(takenBackIn("Rent", november)).toBe(3_000);
     expect(availableIn("Rent")).toBe(0);
@@ -348,7 +348,7 @@ describe("hiding a Category that holds money", () => {
   it("writes nothing but the hide when there is no money to handle", () => {
     const before = records().length;
 
-    const undo = hideCategoryWithUndo(writer, category("Rent").id, {
+    const undo = hideCategoryWithUndo(log, category("Rent").id, {
       month: october,
     });
     expect(records().length).toBe(before + 1);
@@ -369,7 +369,7 @@ describe("hiding a Category that holds money", () => {
       power: availableIn("Power"),
     };
 
-    hideCategoryWithUndo(writer, category("Rent").id, {
+    hideCategoryWithUndo(log, category("Rent").id, {
       month: october,
       other: category("Power").id,
     })();
@@ -391,7 +391,7 @@ describe("hiding a Category that holds money", () => {
     assign("Rent", "2026-09", 10_000);
     assign("Rent", october, -2_000);
 
-    const undo = hideCategoryWithUndo(writer, category("Rent").id, {
+    const undo = hideCategoryWithUndo(log, category("Rent").id, {
       month: october,
     });
     expect(takenBackIn("Rent")).toBe(10_000);
@@ -403,8 +403,8 @@ describe("hiding a Category that holds money", () => {
 
   it("Undo writes nothing if the Category has since been deleted", () => {
     const id = category("Rent").id;
-    const undo = hideCategoryWithUndo(writer, id, { month: october });
-    deleteCategory(writer, id);
+    const undo = hideCategoryWithUndo(log, id, { month: october });
+    deleteCategory(log, id);
     const count = records().length;
 
     expect(undo).toThrow();
@@ -413,11 +413,11 @@ describe("hiding a Category that holds money", () => {
 
   it("undoing an Unhide hides it again, even holding money", () => {
     const id = category("Rent").id;
-    hideCategoryWithUndo(writer, id, { month: october });
+    hideCategoryWithUndo(log, id, { month: october });
     assign("Rent", october, 1_250);
     assign("Rent", december, 500);
 
-    const undo = unhideCategoryWithUndo(writer, id);
+    const undo = unhideCategoryWithUndo(log, id);
     expect(category("Rent").hidden).toBe(false);
 
     undo();
@@ -428,10 +428,10 @@ describe("hiding a Category that holds money", () => {
 
   it("moves a hidden Category's money without changing whether it's hidden", () => {
     const id = category("Rent").id;
-    hideCategoryWithUndo(writer, id, { month: october });
+    hideCategoryWithUndo(log, id, { month: october });
     assign("Rent", october, 1_250);
 
-    const undo = moveOutWithUndo(writer, id, { month: october });
+    const undo = moveOutWithUndo(log, id, { month: october });
 
     expect(category("Rent").hidden).toBe(true);
     expect(availableIn("Rent")).toBe(0);
@@ -444,7 +444,7 @@ describe("hiding a Category that holds money", () => {
 
 describe("undoing a move", () => {
   it("puts a Category back in its Category Group and place", () => {
-    const undo = moveCategoryWithUndo(writer, category("Rent").id, {
+    const undo = moveCategoryWithUndo(log, category("Rent").id, {
       groupId: group("Everyday").id,
       toIndex: 1,
     });
@@ -460,7 +460,7 @@ describe("undoing a move", () => {
   });
 
   it("puts a Category Group back in its place", () => {
-    const undo = moveCategoryGroupWithUndo(writer, group("Savings").id, {
+    const undo = moveCategoryGroupWithUndo(log, group("Savings").id, {
       toIndex: 0,
     });
     expect(outline().map(([name]) => name)).toEqual([
@@ -476,11 +476,11 @@ describe("undoing a move", () => {
 
   it("refuses when another device deleted the Category Group it came from", () => {
     const { id } = category("Emergency Fund");
-    const undo = moveCategoryWithUndo(writer, id, {
+    const undo = moveCategoryWithUndo(log, id, {
       groupId: group("Bills").id,
       toIndex: 0,
     });
-    deleteCategoryGroup(writer, group("Savings").id);
+    deleteCategoryGroup(log, group("Savings").id);
 
     expect(undo).toThrow();
     expect(outline()[0]).toEqual([

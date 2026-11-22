@@ -5,8 +5,8 @@
  * composed here.
  */
 import { useMemo } from "react";
-import type { ChangeLogWriter } from "./kernel/change-log";
-import { useChangeLogWriter } from "./kernel/use-change-log-query";
+import type { DeviceChangeLog } from "./kernel/change-log";
+import { useDeviceChangeLog } from "./kernel/use-change-log-query";
 import { categoryUsed } from "./slices/budget-totals";
 import { categoryGroups } from "./slices/categories";
 import {
@@ -21,12 +21,9 @@ import { useToast } from "./ui/Toast";
 import type { Undo } from "./undo";
 
 /** Takes away Category Groups and everything in them, or refuses and writes nothing. */
-function undoAdding(
-  writer: ChangeLogWriter,
-  groupIds: readonly string[],
-): Undo {
+function undoAdding(log: DeviceChangeLog, groupIds: readonly string[]): Undo {
   return () => {
-    const records = writer.changeLog.readAll();
+    const records = log.readAll();
     const groups = categoryGroups(records).filter(({ id }) =>
       groupIds.includes(id),
     );
@@ -35,50 +32,50 @@ function undoAdding(
     if (used) {
       throw new Error(`${used.name} is in use now, so this can't be undone.`);
     }
-    for (const { id } of categories) deleteCategory(writer, id);
-    for (const { id } of groups) deleteCategoryGroup(writer, id);
+    for (const { id } of categories) deleteCategory(log, id);
+    for (const { id } of groups) deleteCategoryGroup(log, id);
   };
 }
 
 /** Both names are checked first, so a blank one leaves no empty Category Group behind. */
 export function addFirstCategoryWithUndo(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   { name, groupName }: { name: string; groupName: string },
 ): Undo {
   if (!name.trim() || !groupName.trim()) {
     throw new Error("A name can't be blank");
   }
-  const groupId = createCategoryGroup(writer, { name: groupName });
-  createCategory(writer, { groupId, name });
-  return undoAdding(writer, [groupId]);
+  const groupId = createCategoryGroup(log, { name: groupName });
+  createCategory(log, { groupId, name });
+  return undoAdding(log, [groupId]);
 }
 
-export function addStarterSetWithUndo(writer: ChangeLogWriter): Undo {
-  addStarterSet(writer);
+export function addStarterSetWithUndo(log: DeviceChangeLog): Undo {
+  addStarterSet(log);
   return undoAdding(
-    writer,
-    categoryGroups(writer.changeLog.readAll()).map(({ id }) => id),
+    log,
+    categoryGroups(log.readAll()).map(({ id }) => id),
   );
 }
 
 export function useFirstCategoryChanges(): FirstCategoryChanges {
-  const writer = useChangeLogWriter();
+  const log = useDeviceChangeLog();
   const toast = useToast();
   return useMemo(
     () => ({
       addCategory(input) {
         toast({
           text: `Added ${input.name.trim()}`,
-          onUndo: addFirstCategoryWithUndo(writer, input),
+          onUndo: addFirstCategoryWithUndo(log, input),
         });
       },
       addStarterSet() {
         toast({
           text: "Added the starter set",
-          onUndo: addStarterSetWithUndo(writer),
+          onUndo: addStarterSetWithUndo(log),
         });
       },
     }),
-    [writer, toast],
+    [log, toast],
   );
 }

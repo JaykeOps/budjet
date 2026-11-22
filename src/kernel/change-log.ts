@@ -3,9 +3,6 @@
  * domain state (docs/adr/0004, docs/adr/0005).
  */
 
-/** A hybrid logical clock reading: wall-clock milliseconds, then a counter for ties. */
-export type Timestamp = { wallTime: number; counter: number };
-
 export type ChangeRecord<Type extends string = string, Payload = unknown> = {
   id: string;
   /** The id of the thing this record changes. */
@@ -17,18 +14,6 @@ export type ChangeRecord<Type extends string = string, Payload = unknown> = {
   type: Type;
   payload: Payload;
 };
-
-/** Why a change isn't saved yet: the folder's access lapsed, the folder is gone, or the write failed some other way. */
-export type UnsavedReason = "access-lapsed" | "folder-gone" | "write-failed";
-
-/**
- * Whether every change has reached where this Change Log keeps them. The same
- * object comes back until the state changes.
- */
-export type SaveState =
-  | { status: "saved" }
-  | { status: "saving" }
-  | { status: "unsaved"; reason: UnsavedReason };
 
 export type ChangeLog = {
   /** Records a change. It shows at once, and `saveState` follows its write. */
@@ -42,28 +27,175 @@ export type ChangeLog = {
   subscribeToSaveState(listener: () => void): () => void;
 };
 
-export const SAVED: SaveState = { status: "saved" };
-export const SAVING: SaveState = { status: "saving" };
+/**
+ * This device's way into the Change Log: it reads it, and adds the Change
+ * Records this device makes, stamped by this device's clock. It has no `append`
+ * or `merge`, so a record can't be added any other way.
+ *
+ * A write is built in three steps, and nothing is written until the last:
+ * `write(subjectId, type)` says what changes, `ensure(check)` reads the records
+ * as they stand and refuses the write by throwing, and `commit` builds the
+ * payload from what the check found. So no record is written without a check,
+ * and the check never holds the Change Log itself.
+ */
+export type DeviceChangeLog = Pick<
+  ChangeLog,
+  "readAll" | "subscribe" | "saveState" | "subscribeToSaveState"
+> & {
+  write<Type extends string, Payload>(
+    subjectId: string,
+    type: Type,
+  ): Write<Type, Payload>;
+  /**
+   * Writes a new record at the place an earlier one holds in the Change Log, by
+   * taking its timestamp. For Undo, when what a record means depends on what came
+   * before it and it has to come back to where it was: a Replay of the log
+   * then meets it there, on every device.
+   */
+  writeAt<Type extends string, Payload>(
+    timestamp: Timestamp,
+    subjectId: string,
+    type: Type,
+  ): Write<Type, Payload>;
+  /**
+   * Writes any number of records from one check, each stamped after the last,
+   * all together or none. For a change that is several records, such as a
+   * reorder, or that writes a record only when something differs.
+   */
+  writeMany<Record extends ChangeRecord = ChangeRecord>(): WriteMany<Record>;
+};
 
-/** Holds a Change Log's save state and tells subscribers when it changes. */
-export function createSaveStateStore() {
-  let state = SAVED;
-  const listeners = new Set<() => void>();
-  return {
-    get: () => state,
-    set(next: SaveState) {
-      if (JSON.stringify(next) === JSON.stringify(state)) return;
-      state = next;
-      for (const listener of listeners) listener();
-    },
-    subscribe(listener: () => void) {
-      const entry = () => listener();
-      listeners.add(entry);
-      return () => {
-        listeners.delete(entry);
-      };
-    },
+/**
+ * Reads the records as they stand and returns what a write is built from. It
+ * refuses the write by throwing, with the reason.
+ */
+export type Check<Found> = (records: readonly ChangeRecord[]) => Found;
+
+/**
+ * A record still to be written: what it changes and how. Over a union of
+ * record types it is one of them, so a type is never paired with another's
+ * payload.
+ */
+export type NewChangeRecord<Record extends ChangeRecord = ChangeRecord> =
+  Record extends ChangeRecord
+    ? Pick<Record, "subjectId" | "type" | "payload">
+    : never;
+
+export type Write<Type extends string, Payload> = {
+  ensure<Found>(check: Check<Found>): {
+    commit(payload: (found: Found) => Payload): ChangeRecord<Type, Payload>;
   };
+};
+
+export type WriteMany<Record extends ChangeRecord> = {
+  ensure<Found>(check: Check<Found>): {
+    commit(
+      records: (found: Found) => readonly NewChangeRecord<Record>[],
+    ): ChangeRecord<Record["type"], Record["payload"]>[];
+  };
+};
+
+/** This device's DeviceChangeLog over `changeLog`. */
+export function createDeviceChangeLog(
+  changeLog: ChangeLog,
+  deviceId: string,
+  { now = Date.now }: { now?: () => number } = {},
+): DeviceChangeLog {
+  return {
+    readAll: changeLog.readAll,
+    subscribe: changeLog.subscribe,
+    saveState: changeLog.saveState,
+    subscribeToSaveState: changeLog.subscribeToSaveState,
+    write: (subjectId, type) => ({
+      ensure: (check) => ({
+        commit(payload) {
+          const records = changeLog.readAll();
+          const found = check(records);
+          const record = {
+            id: crypto.randomUUID(),
+            subjectId,
+            deviceId,
+            timestamp: nextTimestamp(records.at(-1)?.timestamp, now()),
+            type,
+            payload: payload(found),
+          };
+          changeLog.append([record]);
+          return record;
+        },
+      }),
+    }),
+    writeAt: (timestamp, subjectId, type) => ({
+      ensure: (check) => ({
+        commit(payload) {
+          const found = check(changeLog.readAll());
+          const record = {
+            id: crypto.randomUUID(),
+            subjectId,
+            deviceId,
+            timestamp,
+            writtenAt: now(),
+            type,
+            payload: payload(found),
+          };
+          changeLog.append([record]);
+          return record;
+        },
+      }),
+    }),
+    writeMany: () => ({
+      ensure: (check) => ({
+        commit(build) {
+          const records = changeLog.readAll();
+          const found = check(records);
+          let last = records.at(-1)?.timestamp;
+          const added = build(found).map(({ subjectId, type, payload }) => {
+            last = nextTimestamp(last, now());
+            return {
+              id: crypto.randomUUID(),
+              subjectId,
+              deviceId,
+              timestamp: last,
+              type,
+              payload,
+            };
+          });
+          if (added.length > 0) changeLog.append(added);
+          return added;
+        },
+      }),
+    }),
+  };
+}
+
+/** A hybrid logical clock reading: wall-clock milliseconds, then a counter for ties. */
+export type Timestamp = { wallTime: number; counter: number };
+
+/**
+ * The hybrid logical clock step: a new record is stamped after every record
+ * this device has seen, even when another device's clock runs ahead of ours.
+ */
+function nextTimestamp(
+  newestSeen: Timestamp | undefined,
+  wallTime: number,
+): Timestamp {
+  if (!newestSeen || wallTime > newestSeen.wallTime) {
+    return { wallTime, counter: 0 };
+  }
+  return { wallTime: newestSeen.wallTime, counter: newestSeen.counter + 1 };
+}
+
+/** Orders records oldest first: by timestamp, then device id, so every device agrees. */
+export function compareRecords(a: ChangeRecord, b: ChangeRecord): number {
+  return (
+    a.timestamp.wallTime - b.timestamp.wallTime ||
+    a.timestamp.counter - b.timestamp.counter ||
+    compareStrings(a.deviceId, b.deviceId) ||
+    compareStrings(a.id, b.id)
+  );
+}
+
+function compareStrings(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /** What `merge` should add: each id once, leaving out ids already held. */
@@ -77,16 +209,6 @@ export function recordsToMerge(
     seen.add(id);
     return true;
   });
-}
-
-/** Orders records oldest first: by timestamp, then device id, so every device agrees. */
-export function compareRecords(a: ChangeRecord, b: ChangeRecord): number {
-  return (
-    a.timestamp.wallTime - b.timestamp.wallTime ||
-    a.timestamp.counter - b.timestamp.counter ||
-    compareStrings(a.deviceId, b.deviceId) ||
-    compareStrings(a.id, b.id)
-  );
 }
 
 /**
@@ -118,8 +240,57 @@ export function deletedSubjects(
   return deleted;
 }
 
-function compareStrings(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
+/**
+ * Wraps a Replay of every record so it runs once per Change Log snapshot:
+ * `readAll` returns the same array until the next append, so every query
+ * reading the same records shares one result.
+ */
+export function perSnapshot<Result>(
+  replay: (records: readonly ChangeRecord[]) => Result,
+): (records: readonly ChangeRecord[]) => Result {
+  const results = new WeakMap<readonly ChangeRecord[], Result>();
+  return (records) => {
+    if (results.has(records)) return results.get(records) as Result;
+    const result = replay(records);
+    results.set(records, result);
+    return result;
+  };
+}
+
+/**
+ * Whether every change has reached where this Change Log keeps them. The same
+ * object comes back until the state changes.
+ */
+export type SaveState =
+  | { status: "saved" }
+  | { status: "saving" }
+  | { status: "unsaved"; reason: UnsavedReason };
+
+/** Why a change isn't saved yet: the folder's access lapsed, the folder is gone, or the write failed some other way. */
+export type UnsavedReason = "access-lapsed" | "folder-gone" | "write-failed";
+
+export const SAVED: SaveState = { status: "saved" };
+export const SAVING: SaveState = { status: "saving" };
+
+/** Holds a Change Log's save state and tells subscribers when it changes. */
+export function createSaveStateStore() {
+  let state = SAVED;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => state,
+    set(next: SaveState) {
+      if (JSON.stringify(next) === JSON.stringify(state)) return;
+      state = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe(listener: () => void) {
+      const entry = () => listener();
+      listeners.add(entry);
+      return () => {
+        listeners.delete(entry);
+      };
+    },
+  };
 }
 
 export function createInMemoryChangeLog(): ChangeLog & {
@@ -151,93 +322,5 @@ export function createInMemoryChangeLog(): ChangeLog & {
     // Nothing to wait for: a change is as saved as it will ever be.
     saveState: () => SAVED,
     subscribeToSaveState: () => () => {},
-  };
-}
-
-export type ChangeLogWriter = {
-  readonly changeLog: ChangeLog;
-  write<Type extends string, Payload>(
-    subjectId: string,
-    type: Type,
-    payload: Payload,
-  ): ChangeRecord<Type, Payload>;
-  /**
-   * Writes a new record at the place an earlier one holds in the Change Log, by
-   * taking its timestamp. For Undo, when what a record means depends on what came
-   * before it and it has to come back to where it was: a Replay of the log
-   * then meets it there, on every device.
-   */
-  writeAt<Type extends string, Payload>(
-    timestamp: Timestamp,
-    subjectId: string,
-    type: Type,
-    payload: Payload,
-  ): ChangeRecord<Type, Payload>;
-};
-
-/** Appends records made on this device to the Change Log. */
-export function createChangeLogWriter(
-  changeLog: ChangeLog,
-  deviceId: string,
-  { now = Date.now }: { now?: () => number } = {},
-): ChangeLogWriter {
-  return {
-    changeLog,
-    write(subjectId, type, payload) {
-      const record = {
-        id: crypto.randomUUID(),
-        subjectId,
-        deviceId,
-        timestamp: nextTimestamp(changeLog.readAll().at(-1)?.timestamp, now()),
-        type,
-        payload,
-      };
-      changeLog.append([record]);
-      return record;
-    },
-    writeAt(timestamp, subjectId, type, payload) {
-      const record = {
-        id: crypto.randomUUID(),
-        subjectId,
-        deviceId,
-        timestamp,
-        writtenAt: now(),
-        type,
-        payload,
-      };
-      changeLog.append([record]);
-      return record;
-    },
-  };
-}
-
-/**
- * The hybrid logical clock step: a new record is stamped after every record
- * this device has seen, even when another device's clock runs ahead of ours.
- */
-function nextTimestamp(
-  newestSeen: Timestamp | undefined,
-  wallTime: number,
-): Timestamp {
-  if (!newestSeen || wallTime > newestSeen.wallTime) {
-    return { wallTime, counter: 0 };
-  }
-  return { wallTime: newestSeen.wallTime, counter: newestSeen.counter + 1 };
-}
-
-/**
- * Wraps a Replay of every record so it runs once per Change Log snapshot:
- * `readAll` returns the same array until the next append, so every query
- * reading the same records shares one result.
- */
-export function perSnapshot<Result>(
-  replay: (records: readonly ChangeRecord[]) => Result,
-): (records: readonly ChangeRecord[]) => Result {
-  const results = new WeakMap<readonly ChangeRecord[], Result>();
-  return (records) => {
-    if (results.has(records)) return results.get(records) as Result;
-    const result = replay(records);
-    results.set(records, result);
-    return result;
   };
 }

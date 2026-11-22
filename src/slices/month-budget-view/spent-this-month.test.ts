@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  type ChangeLogWriter,
-  createChangeLogWriter,
+  createDeviceChangeLog,
   createInMemoryChangeLog,
+  type DeviceChangeLog,
 } from "../../kernel/change-log";
 import { money } from "../../kernel/money";
 import type { Month } from "../../kernel/month";
+import { seedRecord } from "../../kernel/seed-record";
 import type { AccountOpened } from "../accounts/records";
 import { type AssignmentSet, assignmentSubject } from "../assignments/records";
 import type { BudgetCreated } from "../budget-setup/records";
@@ -27,25 +28,25 @@ const september: Month = "2026-09";
 /** A Budget in USD with an Everyday and a Savings Group, seeded with the records other slices publish. */
 function budget() {
   const changeLog = createInMemoryChangeLog();
-  const writer = createChangeLogWriter(changeLog, "this-device");
-  seed<BudgetCreated>(writer, "budget", "BudgetCreated", {
+  const log = createDeviceChangeLog(changeLog, "this-device");
+  seed<BudgetCreated>(log, "budget", "BudgetCreated", {
     version: 1,
     currency: "USD",
   });
-  seed<AccountOpened>(writer, "checking", "AccountOpened", {
+  seed<AccountOpened>(log, "checking", "AccountOpened", {
     version: 1,
     name: "Checking",
     kind: "checking",
     openingBalance: money(500_000, "USD"),
   });
   const group = (id: string, position: number) =>
-    seed<CategoryGroupCreated>(writer, id, "CategoryGroupCreated", {
+    seed<CategoryGroupCreated>(log, id, "CategoryGroupCreated", {
       version: 1,
       name: id,
       position,
     });
   const category = (id: string, groupId: string) =>
-    seed<CategoryCreated>(writer, id, "CategoryCreated", {
+    seed<CategoryCreated>(log, id, "CategoryCreated", {
       version: 1,
       groupId,
       name: id,
@@ -59,7 +60,7 @@ function budget() {
   return {
     assign(categoryId: string, of: Month, amount: number) {
       seed<AssignmentSet>(
-        writer,
+        log,
         assignmentSubject(categoryId, of),
         "AssignmentSet",
         {
@@ -73,7 +74,7 @@ function budget() {
     /** Records a Transaction: a negative amount goes out, a positive one comes in. */
     record(date: string, amount: number, categoryId?: string) {
       seed<TransactionRecorded>(
-        writer,
+        log,
         crypto.randomUUID(),
         "TransactionRecorded",
         {
@@ -87,21 +88,21 @@ function budget() {
     },
     leaveOut(groupId: string) {
       seed<CategoryGroupSpentThisMonthSet>(
-        writer,
+        log,
         groupId,
         "CategoryGroupSpentThisMonthSet",
         { version: 1, leftOut: true },
       );
     },
     move(categoryId: string, groupId: string) {
-      seed<CategoryPlaced>(writer, categoryId, "CategoryPlaced", {
+      seed<CategoryPlaced>(log, categoryId, "CategoryPlaced", {
         version: 1,
         groupId,
         position: 0,
       });
     },
     hide(categoryId: string) {
-      seed<CategoryHidden>(writer, categoryId, "CategoryHidden", {
+      seed<CategoryHidden>(log, categoryId, "CategoryHidden", {
         version: 1,
       });
     },
@@ -124,12 +125,12 @@ function budget() {
 }
 
 function seed<Record extends { type: string; payload: unknown }>(
-  writer: ChangeLogWriter,
+  log: DeviceChangeLog,
   subjectId: string,
   type: Record["type"],
   payload: Record["payload"],
 ) {
-  writer.write(subjectId, type, payload);
+  seedRecord(log, subjectId, type, payload);
 }
 
 describe("Spent this Month", () => {

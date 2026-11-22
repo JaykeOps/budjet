@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { type Currency, formatMoney, type Money } from "./kernel/money";
-import { useChangeLogWriter } from "./kernel/use-change-log-query";
+import { useDeviceChangeLog } from "./kernel/use-change-log-query";
 import { placeAddress } from "./place-in-url";
 import { isDesktop } from "./RecordingRow";
 import {
@@ -45,7 +45,7 @@ export function AccountsPlace({
   recordRow: ReactNode;
   onTransferInRow: (draft: TransferDraft) => void;
 }) {
-  const writer = useChangeLogWriter();
+  const log = useDeviceChangeLog();
   const toast = useToast();
   const commands = useRecordCommands();
   const historyChanges = useHistoryChanges();
@@ -59,17 +59,17 @@ export function AccountsPlace({
 
   const check = {
     onMatches({ id, name, balance }: Account) {
-      const recordId = redeclareBalance(writer, id, { balance });
+      const recordId = redeclareBalance(log, id, { balance });
       toast({
         text: `${name} matches your bank`,
-        onUndo: () => deleteRedeclaredBalance(writer, recordId),
+        onUndo: () => deleteRedeclaredBalance(log, recordId),
       });
     },
     onUpdate({ id, name }: Account, balance: Money) {
-      const recordId = redeclareBalance(writer, id, { balance });
+      const recordId = redeclareBalance(log, id, { balance });
       toast({
         text: `${name} is now ${formatMoney(balance)}`,
-        onUndo: () => deleteRedeclaredBalance(writer, recordId),
+        onUndo: () => deleteRedeclaredBalance(log, recordId),
       });
     },
   };
@@ -102,14 +102,14 @@ export function AccountsPlace({
             )
           }
           onRename={({ id, name: before }, name) => {
-            renameAccount(writer, id, { name });
+            renameAccount(log, id, { name });
             toast({
               text: `Renamed to ${name.trim()}`,
-              onUndo: () => renameAccount(writer, id, { name: before }),
+              onUndo: () => renameAccount(log, id, { name: before }),
             });
           }}
           onClose={({ id, name }) => {
-            closeAccount(writer, id);
+            closeAccount(log, id);
             toast({ text: `Closed ${name}` });
           }}
           {...check}
