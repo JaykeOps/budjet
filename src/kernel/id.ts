@@ -41,3 +41,5 @@ export type TransferId = Id<"Transfer">;
 /** A Category in one Month, which its Assignment and Take-back records change. */
 export type AssignmentId = Id<"Assignment">;
 export type BudgetId = Id<"Budget">;
+/** A Change Record's own id, apart from the subject it changes. */
+export type RecordId = Id<"ChangeRecord">;

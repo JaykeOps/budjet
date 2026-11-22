@@ -4,7 +4,12 @@ import {
   createDeviceChangeLog,
   createInMemoryChangeLog,
 } from "../../kernel/change-log";
-import { type AccountId, asId, type CategoryId } from "../../kernel/id";
+import {
+  type AccountId,
+  asId,
+  type CategoryId,
+  type RecordId,
+} from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { seedRecord } from "../../kernel/seed-record";
 import type { BudgetCreated } from "../budget-setup/records";
@@ -639,7 +644,8 @@ describe("Accounts", () => {
     it("can't delete an Opening Balance", () => {
       const { log, checking, account, openingRecord } = checkingAccount();
 
-      for (const id of [openingRecord(), checking]) {
+      // Neither is a re-declared balance: an Opening Balance, and an Account.
+      for (const id of [openingRecord(), checking].map(asId<RecordId>)) {
         expect(() => deleteRedeclaredBalance(log, id)).toThrow(RangeError);
       }
       expect(account()?.balance).toEqual(money(100000, "USD"));

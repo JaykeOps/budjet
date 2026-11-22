@@ -3,7 +3,7 @@
  * versioned contracts, so changing one is a cross-slice change (docs/adr/0005).
  */
 import type { ChangeRecord } from "../../kernel/change-log";
-import type { AccountId } from "../../kernel/id";
+import type { AccountId, RecordId } from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 
 /** Where an Account's money sits. Credit cards and loans are not Accounts. */
@@ -74,7 +74,8 @@ export function isBalanceRedeclared(
  */
 export type RedeclaredBalanceDeleted = ChangeRecord<
   "RedeclaredBalanceDeleted",
-  { version: 1 }
+  { version: 1 },
+  RecordId
 >;
 
 export function isRedeclaredBalanceDeleted(

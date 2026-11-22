@@ -6,6 +6,7 @@ import {
   createInMemoryChangeLog,
 } from "./change-log";
 import { openDataFolderChangeLog } from "./data-folder-change-log";
+import { asId, type RecordId } from "./id";
 import { createInMemoryFolder } from "./in-memory-folder";
 import {
   openIndexedDbChangeLog,
@@ -366,7 +367,7 @@ function openDatabase(indexedDB: IDBFactory): Promise<IDBDatabase> {
 
 function record(id: string, wallTime: number, payload: unknown): ChangeRecord {
   return {
-    id,
+    id: asId<RecordId>(id),
     subjectId: "thing",
     deviceId: "phone",
     timestamp: { wallTime, counter: 0 },

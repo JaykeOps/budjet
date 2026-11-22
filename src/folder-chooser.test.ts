@@ -7,6 +7,7 @@ import {
 } from "./folder-chooser";
 import type { ChangeRecord } from "./kernel/change-log";
 import { openDataFolderChangeLog } from "./kernel/data-folder-change-log";
+import { asId, type RecordId } from "./kernel/id";
 import {
   createInMemoryFolder,
   type InMemoryFolder,
@@ -17,7 +18,7 @@ const NOW = Date.UTC(2026, 10, 1);
 
 function record(id: string, type = "Named", subjectId = "thing") {
   return {
-    id,
+    id: asId<RecordId>(id),
     subjectId,
     deviceId: "phone",
     timestamp: { wallTime: NOW, counter: 0 },

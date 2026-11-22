@@ -2,13 +2,14 @@
  * The Change Log: the append-only store of change records and the only home of
  * domain state (docs/adr/0004, docs/adr/0005).
  */
+import { newId, type RecordId } from "./id";
 
 export type ChangeRecord<
   Type extends string = string,
   Payload = unknown,
   Subject extends string = string,
 > = {
-  id: string;
+  id: RecordId;
   /** The id of the thing this record changes. Each record type says what kind. */
   subjectId: Subject;
   deviceId: string;
@@ -118,7 +119,7 @@ export function createDeviceChangeLog(
           const records = changeLog.readAll();
           const found = check(records);
           const record = {
-            id: crypto.randomUUID(),
+            id: newId<RecordId>(),
             subjectId,
             deviceId,
             timestamp: nextTimestamp(records.at(-1)?.timestamp, now()),
@@ -135,7 +136,7 @@ export function createDeviceChangeLog(
         commit(payload) {
           const found = check(changeLog.readAll());
           const record = {
-            id: crypto.randomUUID(),
+            id: newId<RecordId>(),
             subjectId,
             deviceId,
             timestamp,
@@ -157,7 +158,7 @@ export function createDeviceChangeLog(
           const added = build(found).map(({ subjectId, type, payload }) => {
             last = nextTimestamp(last, now());
             return {
-              id: crypto.randomUUID(),
+              id: newId<RecordId>(),
               subjectId,
               deviceId,
               timestamp: last,

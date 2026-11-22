@@ -12,6 +12,7 @@ import {
   timeBoxed,
   tryFolderOnReturn,
 } from "./folder-on-return";
+import { asId, type RecordId } from "./id";
 import { createInMemoryFolder, type InMemoryFolder } from "./in-memory-folder";
 
 /** A remembered folder that fails with each of these in turn, then is fine. */
@@ -165,7 +166,7 @@ describe("asking to open after access lapsed", () => {
 
 describe("reconnecting while the Budget is open", () => {
   const held = {
-    id: "a",
+    id: asId<RecordId>("a"),
     subjectId: "thing",
     deviceId: "phone",
     timestamp: { wallTime: Date.UTC(2026, 9, 31), counter: 0 },

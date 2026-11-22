@@ -10,7 +10,7 @@ import {
   type DataFolderChangeLog,
   openDataFolderChangeLog,
 } from "./data-folder-change-log";
-import { asId, type BudgetId } from "./id";
+import { asId, type BudgetId, type RecordId } from "./id";
 import { createInMemoryFolder, type InMemoryFolder } from "./in-memory-folder";
 import { rememberedFolderHandle } from "./indexed-db-change-log";
 
@@ -62,7 +62,7 @@ const DAY = 24 * 60 * 60 * 1000;
 
 function record(id: string, wallTime = OCT_31, deviceId = "phone") {
   return {
-    id,
+    id: asId<RecordId>(id),
     subjectId: "thing",
     deviceId,
     timestamp: { wallTime, counter: 0 },
@@ -1224,7 +1224,7 @@ describe("a background check finding a different Budget", () => {
   it("merges this Budget's own BudgetCreated from another device as usual", async () => {
     const { changeLog, folder, onTwoBudgets } = await aBudgetInItsFolder();
     deliver(folder, "other-device", [
-      { ...budgetCreated("mine"), id: "created-again" },
+      { ...budgetCreated("mine"), id: asId<RecordId>("created-again") },
       record("from-other-device", NOV_1, "laptop"),
     ]);
 

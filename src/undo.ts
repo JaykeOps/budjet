@@ -6,7 +6,12 @@
  */
 import { useMemo } from "react";
 import type { DeviceChangeLog } from "./kernel/change-log";
-import type { CategoryId, TransactionId, TransferId } from "./kernel/id";
+import type {
+  CategoryId,
+  RecordId,
+  TransactionId,
+  TransferId,
+} from "./kernel/id";
 import { formatMoney, money } from "./kernel/money";
 import { type Month, monthNameAlone, previousMonth } from "./kernel/month";
 import { useDeviceChangeLog } from "./kernel/use-change-log-query";
@@ -114,7 +119,7 @@ export function deleteTransferWithUndo(
 /** Undoing writes the same balance, with a fresh id, in the same place in the Change Log. */
 export function deleteRedeclaredBalanceWithUndo(
   log: DeviceChangeLog,
-  recordId: string,
+  recordId: RecordId,
 ): Undo {
   deleteRedeclaredBalance(log, recordId);
   return () => {
@@ -251,7 +256,7 @@ export function useHistoryChanges() {
           onUndo: deleteTransferWithUndo(log, id),
         });
       },
-      onDeleteRedeclaredBalance(recordId: string, what: string) {
+      onDeleteRedeclaredBalance(recordId: RecordId, what: string) {
         toast({
           text: `${what} deleted`,
           onUndo: deleteRedeclaredBalanceWithUndo(log, recordId),

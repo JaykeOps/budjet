@@ -1,5 +1,5 @@
 import type { ChangeRecord, DeviceChangeLog } from "../../kernel/change-log";
-import { type AccountId, newId } from "../../kernel/id";
+import { type AccountId, newId, type RecordId } from "../../kernel/id";
 import { formatMoney, type Money } from "../../kernel/money";
 import { isBudgetCreated } from "../budget-setup/records";
 import { type Account, accounts, adjustments, balanceChecks } from "./queries";
@@ -51,7 +51,7 @@ export function redeclareBalance(
   log: DeviceChangeLog,
   accountId: AccountId,
   { balance }: { balance: Money },
-): string {
+): RecordId {
   return log
     .write<BalanceRedeclared["type"], BalanceRedeclared["payload"]>(
       accountId,
@@ -77,7 +77,7 @@ export function redeclareBalance(
  */
 export function deleteRedeclaredBalance(
   log: DeviceChangeLog,
-  recordId: string,
+  recordId: RecordId,
 ): void {
   log
     .write<
@@ -107,8 +107,8 @@ export function deleteRedeclaredBalance(
  */
 export function restoreRedeclaredBalance(
   log: DeviceChangeLog,
-  recordId: string,
-): string {
+  recordId: RecordId,
+): RecordId {
   const missing = () =>
     new RangeError(`No deleted re-declared balance ${recordId}`);
   // Read first to find where the balance goes back to; `ensure` then checks.
