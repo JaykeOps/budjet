@@ -3,7 +3,7 @@ import {
   deletedSubjects,
   perSnapshot,
 } from "../../kernel/change-log";
-import type { AccountId } from "../../kernel/id";
+import type { AccountId, RecordId } from "../../kernel/id";
 import { addMoney, type Money, money } from "../../kernel/money";
 import { isBudgetCreated } from "../budget-setup/records";
 import {
@@ -42,7 +42,7 @@ export type Account = {
 /** The money a re-declared balance added to (above zero) or took from an Account. */
 export type Adjustment = {
   /** The id of the record that re-declared the balance. */
-  id: string;
+  id: RecordId;
   accountId: AccountId;
   /** The day the balance was re-declared, on this device's calendar, "YYYY-MM-DD". */
   date: string;
@@ -64,7 +64,7 @@ export type OpeningBalance = {
 /** A re-declared balance equal to the balance just before it. Nothing moved. */
 export type BalanceCheck = {
   /** The id of the record that re-declared the balance. */
-  id: string;
+  id: RecordId;
   accountId: AccountId;
   /** The day the balance was re-declared, on this device's calendar, "YYYY-MM-DD". */
   date: string;

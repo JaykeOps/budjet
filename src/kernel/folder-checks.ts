@@ -98,7 +98,10 @@ function parseRecord(line: string): ChangeRecord | undefined {
   }
 }
 
-/** Checked because a cut-off line can still be valid JSON, and folds trust every record. */
+/**
+ * Checked because a cut-off line can still be valid JSON, and Replays trust
+ * every record. It's also where a record's ids are trusted to be of their kinds.
+ */
 function isRecord(value: Partial<ChangeRecord> | null): value is ChangeRecord {
   return (
     typeof value?.id === "string" &&

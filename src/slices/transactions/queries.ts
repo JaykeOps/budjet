@@ -1,5 +1,10 @@
 import type { ChangeRecord } from "../../kernel/change-log";
-import type { AccountId, CategoryId, TransferId } from "../../kernel/id";
+import type {
+  AccountId,
+  CategoryId,
+  RecordId,
+  TransferId,
+} from "../../kernel/id";
 import type { Money } from "../../kernel/money";
 import {
   accounts,
@@ -49,7 +54,7 @@ export type TransferEntry = {
 export type AdjustmentEntry = {
   kind: "adjustment";
   /** The id of the record that re-declared the balance. */
-  id: string;
+  id: RecordId;
   accountId: AccountId;
   /** The day the balance was re-declared. */
   date: string;
@@ -62,7 +67,7 @@ export type AdjustmentEntry = {
 export type BalanceCheckEntry = {
   kind: "balance-check";
   /** The id of the record that re-declared the balance. */
-  id: string;
+  id: RecordId;
   accountId: AccountId;
   /** The day the balance was re-declared. */
   date: string;

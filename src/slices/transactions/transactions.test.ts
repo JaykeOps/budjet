@@ -9,6 +9,7 @@ import {
   asId,
   type CategoryGroupId,
   type CategoryId,
+  type RecordId,
   type TransactionId,
 } from "../../kernel/id";
 import { money } from "../../kernel/money";
@@ -292,7 +293,7 @@ describe("Transactions", () => {
   describe("when two devices change the same Transaction, the most recent change wins, unless it's deleted", () => {
     function edit(deviceId: string, wallTime: number): TransactionEdited {
       return {
-        id: `edit-${deviceId}`,
+        id: asId<RecordId>(`edit-${deviceId}`),
         subjectId: lunch,
         deviceId,
         timestamp: { wallTime, counter: 0 },
@@ -309,7 +310,7 @@ describe("Transactions", () => {
     }
     function deletion(deviceId: string, wallTime: number): TransactionDeleted {
       return {
-        id: `delete-${deviceId}`,
+        id: asId<RecordId>(`delete-${deviceId}`),
         subjectId: lunch,
         deviceId,
         timestamp: { wallTime, counter: 0 },
@@ -339,7 +340,7 @@ describe("Transactions", () => {
         const { changeLog, transactions } = budget();
         changeLog.append([
           {
-            id: "recorded",
+            id: asId<RecordId>("recorded"),
             subjectId: "lunch",
             deviceId: "this-device",
             timestamp: { wallTime: 1_000, counter: 0 },

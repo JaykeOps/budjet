@@ -1,6 +1,11 @@
 import { expect, it } from "vitest";
 import type { ChangeRecord } from "../../kernel/change-log";
-import { type AccountId, asId, type CategoryId } from "../../kernel/id";
+import {
+  type AccountId,
+  asId,
+  type CategoryId,
+  type RecordId,
+} from "../../kernel/id";
 import { money } from "../../kernel/money";
 import { type Month, month, nextMonth } from "../../kernel/month";
 import type { AccountOpened } from "../accounts/records";
@@ -33,7 +38,7 @@ function tenYearsOfRecords(): ChangeRecord[] {
   };
   const write = (subjectId: string, type: string, payload: unknown) => {
     records.push({
-      id: `record-${records.length}`,
+      id: asId<RecordId>(`record-${records.length}`),
       subjectId,
       deviceId: "this-device",
       timestamp: { wallTime: wallTime++, counter: 0 },

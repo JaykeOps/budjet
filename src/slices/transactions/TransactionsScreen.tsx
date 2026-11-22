@@ -1,5 +1,10 @@
 import { type ReactNode, useId, useState } from "react";
-import type { AccountId, TransactionId, TransferId } from "../../kernel/id";
+import type {
+  AccountId,
+  RecordId,
+  TransactionId,
+  TransferId,
+} from "../../kernel/id";
 import type { Currency } from "../../kernel/money";
 import { EmptyState } from "../../ui/EmptyState";
 import type { MenuAction } from "../../ui/Menu";
@@ -21,7 +26,7 @@ type HistoryActions = {
   onEdit: (id: TransactionId, input: TransactionInput) => void;
   onDelete: (id: TransactionId) => void;
   /** `what` names it for a toast: "Adjustment" or "Balance check". */
-  onDeleteRedeclaredBalance: (recordId: string, what: string) => void;
+  onDeleteRedeclaredBalance: (recordId: RecordId, what: string) => void;
   onEditTransfer: (id: TransferId, input: TransferInput) => void;
   onDeleteTransfer: (id: TransferId) => void;
 };
@@ -181,11 +186,17 @@ function useRowChanges({
         ? id === entry.fromAccountId || id === entry.toAccountId
         : id === entry.accountId,
     );
-  const deleteRedeclared = (entry: TransactionListEntry) =>
+  const deleteRedeclared = (entry: TransactionListEntry) => {
+    if (entry.kind !== "adjustment" && entry.kind !== "balance-check") {
+      throw new RangeError(
+        "Only an Adjustment or Balance check is re-declared",
+      );
+    }
     onDeleteRedeclaredBalance(
       entry.id,
       entry.kind === "adjustment" ? "Adjustment" : "Balance check",
     );
+  };
 
   function open(entry: TransactionListEntry) {
     if (entry.kind === "transfer" && !closedAccount(entry)) {
